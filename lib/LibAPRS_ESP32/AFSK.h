@@ -158,7 +158,7 @@ inline static uint8_t sinSample(uint16_t i)
 
 #define CPU_FREQ F_CPU
 
-#define CONFIG_AFSK_RX_BUFLEN 1000
+#define CONFIG_AFSK_RX_BUFLEN 350
 #define CONFIG_AFSK_TX_BUFLEN 350
 #define CONFIG_AFSK_RXTIMEOUT 0
 #define CONFIG_AFSK_PREAMBLE_LEN 150UL

@@ -57,7 +57,7 @@ bool aprsUpdate = false;
 boolean gotPacket = false;
 AX25Msg incomingPacket;
 
-cppQueue PacketBuffer(sizeof(AX25Msg), 10, IMPLEMENTATION); // Instantiate queue
+cppQueue PacketBuffer(sizeof(AX25Msg), 5, IMPLEMENTATION); // Instantiate queue
 
 statusType status;
 digiTLMType digiTLM;
@@ -79,7 +79,6 @@ IPAddress gateway(192, 168, 4, 254);
 IPAddress subnet(255, 255, 255, 0);
 
 int pkgTNC_count = 0;
-void TNC2Raw();
 
 String getValue(String data, char separator, int index)
 {
@@ -475,7 +474,7 @@ void setup()
     xTaskCreatePinnedToCore(
         taskAPRS,        /* Function to implement the task */
         "taskAPRS",      /* Name of the task */
-        16384,           /* Stack size in words */
+        8192,           /* Stack size in words */
         NULL,            /* Task input parameter */
         1,               /* Priority of the task */
         &taskAPRSHandle, /* Task handle. */
@@ -485,7 +484,7 @@ void setup()
     xTaskCreatePinnedToCore(
         taskNetwork,        /* Function to implement the task */
         "taskNetwork",      /* Name of the task */
-        32768,              /* Stack size in words */
+        16384,              /* Stack size in words */
         NULL,               /* Task input parameter */
         1,                  /* Priority of the task */
         &taskNetworkHandle, /* Task handle. */
@@ -583,16 +582,17 @@ int processPacket(String &tnc2)
     return tnc2.length();
 }
 
+bool AFSKInitAct = false;
 void loop()
 {
     vTaskDelay(1 / portTICK_PERIOD_MS);
-    serviceHandle();
-    AFSK_Poll();
+    if (AFSKInitAct == true)
+    {
+        AFSK_Poll();
+    }
 }
 
 long sendTimer = 0;
-bool firstAFSK_init = false;
-bool AFSKInitAct = false;
 
 void taskAPRS(void *pvParameters)
 {
@@ -600,16 +600,15 @@ void taskAPRS(void *pvParameters)
     char *raw;
     char *str;
     Serial.println("Task APRS has been start");
-    firstAFSK_init = true;
     PacketBuffer.clean();
 
-    AFSKInitAct = true;
     APRS_init();
     APRS_setCallsign(config.aprs_mycall, config.aprs_ssid);
     APRS_setPath1(config.aprs_path, 1);
     APRS_setPreamble(300);
     APRS_setTail(0);
     sendTimer = millis() - (config.aprs_beacon * 1000) + 30000;
+    AFSKInitAct = true;
     for (;;)
     {
         long now = millis();
@@ -795,7 +794,8 @@ void taskNetwork(void *pvParameters)
     for (;;)
     {
         // wdtNetworkTimer = millis();
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        vTaskDelay(1 / portTICK_PERIOD_MS);
+        serviceHandle();
         if (config.wifi_mode == WIFI_AP_STA_FIX || config.wifi_mode == WIFI_STA_FIX)
         {
             if (WiFi.status() != WL_CONNECTED)
@@ -842,16 +842,13 @@ void taskNetwork(void *pvParameters)
             }
             else
             {
-                if (firstAFSK_init == false)
-                    firstAFSK_init = true;
-
                 if (millis() > NTP_Timeout)
                 {
                     NTP_Timeout = millis() + 86400000;
                     // Serial.println("Config NTP");
                     // setSyncProvider(getNtpTime);
                     Serial.println("Contacting Time Server");
-                    configTime(3600 * timeZone, 0, "aprs.dprns.com", "1.pool.ntp.org");
+                    configTime(3600 * timeZone, 0, "203.150.19.26", "1.pool.ntp.org");
                     vTaskDelay(3000 / portTICK_PERIOD_MS);
                     // if (systemUptime == 0)
                     //{

@@ -57,7 +57,6 @@ uint8_t CountOnesFromInteger(uint8_t value)
 #define IMPLEMENTATION FIFO
 
 #ifndef I2S_INTERNAL
-// cppQueue pcmq(sizeof(uint8_t), 8000, IMPLEMENTATION); // Instantiate queue
 cppQueue adcq(sizeof(int8_t), 19200, IMPLEMENTATION); // Instantiate queue
 #endif
 
