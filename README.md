@@ -81,12 +81,15 @@ Solder jumper is needed depending on a transceiver.
 |HT Mic Cable|-|SPK|PTT|GND|MIC|-|
 
 for Alinco DR-135(DB9)
+
 ![Alinco](image/Alinco_Pinout.png)
 
 for ICOM IC2200(RJ45)
+
 ![IC2200](image/IC2200_Pinout.png)
 
 for Yaesu FT-2800(RJ11)
+
 ![FT2800](image/FT2800_Pinout.png)
 
 for Handheld
@@ -100,7 +103,7 @@ for Handheld
 - 2.Download firmware and open the program ESP32 DOWNLOAD TOOL, set it in the firmware upload program, set the firmware to ESP32IGate_Vxx.bin, location 0x10000 and partitions.bin at 0x8000 and bootloader.bin at 0x1000 and boot.bin at 0xe000, if not loaded, connect GPIO0 cable to GND, press START button finished, press power button or reset (red) again.
 - 3.Then go to WiFi AP SSID: ESP32IGate and open a browser to the website. http://192.168.4.1 password: aprsthnetwork Can be fixed Or turn on your Wi-Fi router.
 
-![ESP32Tool(image/ESP32Tool.png)
+![ESP32Tool](image/ESP32Tool.png)
 
 ## ESP32 Flash Download Tools
 https://www.espressif.com/en/support/download/other-tools

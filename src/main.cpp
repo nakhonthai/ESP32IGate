@@ -290,74 +290,6 @@ void aprs_msg_callback(struct AX25Msg *msg)
     PacketBuffer.push(&pkg); //ใส่แพ็จเก็จจาก TNC ลงคิวบัพเฟอร์
 }
 
-// char *srccall;
-// char *dstcall;
-// char *datapayload;
-// char packetchar[500];
-
-// void TNC2Raw()
-// {
-//     boolean tcpippacket = false;
-//     srccall = incomingPacket.src.call;
-//     dstcall = incomingPacket.dst.call;
-//     char *datastr = (char *)incomingPacket.info;
-//     datastr[incomingPacket.len] = 0;
-//     if (datastr[0] != 0)
-//     {
-//         // Fix for digirepeated TCPIP APRS.IS Packets
-//         if (datastr[0] == '}')
-//         {
-//             tcpippacket = true;
-//         }
-//         datapayload = datastr;
-//         char sssid[10];
-//         itoa(incomingPacket.src.ssid, sssid, 10);
-//         char dssid[10];
-//         itoa(incomingPacket.dst.ssid, dssid, 10);
-//         memset(packetchar, 0, sizeof(packetchar));
-//         packetchar[0] = 0;
-//         strcat(packetchar, srccall);
-//         strcat(packetchar, "-");
-//         strcat(packetchar, sssid);
-//         strcat(packetchar, ">");
-//         strcat(packetchar, dstcall);
-//         strcat(packetchar, "-");
-//         strcat(packetchar, dssid);
-//         for (int i = 0; i < incomingPacket.rpt_count; i++)
-//         {
-//             strcat(packetchar, ",");
-//             char *rptcall = incomingPacket.rpt_list[i].call;
-//             strcat(packetchar, rptcall);
-//             strcat(packetchar, "-");
-//             char rssid[10];
-//             itoa(incomingPacket.rpt_list[i].ssid, rssid, 10);
-//             strcat(packetchar, rssid);
-//         }
-//         strcat(packetchar, ",qAR,NOCALL-1:"); /// Your call and SSID
-//         /* BUG #3 here: string function stops copying on the first NUL byte */
-//         strcat(packetchar, datastr);
-// // strcat (packetchar, lf);
-
-// /* BUG #3: println stops writing on the first NUL byte */
-// #ifdef DEBUG_TNC
-//         Serial.printf("[%d] ", ++pkgTNC_count);
-// #endif
-//         Serial.println(packetchar);
-
-//         // Don't IGATE TCPIP repeaded packets
-//         if (0 && !tcpippacket)
-//         {
-//             /* BUG #3 present here too: println stops writing on the first
-//              * NUL byte. Do not run this before fixing and testing on packets
-//              * with NUL bytes. They exist and this code corrupts the packets
-//              * further.
-//              */
-//             // client.println(packetchar);
-//             // client.println();
-//         }
-//     }
-// }
-
 void printTime()
 {
     Serial.print("[");
@@ -817,8 +749,6 @@ void taskAPRS(void *pvParameters)
 
 int mqttRetry = 0;
 long wifiTTL = 0;
-// char raw[350];
-// char str[350];
 
 void taskNetwork(void *pvParameters)
 {
@@ -999,18 +929,6 @@ void taskNetwork(void *pvParameters)
                             }
                         }
                     }
-
-                    // if (aprsUpdate)
-                    // {
-                    //     aprsUpdate = false;
-                    //     String tnc2Raw = send_fix_location();
-                    //     aprsClient.println(tnc2Raw);
-                    //     // Serial.println("WX Send to APRS-IS: " + raw);
-                    //     if (config.tnc)
-                    //     {
-                    //         APRS_sendTNC2Pkt(tnc2Raw);
-                    //     }
-                    // }
                 }
 
                 if (millis() > pingTimeout)
