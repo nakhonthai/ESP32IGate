@@ -73,7 +73,7 @@ D2,D1 เปลี่ยนเป็นตัวเก็บประจุแ�
 
 Solder jumper is needed depending on a transceiver.
 
-|Manufacture|RJ1-1(+VIN)|RJ1-2(SPK)|RJ1-3(PTT)|RJ1-4(GND)|RJ1-5(MIC)|RJ1-6(SQL)|
+|Manufacture|RJ11-1 (+VIN)|RJ11-2 (SPK)|RJ11-3 (PTT)|RJ11-4 (GND)|RJ11-5 (MIC)|RJ11-6 (SQL)|
 |---|---|---|---|---|---|---|
 |Alinco DR-135(DB9)|-|2|7|5|9|1|
 |IC2200(RJ45)|-|SP|4|5|6|-|
@@ -93,6 +93,7 @@ for Yaesu FT-2800(RJ11)
 ![FT2800](image/FT2800_Pinout.png)
 
 for Handheld
+
 ![Handheld](image/HT_Pinout.png)
 
 ## Howto Devellop
