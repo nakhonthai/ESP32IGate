@@ -435,6 +435,7 @@ boolean APRSConnect()
 void setup()
 {
     byte *ptr;
+    pinMode(0, INPUT_PULLUP); // BOOT Button
     // Set up serial port
     Serial.begin(9600); // debug
     Serial.setRxBufferSize(256);
@@ -449,7 +450,7 @@ void setup()
         Serial.println(F("failed to initialise EEPROM")); // delay(100000);
     }
 
-    delay(200);
+    delay(500);
 
     //ตรวจสอบคอนฟิกซ์ผิดพลาด
     ptr = (byte *)&config;
@@ -474,7 +475,7 @@ void setup()
     xTaskCreatePinnedToCore(
         taskAPRS,        /* Function to implement the task */
         "taskAPRS",      /* Name of the task */
-        8192,           /* Stack size in words */
+        8192,            /* Stack size in words */
         NULL,            /* Task input parameter */
         1,               /* Priority of the task */
         &taskAPRSHandle, /* Task handle. */
@@ -582,7 +583,9 @@ int processPacket(String &tnc2)
     return tnc2.length();
 }
 
+long sendTimer = 0;
 bool AFSKInitAct = false;
+int btn_count = 0;
 void loop()
 {
     vTaskDelay(1 / portTICK_PERIOD_MS);
@@ -591,8 +594,6 @@ void loop()
         AFSK_Poll();
     }
 }
-
-long sendTimer = 0;
 
 void taskAPRS(void *pvParameters)
 {
@@ -617,6 +618,39 @@ void taskAPRS(void *pvParameters)
         time(&timeStamp);
         vTaskDelay(10 / portTICK_PERIOD_MS);
 
+        if (digitalRead(0) == LOW)
+        {
+            btn_count++;
+            if (btn_count > 1000) // Push BOOT 10sec
+            {
+                digitalWrite(LED_PIN, HIGH);
+                digitalWrite(LED_TX_PIN, HIGH);
+            }
+        }
+        else
+        {
+            if (btn_count > 0)
+            {
+                //Serial.printf("btn_count=%dms\n", btn_count * 10);
+                if (btn_count > 1000) // Push BOOT 10sec to Factory Default
+                {
+                    defaultConfig();
+                    esp_restart();
+                }
+                else if (btn_count > 10) // Push BOOT >100mS to PTT Fix location
+                {
+                    if (config.tnc)
+                    {
+                        String tnc2Raw = send_fix_location();
+                        APRS_sendTNC2Pkt(tnc2Raw); // Send packet to RF
+#ifdef DEBUG_TNC
+                        Serial.println("Manual TX: " + tnc2Raw);
+#endif
+                    }
+                }
+                btn_count = 0;
+            }
+        }
 #ifdef SA818
 // if(digitalRead(SQL_PIN)==HIGH){
 // 	delay(10);
@@ -637,7 +671,6 @@ void taskAPRS(void *pvParameters)
         if (now > (sendTimer + (config.aprs_beacon * 1000)))
         {
             sendTimer = now;
-            // aprsUpdate = true;
 #ifdef SA818
             SA818_CHECK();
 #endif
@@ -850,12 +883,13 @@ void taskNetwork(void *pvParameters)
                     Serial.println("Contacting Time Server");
                     configTime(3600 * timeZone, 0, "203.150.19.26", "1.pool.ntp.org");
                     vTaskDelay(3000 / portTICK_PERIOD_MS);
-                    // if (systemUptime == 0)
-                    //{
-                    // systemUptime = now();
-                    time(&systemUptime);
-                    setTime(systemUptime);
-                    //}
+                    time_t systemTime;
+                    time(&systemTime);
+                    setTime(systemTime);
+                    if (systemUptime == 0)
+                    {
+                        systemUptime = now();
+                    }
                 }
 
                 if (config.aprs)
