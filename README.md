@@ -36,6 +36,10 @@ ESP32DR Simple Circut is small interface board for connecting to a transceiver.
 ### CAD data
  
 The gerber data is [here](doc/Gerber_ESP32DR_Simple.zip)
+The PCB film positive is [here](doc/PCB_Bottom.pdf)
+The PCB film negative is [here](doc/PCB_Bottom_Invert.pdf)
+The PCB Layout is [here](doc/PCB_Layout.pdf)
+The Schematic PDF is [here](doc/ESP32DR_Simple_Schematic.pdf)
 
 ### BOM list  
 
@@ -64,6 +68,8 @@ The gerber data is [here](doc/Gerber_ESP32DR_Simple.zip)
 
 R18 and R19 ไม่ใส่ก็ได้.  
 D2,D1 เปลี่ยนเป็นตัวเก็บประจุแบบเซรามิกมัลติเลเยอร์ค่า 10nF แทนได้ 
+
+The Howto DIY is [here](doc/ESP32DR_DIY-Thai.pdf)
 
 ### Mounting drawing
 
@@ -103,6 +109,7 @@ for Handheld
 - 1.Connect the USB cable to the ESP32 Module.
 - 2.Download firmware and open the program ESP32 DOWNLOAD TOOL, set it in the firmware upload program, set the firmware to ESP32IGate_Vxx.bin, location 0x10000 and partitions.bin at 0x8000 and bootloader.bin at 0x1000 and boot.bin at 0xe000, if not loaded, connect GPIO0 cable to GND, press START button finished, press power button or reset (red) again.
 - 3.Then go to WiFi AP SSID: ESP32IGate and open a browser to the website. http://192.168.4.1 password: aprsthnetwork Can be fixed Or turn on your Wi-Fi router.
+- 4.Push BOOT button long >100ms to TX Position and >10Sec to Factory Default
 
 ![ESP32Tool](image/ESP32Tool.png)
 

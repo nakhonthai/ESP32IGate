@@ -635,6 +635,7 @@ void taskAPRS(void *pvParameters)
                 if (btn_count > 1000) // Push BOOT 10sec to Factory Default
                 {
                     defaultConfig();
+                    Serial.println("SYSTEM REBOOT NOW!");
                     esp_restart();
                 }
                 else if (btn_count > 10) // Push BOOT >100mS to PTT Fix location
