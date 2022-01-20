@@ -36,9 +36,13 @@ ESP32DR Simple Circut is small interface board for connecting to a transceiver.
 ### CAD data
  
 The gerber data is [here](doc/Gerber_ESP32DR_Simple.zip)
+
 The PCB film positive is [here](doc/PCB_Bottom.pdf)
+
 The PCB film negative is [here](doc/PCB_Bottom_Invert.pdf)
+
 The PCB Layout is [here](doc/PCB_Layout.pdf)
+
 The Schematic PDF is [here](doc/ESP32DR_Simple_Schematic.pdf)
 
 ### BOM list  
