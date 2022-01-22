@@ -73,6 +73,7 @@ The Schematic PDF is [here](doc/ESP32DR_Simple_Schematic.pdf)
 *หากใช้ต่อกับวิทยุรับส่งเข้าขาไมค์นอก ให้เปลี่ยน R4 เป็น 100K
 
 จัดซื้อชุดคิทผ่าน Shopee ได้ที่ [คลิ๊ก](https://shopee.co.th/product/45191268/13373396785)
+
 The Howto DIY is [here](doc/ESP32DR_DIY-Thai.pdf)
 
 ### Mounting drawing
