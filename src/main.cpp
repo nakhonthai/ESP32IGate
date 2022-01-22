@@ -444,13 +444,19 @@ void setup()
 
     Serial.println();
     Serial.println("Start ESP32IGate V" + String(VERSION));
+    Serial.println("Push BOOT for Factory Default config.");
 
     if (!EEPROM.begin(EEPROM_SIZE))
     {
         Serial.println(F("failed to initialise EEPROM")); // delay(100000);
     }
 
-    delay(500);
+    delay(3000);
+    if (digitalRead(0) == LOW) {
+		defaultConfig();
+	    Serial.println("Manual Default configure!");
+		delay(3000);
+	}
 
     //ตรวจสอบคอนฟิกซ์ผิดพลาด
     ptr = (byte *)&config;
