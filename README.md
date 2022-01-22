@@ -4,7 +4,7 @@ ESP32IGate is a Internet Gateway + TNC Built in that is implemented for Espressi
 The development of ESP32IGate is for the study of converting analog signals to digital data. using the LibAPRS library to further develop
 To receive signals via ADC SAR using interrupt sampling or using I2S to read sampling signals at 9600 sample/sec on ESP32 microcontrollers and improve data conductivity. Access to the Internet Gateway (APRS-IS) for further applications or developments. 
 
-feature
+## Feature
 
 * supported hardware: ESP32DR Simple or ESP32DR_SA818 by Module ESP32 DevKit
 * using ESP-Arduino development on Visual studio code IDE
@@ -18,8 +18,6 @@ feature
 * display received and transmit packet on the LED
 
 ![esp32dr-test](image/ESP32DR_Simple_Test.png)
-![model](image/ESP32DR_Simple_Model.png)
-
 
 ## ESP32DR Simple
 
@@ -70,9 +68,11 @@ The Schematic PDF is [here](doc/ESP32DR_Simple_Schematic.pdf)
 |C2|10nF หรือ 0.01uF|ตัวเก็บประจุแบบโพลีโพรไพลีน|
 |D2,D1|1N4148|ไดโอด หรือใช้ C 0.01uF แทนได้|
 
-R18 and R19 ไม่ใส่ก็ได้.  
-D2,D1 เปลี่ยนเป็นตัวเก็บประจุแบบเซรามิกมัลติเลเยอร์ค่า 10nF แทนได้ 
+*R18 and R19 ไม่ใส่ก็ได้.  
+*D2,D1 เปลี่ยนเป็นตัวเก็บประจุแบบเซรามิกมัลติเลเยอร์ค่า 10nF แทนได้ 
+*หากใช้ต่อกับวิทยุรับส่งเข้าขาไมค์นอก ให้เปลี่ยน R4 เป็น 100K
 
+จัดซื้อชุดคิทผ่าน Shopee ได้ที่ [คลิ๊ก](https://shopee.co.th/product/45191268/13373396785)
 The Howto DIY is [here](doc/ESP32DR_DIY-Thai.pdf)
 
 ### Mounting drawing
