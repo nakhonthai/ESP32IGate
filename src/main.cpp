@@ -154,7 +154,7 @@ void defaultConfig()
     config.wifi_client = true;
     config.synctime = true;
     config.mqtt_port = 1883;
-    config.aprs_beacon = 30;
+    config.aprs_beacon = 600;
     config.gps_lat = 13.7555;
     config.gps_lon = 100.4930;
     config.gps_alt = 3;
@@ -455,7 +455,7 @@ void setup()
     if (digitalRead(0) == LOW) {
 		defaultConfig();
 	    Serial.println("Manual Default configure!");
-		delay(3000);
+		while(digitalRead(0) == LOW);
 	}
 
     //ตรวจสอบคอนฟิกซ์ผิดพลาด

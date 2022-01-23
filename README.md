@@ -84,6 +84,8 @@ The Howto DIY is [here](doc/ESP32DR_DIY-Thai.pdf)
 
 Solder jumper is needed depending on a transceiver.
 
+![ESP32DR_Pinout](image/RJ12Pinout.png)
+
 |Manufacture|RJ11-1 (+VIN)|RJ11-2 (SPK)|RJ11-3 (PTT)|RJ11-4 (GND)|RJ11-5 (MIC)|RJ11-6 (SQL)|
 |---|---|---|---|---|---|---|
 |Alinco DR-135(DB9)|-|2|7|5|9|1|
@@ -93,19 +95,21 @@ Solder jumper is needed depending on a transceiver.
 
 for Alinco DR-135(DB9)
 
-![Alinco](image/Alinco_Pinout.png)
+![Alinco](image/ESP32DR_DR135.png)
 
 for ICOM IC2200(RJ45)
 
-![IC2200](image/IC2200_Pinout.png)
+![IC2200](image/ESP32DR_IC2200.png)
 
 for Yaesu FT-2800(RJ11)
 
-![FT2800](image/FT2800_Pinout.png)
+![FT2800](image/ESP32DR_FT2800.png)
 
 for Handheld
 
-![Handheld](image/HT_Pinout.png)
+![Handheld](image/ESP32DR_HT.png)
+
+![HT-RX](image/ESP32DR_RxOnly.png)
 
 ## Howto Devellop
 -Pull and Compile by PlatformIO on the Visual Studio Code.
