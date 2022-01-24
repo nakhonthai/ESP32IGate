@@ -12,8 +12,7 @@ extern statusType status;
 extern digiTLMType digiTLM;
 extern Configuration config;
 extern TaskHandle_t taskNetworkHandle;
-extern TaskHandle_t taskDSPHandle;
-extern TaskHandle_t taskUIHandle;
+extern TaskHandle_t taskAPRSHandle;
 extern time_t systemUptime;
 extern pkgListType pkgList[PKGLISTSIZE];
 

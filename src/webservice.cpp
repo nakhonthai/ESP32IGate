@@ -483,7 +483,7 @@ void handle_setting()
 					}
 				}
 			}
-			
+
 			config.synctime = synctime;
 			saveEEPROM();
 			// topBar(WiFi.RSSI());
@@ -847,6 +847,7 @@ void handle_system()
 				break;
 			}
 		}
+		saveEEPROM();
 	}
 	else if (server.hasArg("updateTime"))
 	{
@@ -906,11 +907,71 @@ void handle_system()
 				break;
 			}
 		}
+		saveEEPROM();
 	}
 	else if (server.hasArg("updateWifi"))
 	{
+		bool wifiSTA = false;
+		bool wifiAP = false;
 		for (uint8_t i = 0; i < server.args(); i++)
 		{
+			if (server.argName(i) == "wifiAP")
+			{
+				if (server.arg(i) != "")
+				{
+					if (String(server.arg(i)) == "OK")
+					{
+						wifiAP = true;
+					}
+				}
+			}
+			if (server.argName(i) == "wificlient")
+			{
+				if (server.arg(i) != "")
+				{
+					if (String(server.arg(i)) == "OK")
+					{
+						wifiSTA = true;
+					}
+				}
+			}
+
+			if (server.argName(i) == "gpsLat")
+			{
+				if (server.arg(i) != "")
+				{
+					config.gps_lat = server.arg(i).toFloat();
+				}
+			}
+			if (server.argName(i) == "gpsLon")
+			{
+				if (server.arg(i) != "")
+				{
+					config.gps_lon = server.arg(i).toFloat();
+				}
+			}
+			if (server.argName(i) == "gpsAlt")
+			{
+				if (server.arg(i) != "")
+				{
+					config.gps_alt = server.arg(i).toFloat();
+				}
+			}
+
+			if (server.argName(i) == "wifi_ssidAP")
+			{
+				if (server.arg(i) != "")
+				{
+					strcpy(config.wifi_ap_ssid, server.arg(i).c_str());
+				}
+			}
+			if (server.argName(i) == "wifi_passAP")
+			{
+				if (server.arg(i) != "")
+				{
+					strcpy(config.wifi_ap_pass, server.arg(i).c_str());
+				}
+			}
 			if (server.argName(i) == "wifi_ssid")
 			{
 				if (server.arg(i) != "")
@@ -926,6 +987,23 @@ void handle_system()
 				}
 			}
 		}
+		if (wifiAP && wifiSTA)
+		{
+			config.wifi_mode = WIFI_AP_STA_FIX;
+		}
+		else if (wifiAP)
+		{
+			config.wifi_mode = WIFI_AP_FIX;
+		}
+		else if (wifiSTA)
+		{
+			config.wifi_mode = WIFI_STA_FIX;
+		}
+		else
+		{
+			config.wifi_mode = WIFI_OFF_FIX;
+		}
+		saveEEPROM();
 	}
 
 	struct tm tmstruct;
@@ -987,7 +1065,7 @@ void handle_system()
 	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">WiFi AP PASSWORD</label>\n";
 	webString += "<div class=\"col-sm-4 col-xs-6\"><input class=\"form-control\" id=\"wifi_passAP\" name=\"wifi_passAP\" type=\"password\" value=\"" + String(config.wifi_ap_pass) + "\" /></div>\n";
 	webString += "</div><hr width=\"50%\">\n";
-	
+
 	webString += "<div class=\"form-group\">\n";
 	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">WiFi Client Enable</label>\n";
 	String wifiFlage = "";
@@ -1324,7 +1402,7 @@ void webService()
 			HTTPUpload &upload = server.upload();
 			if (upload.status == UPLOAD_FILE_START)
 			{
-				// Serial.printf("Firmware Update FILE: %s\n", upload.filename.c_str());
+				Serial.printf("Firmware Update FILE: %s\n", upload.filename.c_str());
 				if (!Update.begin(UPDATE_SIZE_UNKNOWN))
 				{ // start with max available size
 					Update.printError(Serial);
@@ -1334,9 +1412,12 @@ void webService()
 				{
 					// wdtDisplayTimer = millis();
 					// wdtSensorTimer = millis();
-					//  vTaskSuspend(taskSensorHandle);
-					vTaskSuspend(taskNetworkHandle);
+					i2s_adc_disable(I2S_NUM_0);
+					dac_i2s_disable();
+					vTaskSuspend(taskAPRSHandle);
+					//vTaskSuspend(taskNetworkHandle);
 					config.aprs = false;
+					config.tnc=false;
 #ifndef I2S_INTERNAL
 					AFSK_TimerEnable(false);
 #endif

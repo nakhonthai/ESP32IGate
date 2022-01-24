@@ -481,7 +481,7 @@ void setup()
     xTaskCreatePinnedToCore(
         taskAPRS,        /* Function to implement the task */
         "taskAPRS",      /* Name of the task */
-        8192,            /* Stack size in words */
+        16384,            /* Stack size in words */
         NULL,            /* Task input parameter */
         1,               /* Priority of the task */
         &taskAPRSHandle, /* Task handle. */
@@ -623,6 +623,7 @@ void taskAPRS(void *pvParameters)
         time_t timeStamp;
         time(&timeStamp);
         vTaskDelay(10 / portTICK_PERIOD_MS);
+        //serviceHandle();
 
         if (digitalRead(0) == LOW)
         {
@@ -836,6 +837,7 @@ void taskNetwork(void *pvParameters)
         // wdtNetworkTimer = millis();
         vTaskDelay(1 / portTICK_PERIOD_MS);
         serviceHandle();
+        
         if (config.wifi_mode == WIFI_AP_STA_FIX || config.wifi_mode == WIFI_STA_FIX)
         {
             if (WiFi.status() != WL_CONNECTED)
