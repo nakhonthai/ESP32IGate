@@ -60,7 +60,7 @@ AX25Msg incomingPacket;
 cppQueue PacketBuffer(sizeof(AX25Msg), 5, IMPLEMENTATION); // Instantiate queue
 
 statusType status;
-digiTLMType digiTLM;
+RTC_DATA_ATTR digiTLMType digiTLM;
 
 Configuration config;
 
@@ -452,11 +452,13 @@ void setup()
     }
 
     delay(3000);
-    if (digitalRead(0) == LOW) {
-		defaultConfig();
-	    Serial.println("Manual Default configure!");
-		while(digitalRead(0) == LOW);
-	}
+    if (digitalRead(0) == LOW)
+    {
+        defaultConfig();
+        Serial.println("Manual Default configure!");
+        while (digitalRead(0) == LOW)
+            ;
+    }
 
     //ตรวจสอบคอนฟิกซ์ผิดพลาด
     ptr = (byte *)&config;
@@ -481,7 +483,7 @@ void setup()
     xTaskCreatePinnedToCore(
         taskAPRS,        /* Function to implement the task */
         "taskAPRS",      /* Name of the task */
-        16384,            /* Stack size in words */
+        16384,           /* Stack size in words */
         NULL,            /* Task input parameter */
         1,               /* Priority of the task */
         &taskAPRSHandle, /* Task handle. */
@@ -601,6 +603,32 @@ void loop()
     }
 }
 
+void sendIsPkgMsg(char *raw)
+{
+    char str[300];
+    char call[11];
+    int i;
+    memset(&call[0], 0, 11);
+    if (config.aprs_ssid == 0)
+        sprintf(call, "%s", config.aprs_mycall);
+    else
+        sprintf(call, "%s-%d", config.aprs_mycall, config.aprs_ssid);
+    i = strlen(call);
+    for (; i < 9; i++)
+        call[i] = 0x20;
+
+    if (config.aprs_ssid == 0)
+        sprintf(str, "%s>APE32I::%s:%s", config.aprs_mycall, call, raw);
+    else
+        sprintf(str, "%s-%d>APE32I::%s:%s", config.aprs_mycall, config.aprs_ssid, call, raw);
+
+    String tnc2Raw = String(str);
+    if (aprsClient.connected())
+        aprsClient.println(tnc2Raw); // Send packet to Inet
+    else
+        APRS_sendTNC2Pkt(tnc2Raw); // Send packet to RF
+}
+
 void taskAPRS(void *pvParameters)
 {
     //	long start, stop;
@@ -615,6 +643,7 @@ void taskAPRS(void *pvParameters)
     APRS_setPreamble(300);
     APRS_setTail(0);
     sendTimer = millis() - (config.aprs_beacon * 1000) + 30000;
+    digiTLM.TeleTimeout = millis() + 60000; // 1Min
     AFSKInitAct = true;
     for (;;)
     {
@@ -623,7 +652,7 @@ void taskAPRS(void *pvParameters)
         time_t timeStamp;
         time(&timeStamp);
         vTaskDelay(10 / portTICK_PERIOD_MS);
-        //serviceHandle();
+        // serviceHandle();
 
         if (digitalRead(0) == LOW)
         {
@@ -638,7 +667,7 @@ void taskAPRS(void *pvParameters)
         {
             if (btn_count > 0)
             {
-                //Serial.printf("btn_count=%dms\n", btn_count * 10);
+                // Serial.printf("btn_count=%dms\n", btn_count * 10);
                 if (btn_count > 1000) // Push BOOT 10sec to Factory Default
                 {
                     defaultConfig();
@@ -701,6 +730,39 @@ void taskAPRS(void *pvParameters)
             //  	APRS_setPreamble(350);
             //  	APRS_setTail(50);
             // APRS_sendTNC2Pkt("HS5TQA-6>APE32I,TRACE2-2:=1343.76N/10026.06E&ESP32 APRS Internet Gateway");
+        }
+
+        if (config.tnc_telemetry)
+        {
+            if (digiTLM.TeleTimeout < millis())
+            {
+                digiTLM.TeleTimeout = millis() + 600000; // 10Min
+                if ((digiTLM.Sequence % 6) == 0)
+                {
+                    sendIsPkgMsg((char *)&PARM[0]);
+                    sendIsPkgMsg((char *)&UNIT[0]);
+                    sendIsPkgMsg((char *)&EQNS[0]);
+                }
+                char rawTlm[100];
+                if (config.aprs_ssid == 0)
+                    sprintf(rawTlm, "%s>APE32I:T#%03d,%d,%d,%d,%d,%d,00000000", config.aprs_mycall, digiTLM.Sequence, digiTLM.RF2INET, digiTLM.INET2RF, digiTLM.RX, digiTLM.TX, digiTLM.DROP);
+                else
+                    sprintf(rawTlm, "%s-%d>APE32I:T#%03d,%d,%d,%d,%d,%d,00000000", config.aprs_mycall,config.aprs_ssid, digiTLM.Sequence, digiTLM.RF2INET, digiTLM.INET2RF, digiTLM.RX, digiTLM.TX, digiTLM.DROP);
+                
+                if (aprsClient.connected())
+                    aprsClient.println(String(rawTlm)); // Send packet to Inet
+                else
+                    APRS_sendTNC2Pkt(String(rawTlm)); // Send packet to RF
+                digiTLM.Sequence++;
+                if (digiTLM.Sequence > 999)
+                    digiTLM.Sequence = 0;
+                digiTLM.DROP = 0;
+                digiTLM.INET2RF = 0;
+                digiTLM.RF2INET = 0;
+                digiTLM.RX = 0;
+                digiTLM.TX = 0;
+                // client.println(raw);
+            }
         }
 
         // IGate
@@ -837,7 +899,7 @@ void taskNetwork(void *pvParameters)
         // wdtNetworkTimer = millis();
         vTaskDelay(1 / portTICK_PERIOD_MS);
         serviceHandle();
-        
+
         if (config.wifi_mode == WIFI_AP_STA_FIX || config.wifi_mode == WIFI_STA_FIX)
         {
             if (WiFi.status() != WL_CONNECTED)
@@ -922,7 +984,7 @@ void taskNetwork(void *pvParameters)
                             int start_val = line.indexOf(">", 0); // หาตำแหน่งแรกของ >
                             if (start_val > 3)
                             {
-                                raw = (char *)malloc(line.length() + 1);
+                                // raw = (char *)malloc(line.length() + 1);
                                 String src_call = line.substring(0, start_val);
                                 String msg_call = "::" + src_call;
 
@@ -930,17 +992,17 @@ void taskNetwork(void *pvParameters)
                                 digiTLM.RX++;
                                 if (config.tnc && config.inet2rf)
                                 {
-                                    if (line.indexOf(msg_call) <= 0) // src callsign = msg callsign
+                                    if (line.indexOf(msg_call) <= 0) // src callsign = msg callsign ไม่ใช่หัวข้อโทรมาตร
                                     {
-                                        if (line.indexOf(":T#") < 0)
+                                        if (line.indexOf(":T#") < 0) //ไม่ใช่ข้อความโทรมาตร
                                         {
-                                            if (line.indexOf("::") > 0)
-                                            { // message only
-                                                raw[0] = '}';
+                                            if (line.indexOf("::") > 0) //ข้อความเท่านั้น
+                                            {                           // message only
+                                                // raw[0] = '}';
                                                 line.toCharArray(&raw[1], line.length());
                                                 // tncTxEnable = false;
-                                                SerialTNC.flush();
-                                                SerialTNC.println(raw);
+                                                // SerialTNC.flush();
+                                                // SerialTNC.println(raw);
                                                 APRS_sendTNC2Pkt(line); // Send out RF by TNC build in
                                                 // tncTxEnable = true;
                                                 status.inet2rf++;
@@ -948,7 +1010,7 @@ void taskNetwork(void *pvParameters)
                                                 printTime();
 #ifdef DEBUG
                                                 Serial.print("INET->RF ");
-                                                Serial.println(raw);
+                                                Serial.println(line);
 #endif
                                             }
                                         }
@@ -961,11 +1023,11 @@ void taskNetwork(void *pvParameters)
                                     }
                                 }
 
-                                memset(&raw[0], 0, sizeof(raw));
-                                line.toCharArray(&raw[0], start_val + 1);
-                                raw[start_val + 1] = 0;
-                                pkgListUpdate(&raw[0], 0);
-                                free(raw);
+                                // memset(&raw[0], 0, sizeof(raw));
+                                // line.toCharArray(&raw[0], start_val + 1);
+                                // raw[start_val + 1] = 0;
+                                // pkgListUpdate(&raw[0], 0);
+                                // free(raw);
                             }
                         }
                     }
