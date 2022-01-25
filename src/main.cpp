@@ -259,9 +259,11 @@ void sortPkgDesc(pkgListType a[], int size)
 void pkgListUpdate(char *call, bool type)
 {
     char i = pkgList_Find(call);
+    time_t now;
+    time(&now);
     if (i != 255)
     { // Found call in old pkg
-        pkgList[(uint)i].time = now();
+        pkgList[(uint)i].time = now;
         pkgList[(uint)i].pkg++;
         pkgList[(uint)i].type = type;
         // Serial.print("Update: ");
@@ -269,7 +271,7 @@ void pkgListUpdate(char *call, bool type)
     else
     {
         i = pkgListOld();
-        pkgList[(uint)i].time = now();
+        pkgList[(uint)i].time = now;
         pkgList[(uint)i].pkg = 1;
         pkgList[(uint)i].type = type;
         strcpy(pkgList[(uint)i].calsign, call);
@@ -291,12 +293,14 @@ void aprs_msg_callback(struct AX25Msg *msg)
 
 void printTime()
 {
+    struct tm tmstruct;
+	getLocalTime(&tmstruct, 5000);
     Serial.print("[");
-    Serial.print(hour());
+    Serial.print(tmstruct.tm_hour);
     Serial.print(":");
-    Serial.print(minute());
+    Serial.print(tmstruct.tm_min);
     Serial.print(":");
-    Serial.print(second());
+    Serial.print( tmstruct.tm_sec);
     Serial.print("]");
 }
 
@@ -476,14 +480,14 @@ void setup()
 #endif
 
     enableLoopWDT();
-    // enableCore0WDT();
+    enableCore0WDT();
     enableCore1WDT();
 
     // Task 1
     xTaskCreatePinnedToCore(
         taskAPRS,        /* Function to implement the task */
         "taskAPRS",      /* Name of the task */
-        16384,           /* Stack size in words */
+        8192,           /* Stack size in words */
         NULL,            /* Task input parameter */
         1,               /* Priority of the task */
         &taskAPRSHandle, /* Task handle. */
@@ -493,7 +497,7 @@ void setup()
     xTaskCreatePinnedToCore(
         taskNetwork,        /* Function to implement the task */
         "taskNetwork",      /* Name of the task */
-        16384,              /* Stack size in words */
+        20000,              /* Stack size in words */
         NULL,               /* Task input parameter */
         1,                  /* Priority of the task */
         &taskNetworkHandle, /* Task handle. */
@@ -765,7 +769,7 @@ void taskAPRS(void *pvParameters)
             }
         }
 
-        // IGate
+        // IGate RF->INET
         if (config.tnc)
         {
             if (PacketBuffer.getCount() > 0)
@@ -783,10 +787,9 @@ void taskAPRS(void *pvParameters)
                     int start_val = tnc2.indexOf(">", 0); // หาตำแหน่งแรกของ >
                     if (start_val > 3)
                     {
-                        // str=(char *)malloc(tnc2.length());
                         raw = (char *)malloc(tnc2.length() + 20);
                         status.tncCount++;
-                        if (tnc2.indexOf("RFONLY", 10) > 0)
+                        if (tnc2.indexOf("RFONLY", 10) > 0) //PATH RFONLY จะไม่ส่งเข้า APRS-IS
                         {
                             status.dropCount++;
                             digiTLM.DROP++;
@@ -828,7 +831,7 @@ void taskAPRS(void *pvParameters)
                             }
                             free(str);
                         }
-                        memset(&raw[0], 0, sizeof(raw));
+                        //memset(&raw[0], 0, sizeof(raw));
                         tnc2.toCharArray(&raw[0], start_val + 1);
                         raw[start_val + 1] = 0;
                         pkgListUpdate(&raw[0], 1);
@@ -854,8 +857,6 @@ long wifiTTL = 0;
 
 void taskNetwork(void *pvParameters)
 {
-    char *raw;
-    // char *str;
     int c = 0;
     Serial.println("Task Network has been start");
 
@@ -897,7 +898,7 @@ void taskNetwork(void *pvParameters)
     for (;;)
     {
         // wdtNetworkTimer = millis();
-        vTaskDelay(1 / portTICK_PERIOD_MS);
+        vTaskDelay(10 / portTICK_PERIOD_MS);
         serviceHandle();
 
         if (config.wifi_mode == WIFI_AP_STA_FIX || config.wifi_mode == WIFI_STA_FIX)
@@ -952,7 +953,7 @@ void taskNetwork(void *pvParameters)
                     // Serial.println("Config NTP");
                     // setSyncProvider(getNtpTime);
                     Serial.println("Contacting Time Server");
-                    configTime(3600 * timeZone, 0, "203.150.19.26", "1.pool.ntp.org");
+                    configTime(3600 * timeZone, 0, "203.150.19.26", "110.170.126.101","77.68.122.252");
                     vTaskDelay(3000 / portTICK_PERIOD_MS);
                     time_t systemTime;
                     time(&systemTime);
@@ -999,7 +1000,7 @@ void taskNetwork(void *pvParameters)
                                             if (line.indexOf("::") > 0) //ข้อความเท่านั้น
                                             {                           // message only
                                                 // raw[0] = '}';
-                                                line.toCharArray(&raw[1], line.length());
+                                                //line.toCharArray(&raw[1], line.length());
                                                 // tncTxEnable = false;
                                                 // SerialTNC.flush();
                                                 // SerialTNC.println(raw);

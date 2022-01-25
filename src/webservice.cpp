@@ -199,12 +199,16 @@ void setHTML(byte page)
 		webString += "<div  class=\"L1\"><u>LAST STATION</u></div>";
 		webString += "<table border=\"0\" width=\"200\">";
 		sort(pkgList, PKGLISTSIZE);
+
 		for (int i = 0; i < PKGLISTSIZE; i++)
 		{
 			if (pkgList[i].time > 0)
 			{
 				pkgList[i].calsign[10] = 0;
-				String str = String(hour(pkgList[i].time), DEC) + ":" + String(minute(pkgList[i].time), DEC) + ":" + String(second(pkgList[i].time), DEC);
+				time_t tm=pkgList[i].time;
+				localtime_r(&pkgList[i].time, &tmstruct);
+				String str = String(tmstruct.tm_hour, DEC) + ":" + String(tmstruct.tm_min, DEC) + ":" + String(tmstruct.tm_sec, DEC);
+				//String str = String(hour(pkgList[i].time), DEC) + ":" + String(minute(pkgList[i].time), DEC) + ":" + String(second(pkgList[i].time), DEC);
 				webString += "<tr><td align=\"left\">" + String(pkgList[i].calsign) + "</td><td align=\"right\">" + str + "</td></tr>";
 			}
 		}
