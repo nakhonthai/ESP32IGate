@@ -448,7 +448,7 @@ void setup()
 
     Serial.println();
     Serial.println("Start ESP32IGate V" + String(VERSION));
-    Serial.println("Push BOOT for Factory Default config.");
+    Serial.println("Push BOOT after 3 sec for Factory Default config.");
 
     if (!EEPROM.begin(EEPROM_SIZE))
     {
@@ -460,8 +460,7 @@ void setup()
     {
         defaultConfig();
         Serial.println("Manual Default configure!");
-        while (digitalRead(0) == LOW)
-            ;
+        while(digitalRead(0) == LOW);
     }
 
     //ตรวจสอบคอนฟิกซ์ผิดพลาด

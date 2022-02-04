@@ -754,13 +754,22 @@ void handle_service()
 	webString += "</div>\n";
 
 	webString += "<div class=\"form-group\">\n";
-	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">My Call</label>\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">My CallSign</label>\n";
 	webString += "<div class=\"col-sm-3 col-xs-4\"><input class=\"form-control\" id=\"mycall\" name=\"myCall\" type=\"text\" value=\"" + String(config.aprs_mycall) + "\" /></div>\n";
 	webString += "</div>\n";
 
 	webString += "<div class=\"form-group\">\n";
 	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">My SSID</label>\n";
-	webString += "<div class=\"col-sm-2 col-xs-2\"><input class=\"form-control\" id=\"myssid\" name=\"mySSID\" type=\"text\" value=\"" + String(config.aprs_ssid) + "\" /></div>\n";
+	//webString += "<div class=\"col-sm-2 col-xs-2\"><input class=\"form-control\" id=\"myssid\" name=\"mySSID\" type=\"text\" value=\"" + String(config.aprs_ssid) + "\" /></div>\n";
+	webString += "<div class=\"col-sm-2 col-xs-6\"><select name=\"mySSID\" id=\"mySSID\">\n";
+	for(uint8_t ssid=0;ssid<=15;ssid++){
+		if(config.aprs_ssid==ssid){
+			webString += "<option value=\""+String(ssid)+"\" selected>"+String(ssid)+"</option>\n";
+		}else{
+			webString += "<option value=\""+String(ssid)+"\">"+String(ssid)+"</option>\n";
+		}
+	}
+	webString += "</select></div>\n";
 	webString += "</div>\n";
 
 	webString += "<div class=\"form-group\">\n";
