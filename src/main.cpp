@@ -57,6 +57,12 @@ bool aprsUpdate = false;
 boolean gotPacket = false;
 AX25Msg incomingPacket;
 
+bool lastPkg=false;
+bool afskSync=false;
+String lastPkgRaw="";
+float dBV=0;
+int mVrms=0;
+
 cppQueue PacketBuffer(sizeof(AX25Msg), 5, IMPLEMENTATION); // Instantiate queue
 
 statusType status;
@@ -176,6 +182,7 @@ void defaultConfig()
     sprintf(config.tnc_comment, "ESP32 Build in TNC");
     sprintf(config.aprs_filter, "g/HS*/E2*");
     sprintf(config.tnc_path, "WIDE1-1");
+    config.wifi_power = -4;
     saveEEPROM();
 }
 
@@ -777,6 +784,8 @@ void taskAPRS(void *pvParameters)
                 //นำข้อมูลแพ็จเกจจาก TNC ออกจากคิว
                 PacketBuffer.pop(&incomingPacket);
                 processPacket(tnc2);
+                lastPkg=true;
+                lastPkgRaw=tnc2;
                 // ESP_BT.println(tnc2);
                 status.allCount++;
 
@@ -914,7 +923,7 @@ void taskNetwork(void *pvParameters)
                     Serial.print("WiFi connecting..");
                     // udp.endPacket();
                     WiFi.disconnect();
-                    WiFi.setTxPower(WIFI_POWER_19_5dBm);
+                    WiFi.setTxPower((wifi_power_t)config.wifi_power);
                     WiFi.setHostname("ESP32IGate");
                     WiFi.begin(config.wifi_ssid, config.wifi_pass);
                     // Wait up to 1 minute for connection...

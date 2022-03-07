@@ -411,6 +411,7 @@ uint8_t AFSK_dac_isr(Afsk *afsk)
 }
 
 int hdlc_flag_count = 0;
+bool hdlc_flage_end=false;
 static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
 {
   // Initialise a return value. We start with the
@@ -455,6 +456,7 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
       hdlc->receiving = false;
       LED_RX_OFF();
       hdlc_flag_count = 0;
+      hdlc_flage_end=false;
     }
 
     // Everytime we receive a HDLC_FLAG, we reset the
@@ -481,6 +483,7 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
     hdlc->receiving = false;
     LED_RX_OFF();
     hdlc_flag_count = 0;
+    hdlc_flage_end=false;
     return ret;
   }
 
@@ -489,6 +492,8 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
   // with anything.
   if (!hdlc->receiving)
     return ret;
+
+  hdlc_flage_end=true;
 
   // First check if what we are seeing is a stuffed bit.
   // Since the different HDLC control characters like
@@ -765,8 +770,16 @@ void IRAM_ATTR sample_isr()
 bool tx_en = false;
 #endif
 
+extern int mVrms;
+extern float dBV;
+extern bool afskSync;
+
+long mVsum = 0;
+int mVsumCount = 0;
+
 void AFSK_Poll()
 {
+  int mV;
   int x = 0;
   // uint8_t sintable[8] = {127, 217, 254, 217, 127, 36, 0, 36};
 #ifdef I2S_INTERNAL
@@ -838,6 +851,7 @@ void AFSK_Poll()
 #ifdef I2S_INTERNAL
     if (i2s_read(I2S_NUM_0, (char *)&pcm_in, (ADC_SAMPLES_COUNT * sizeof(uint16_t)), &bytesRead, portMAX_DELAY) == ESP_OK)
     {
+
       for (int i = 0; i < (bytesRead / sizeof(uint16_t)); i += 2)
       {
         adcVal = (int)pcm_in[i];
@@ -851,11 +865,32 @@ void AFSK_Poll()
           if (offset > 3300 || offset < 1300) // Over dc offset to default
             offset = 2303;
         }
-        adcVal -= offset;                               // Convert unsinewave to sinewave
+        adcVal -= offset; // Convert unsinewave to sinewave
+
+        mV = abs((int)adcVal); //mVp-p
+        mV = (int)((float)mV / 3.68F); // mV=(mV*625)/36848;
+        mVsum += powl(mV, 2);
+        mVsumCount++;
         int8_t adcR = (int8_t)((int16_t)(adcVal >> 4)); // Reduce 12bit to 8bit
-        AFSK_adc_isr(AFSK_modem, adcR);                 // Process signal IIR
+        
+        AFSK_adc_isr(AFSK_modem, adcR); // Process signal IIR
         if (i % 4 == 0)
           APRS_poll(); // Poll check every 1 bit
+      }
+      //Get mVrms on Sync flage 0x7E
+      if (hdlc_flag_count > 3 && hdlc_flage_end==true)
+      {
+        if (mVsumCount > 1920){
+          mVrms = sqrtl(mVsum / mVsumCount);
+          mVsum=0;
+          mVsumCount=0;
+          
+          double Vrms=(double)mVrms/1000;
+          dBV = 20.0F * log10(Vrms);
+          //dBu = 20 * log10(Vrms / 0.7746);
+          Serial.printf("mVrms=%d dBV=%0.1f agc=%0.2f\n",mVrms,dBV);
+          afskSync=true;
+        }
       }
     }
 #else

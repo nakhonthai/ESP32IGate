@@ -10,7 +10,7 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define VERSION "0.3"
+#define VERSION "0.4"
 
 #define DEBUG
 //#define DEBUG_IS
@@ -98,6 +98,7 @@ typedef struct Config_Struct {
 	char mqtt_host[20];
 	char mqtt_user[10];
 	char mqtt_pass[10];
+	char wifi_power;
 }Configuration;
 
 typedef struct digiTLM_struct {
@@ -137,6 +138,8 @@ const char PARM[] = { "PARM.RF->INET,INET->RF,RxPkts,TxPkts,IGateDropRx" };
 const char UNIT[] = { "UNIT.Pkts,Pkts,Pkts,Pkts,Pkts" };
 const char EQNS[] = { "EQNS.0,1,0,0,1,0,0,1,0,0,1,0,0,1,0" };
 
+const float wifiPwr[12][2]={{-4,-1},{8,2},{20,5},{28,7},{34,8.5},{44,11},{52,13},{60,15},{68,17},{74,18.5},{76,19},{78,19.5}};
+
 void saveEEPROM();
 void defaultConfig();
 String getValue(String data, char separator, int index);
@@ -146,5 +149,6 @@ void taskNetwork(void * pvParameters);
 void sort(pkgListType a[], int size);
 void sortPkgDesc(pkgListType a[], int size);
 int processPacket(String &tnc2);
+String send_fix_location();
 
 #endif

@@ -4,6 +4,8 @@
 */
 #include "AFSK.h"
 #include "webservice.h"
+#include "base64.hpp"
+#include <LibAPRSesp.h>
 
 // Web Server;
 WebServer server(80);
@@ -130,13 +132,58 @@ void setHTML(byte page)
 		////////////
 		webString += "    </script> \n";
 	}
+	else if (page == 7)
+	{
+		webString += "<script src=\"https://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js\"></script>\n";
+		webString += "<script src=\"https://code.highcharts.com/highcharts.js\"></script>\n";
+		webString += "<script src=\"https://code.highcharts.com/highcharts-more.js\"></script>\n";
+		webString += "<script language=\"JavaScript\">";
+		webString += "$(document).ready(function() {\nvar chart = {\ntype: 'gauge',plotBorderWidth: 1,plotBackgroundColor: {linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },stops: [[0, '#FFFFC6'],[0.3, '#FFFFFF'],[1, '#FFF4C6']]},plotBackgroundImage: null,height: 200};\n";
+		webString += "var credits = {enabled: false};\n";
+		webString += "var title = {text: 'RX VU Meter'};\n";
+		webString += "var pane = [{startAngle: -45,endAngle: 45,background: null,center: ['50%', '145%'],size: 300}];\n";
+		webString += "var yAxis = [{min: -40,max: 1,minorTickPosition: 'outside',tickPosition: 'outside',labels: {rotation: 'auto',distance: 20},\n";
+		webString += "plotBands: [{from: -10,to: 1,color: '#C02316',innerRadius: '100%',outerRadius: '105%'},{from: -20,to: -10,color: '#00C000',innerRadius: '100%',outerRadius: '105%'},{from: -30,to: -20,color: '#AFFF0F',innerRadius: '100%',outerRadius: '105%'},{from: -40,to: -30,color: '#C0A316',innerRadius: '100%',outerRadius: '105%'}],\n";
+		webString += "pane: 0,title: {text: '<span style=\"font-size:12px\">dBV</span>',y: -40}}];\n";
+		webString += "var plotOptions = {gauge: {dataLabels: {enabled: false},dial: {radius: '100%'}}};\n";
+		webString += "var series= [{data: [-40],yAxis: 0}];\n";
+		webString += "var json = {};\n json.chart = chart;\n json.credits = credits;\n json.title = title;\n json.pane = pane;\n json.yAxis = yAxis;\n json.plotOptions = plotOptions;\n json.series = series;\n";
+
+		// Add some life
+		webString += "var chartFunction = function (chart) { \n"; // the chart may be destroyed
+		webString += "var Vrms=0;\nvar dBV=-40;\nvar active=0;var raw=\"\";var timeStamp;\n";
+		webString += "setInterval(function () {\n if (chart.series) {\n";
+		webString += "var left = chart.series[0].points[0];\n";
+		webString += "$.getJSON(\"./realtime\", function(json){\n";
+		webString += "active=parseInt(json.Active);\n";
+		// webString += "if(active==1){\n";
+		webString += "Vrms=parseFloat(json.mVrms)/1000;\n";
+		webString += "dBV=20.0*Math.log10(Vrms);\n";
+		webString += "if(dBV<-40) dBV=-40;\n";
+		webString += "raw=json.RAW;\n";
+		webString += "timeStamp=Number(json.timeStamp);\n";
+		webString += "});\n";
+		webString += "if(active==1){\nleft.update(dBV,false);\nchart.redraw();\n";
+		webString += "var date=new Date(timeStamp * 1000).toLocaleString();\n";
+		webString += "var head=date+\"[\"+Vrms.toFixed(3)+\"Vrms,\"+dBV.toFixed(1)+\"dBV]\\n\";\n";
+		webString += "document.getElementById(\"raw_txt\").value+=head+atob(raw)+\"\\n\";\n";
+		webString += "}\n";
+		webString += "}}, 1000);};\n";
+		webString += "$('#vumeter').highcharts(json, chartFunction);\n";
+		webString += "});\n</script>\n";
+	}
+
 	String strActiveP1 = "";
 	String strActiveP2 = "";
 	String strActiveP3 = "";
 	String strActiveP4 = "";
 	String strActiveP5 = "";
 	String strActiveP6 = "";
-	if (page == 5)
+	String strActiveP7 = "";
+
+	if (page == 6)
+		strActiveP7 = "class=active";
+	else if (page == 5)
 		strActiveP6 = "class=active";
 	else if (page == 4)
 		strActiveP5 = "class=active";
@@ -159,6 +206,7 @@ void setHTML(byte page)
 	webString += "<li role=\"presentation\"" + strActiveP3 + ">\n<a href=\"/config\" id=\"channel_link_settings\">Setting</a>\n</li>\n";
 	webString += "<li role=\"presentation\"" + strActiveP4 + ">\n<a href=\"/service\" id=\"channel_link_service\">Server</a>\n</li>\n";
 	webString += "<li role=\"presentation\"" + strActiveP5 + ">\n<a href=\"/system\" id=\"channel_link_system\">System</a>\n</li>\n";
+	webString += "<li role=\"presentation\"" + strActiveP7 + ">\n<a href=\"/test\" id=\"channel_link_system\">Test</a>\n</li>\n";
 	webString += "<li role=\"presentation\"" + strActiveP6 + ">\n<a href=\"/firmware\" id=\"channel_link_firmware\">Firmware</a>\n</li>\n";
 	webString += "</ul>\n</div>";
 
@@ -205,10 +253,10 @@ void setHTML(byte page)
 			if (pkgList[i].time > 0)
 			{
 				pkgList[i].calsign[10] = 0;
-				time_t tm=pkgList[i].time;
+				time_t tm = pkgList[i].time;
 				localtime_r(&pkgList[i].time, &tmstruct);
 				String str = String(tmstruct.tm_hour, DEC) + ":" + String(tmstruct.tm_min, DEC) + ":" + String(tmstruct.tm_sec, DEC);
-				//String str = String(hour(pkgList[i].time), DEC) + ":" + String(minute(pkgList[i].time), DEC) + ":" + String(second(pkgList[i].time), DEC);
+				// String str = String(hour(pkgList[i].time), DEC) + ":" + String(minute(pkgList[i].time), DEC) + ":" + String(second(pkgList[i].time), DEC);
 				webString += "<tr><td align=\"left\">" + String(pkgList[i].calsign) + "</td><td align=\"right\">" + str + "</td></tr>";
 			}
 		}
@@ -760,13 +808,17 @@ void handle_service()
 
 	webString += "<div class=\"form-group\">\n";
 	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">My SSID</label>\n";
-	//webString += "<div class=\"col-sm-2 col-xs-2\"><input class=\"form-control\" id=\"myssid\" name=\"mySSID\" type=\"text\" value=\"" + String(config.aprs_ssid) + "\" /></div>\n";
+	// webString += "<div class=\"col-sm-2 col-xs-2\"><input class=\"form-control\" id=\"myssid\" name=\"mySSID\" type=\"text\" value=\"" + String(config.aprs_ssid) + "\" /></div>\n";
 	webString += "<div class=\"col-sm-2 col-xs-6\"><select name=\"mySSID\" id=\"mySSID\">\n";
-	for(uint8_t ssid=0;ssid<=15;ssid++){
-		if(config.aprs_ssid==ssid){
-			webString += "<option value=\""+String(ssid)+"\" selected>"+String(ssid)+"</option>\n";
-		}else{
-			webString += "<option value=\""+String(ssid)+"\">"+String(ssid)+"</option>\n";
+	for (uint8_t ssid = 0; ssid <= 15; ssid++)
+	{
+		if (config.aprs_ssid == ssid)
+		{
+			webString += "<option value=\"" + String(ssid) + "\" selected>" + String(ssid) + "</option>\n";
+		}
+		else
+		{
+			webString += "<option value=\"" + String(ssid) + "\">" + String(ssid) + "</option>\n";
 		}
 	}
 	webString += "</select></div>\n";
@@ -999,6 +1051,14 @@ void handle_system()
 					strcpy(config.wifi_pass, server.arg(i).c_str());
 				}
 			}
+			if (server.argName(i) == "wifi_pwr")
+			{
+				if (server.arg(i) != "")
+				{
+					if (isValidNumber(server.arg(i)))
+						config.wifi_power = server.arg(i).toInt();
+				}
+			}
 		}
 		if (wifiAP && wifiSTA)
 		{
@@ -1096,6 +1156,20 @@ void handle_system()
 	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">WiFi PASSWORD</label>\n";
 	webString += "<div class=\"col-sm-4 col-xs-6\"><input class=\"form-control\" id=\"wifi_pass\" name=\"wifi_pass\" type=\"password\" value=\"" + String(config.wifi_pass) + "\" /></div>\n";
 	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">WiFi Power</label>\n";
+	webString += "<div class=\"col-sm-4 col-xs-6\"><select name=\"wifi_pwr\" id=\"wifi_pwr\">\n";
+	for (int i = 0; i < 12; i++)
+	{
+		if (config.wifi_power == wifiPwr[i][0])
+			webString += "<option value=\"" + String(wifiPwr[i][0], 0) + "\" selected>" + String(wifiPwr[i][1], 1) + " dBm</option>\n";
+		else
+			webString += "<option value=\"" + String(wifiPwr[i][0], 0) + "\" >" + String(wifiPwr[i][1], 1) + " dBm</option>\n";
+	}
+	webString += "</select></div>\n";
+	webString += "</div>\n";
+
 	webString += "<div><input class=\"btn btn-primary\" id=\"setting_time_sumbit\" name=\"updateWifi\" type=\"submit\" value=\"Update WiFi\" maxlength=\"80\"/></div></form>\n";
 
 	webString += "<div class = \"col-pad\">\n<h3>WiFi Status</h3>\n";
@@ -1120,6 +1194,58 @@ void handle_system()
 	{
 		webString += "OFF";
 	}
+
+	wifi_power_t wpr = WiFi.getTxPower();
+	String wifipower = "";
+	if (wpr < 8)
+	{
+		wifipower = "-1 dBm";
+	}
+	else if (wpr < 21)
+	{
+		wifipower = "2 dBm";
+	}
+	else if (wpr < 29)
+	{
+		wifipower = "5 dBm";
+	}
+	else if (wpr < 35)
+	{
+		wifipower = "8.5 dBm";
+	}
+	else if (wpr < 45)
+	{
+		wifipower = "11 dBm";
+	}
+	else if (wpr < 53)
+	{
+		wifipower = "13 dBm";
+	}
+	else if (wpr < 61)
+	{
+		wifipower = "15 dBm";
+	}
+	else if (wpr < 69)
+	{
+		wifipower = "17 dBm";
+	}
+	else if (wpr < 75)
+	{
+		wifipower = "18.5 dBm";
+	}
+	else if (wpr < 77)
+	{
+		wifipower = "19 dBm";
+	}
+	else if (wpr < 80)
+	{
+		wifipower = "19.5 dBm";
+	}
+	else
+	{
+		wifipower = "20 dBm";
+	}
+
 	webString += "</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>MAC:</b></td>\n";
 	webString += "<td align=\"left\">" + String(WiFi.macAddress()) + "</td></tr>\n";
@@ -1146,6 +1272,91 @@ void handle_system()
 				 "format: 'YYYY-MM-DD HH:mm:ss'\n"
 				 "});\n"
 				 "});\n</script>\n";
+	webString += "</body></html>\n";
+	server.send(200, "text/html", webString); // send to someones browser when asked
+
+	delay(100);
+}
+
+extern bool afskSync;
+extern String lastPkgRaw;
+extern float dBV;
+extern int mVrms;
+void handle_realtime()
+{
+	// char jsonMsg[1000];
+	char *jsonMsg;
+	time_t timeStamp;
+	time(&timeStamp);
+
+	if (afskSync && (lastPkgRaw.length() > 5))
+	{
+		int input_length = lastPkgRaw.length();
+		jsonMsg = (char *)malloc((input_length * 2) + 70);
+		char *input_buffer = (char *)malloc(input_length + 2);
+		char *output_buffer = (char *)malloc(input_length * 2);
+		if (output_buffer)
+		{
+			lastPkgRaw.toCharArray(input_buffer, lastPkgRaw.length(), 0);
+			lastPkgRaw.clear();
+			encode_base64((unsigned char *)input_buffer, input_length, (unsigned char *)output_buffer);
+			// Serial.println(output_buffer);
+			sprintf(jsonMsg, "{\"Active\":\"1\",\"mVrms\":\"%d\",\"RAW\":\"%s\",\"timeStamp\":\"%li\"}", mVrms, output_buffer, timeStamp);
+			// Serial.println(jsonMsg);
+			free(input_buffer);
+			free(output_buffer);
+		}
+	}
+	else
+	{
+		jsonMsg = (char *)malloc(100);
+		if (afskSync)
+			sprintf(jsonMsg, "{\"Active\":\"1\",\"mVrms\":\"%d\",\"RAW\":\"REVDT0RFIEZBSUwh\",\"timeStamp\":\"%li\"}", mVrms, timeStamp);
+		else
+			sprintf(jsonMsg, "{\"Active\":\"0\",\"mVrms\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%li\"}", timeStamp);
+	}
+	afskSync = false;
+	server.send(200, "text/html", String(jsonMsg));
+	delay(100);
+	free(jsonMsg);
+}
+
+void handle_test()
+{
+	if (server.hasArg("sendBeacon"))
+	{
+		String tnc2Raw = send_fix_location();
+		APRS_sendTNC2Pkt(tnc2Raw); // Send packet to RF
+	}
+	else if (server.hasArg("sendRaw"))
+	{
+		for (uint8_t i = 0; i < server.args(); i++)
+		{
+			if (server.argName(i) == "raw")
+			{
+				if (server.arg(i) != "")
+				{
+					String tnc2Raw = server.arg(i);
+					APRS_sendTNC2Pkt(server.arg(i)); // Send packet to RF
+					Serial.println("Send RAW: " + tnc2Raw);
+				}
+				break;
+			}
+		}
+	}
+	setHTML(7);
+
+	webString += "<table>\n";
+	webString += "<tr><td><form accept-charset=\"UTF-8\" action=\"/test\" class=\"form-horizontal\" id=\"test_form\" method=\"post\">\n";
+	webString += "<div style=\"margin-left: 20px;\"><input type='submit' class=\"btn btn-danger\" name=\"sendBeacon\" value='SEND BEACON'></div><br />\n";
+	webString += "<div style=\"margin-left: 20px;\">TNC2 RAW: <input id=\"raw\" name=\"raw\" type=\"text\" size=\"60\" value=\"" + String(config.aprs_mycall) + ">APE32I,WIDE1-1:>Test Status\"/></div>\n";
+	webString += "<div style=\"margin-left: 20px;\"><input type='submit' class=\"btn btn-primary\" name=\"sendRaw\" value='SEND RAW'></div>\n";
+	webString += "</form></td></tr>\n";
+	webString += "<tr><td><hr width=\"80%\" /></td></tr>\n";
+	webString += "<tr><td><div id=\"vumeter\" style=\"width: 300px; height: 200px; margin: 10px;\"></div></td>\n";
+	webString += "<tr><td><div style=\"margin: 15px;\">Terminal<br /><textarea id=\"raw_txt\" name=\"raw_txt\" rows=\"25\" cols=\"80\" /></textarea></div></td></tr>\n";
+	webString += "</table>\n";
+
 	webString += "</body></html>\n";
 	server.send(200, "text/html", webString); // send to someones browser when asked
 
@@ -1402,6 +1613,8 @@ void webService()
 	server.on("/default", handle_default);
 	server.on("/service", handle_service);
 	server.on("/system", handle_system);
+	server.on("/test", handle_test);
+	server.on("/realtime", handle_realtime);
 	server.on("/firmware", handle_firmware);
 	/*handling uploading firmware file */
 	server.on(
@@ -1431,9 +1644,9 @@ void webService()
 					i2s_adc_disable(I2S_NUM_0);
 					dac_i2s_disable();
 					vTaskSuspend(taskAPRSHandle);
-					//vTaskSuspend(taskNetworkHandle);
+					// vTaskSuspend(taskNetworkHandle);
 					config.aprs = false;
-					config.tnc=false;
+					config.tnc = false;
 #ifndef I2S_INTERNAL
 					AFSK_TimerEnable(false);
 #endif
