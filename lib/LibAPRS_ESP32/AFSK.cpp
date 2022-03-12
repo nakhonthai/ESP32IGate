@@ -6,7 +6,7 @@
 #include <driver/adc.h>
 #include "esp_adc_cal.h"
 #include "cppQueue.h"
-//#include "ButterworthFilter.h"
+#include "ButterworthFilter.h"
 
 extern "C"
 {
@@ -28,7 +28,7 @@ bool hw_afsk_dac_isr = false;
 Afsk *AFSK_modem;
 
 // //กรองความถี่สูงผ่าน >300Hz  HPF Butterworth Filter. 0-300Hz ช่วงความถี่ต่ำใช้กับโทน CTCSS/DCS ในวิทยุสื่อสารจะถูกรองทิ้ง
-// ButterworthFilter hp_filter(300, 9600, ButterworthFilter::ButterworthFilter::Highpass, 2);
+ButterworthFilter hp_filter(1300, 9600, ButterworthFilter::ButterworthFilter::Highpass, 1);
 // //กรองความถี่ต่ำผ่าน <3KHz  LPF Butterworth Filter. ความถี่เสียงที่มากกว่า 3.5KHz ไม่ใช่ความถี่เสียงคนพูดจะถูกกรองทิ้ง
 // ButterworthFilter lp_filter(3500, 9600, ButterworthFilter::ButterworthFilter::Lowpass, 2);
 
@@ -411,7 +411,7 @@ uint8_t AFSK_dac_isr(Afsk *afsk)
 }
 
 int hdlc_flag_count = 0;
-bool hdlc_flage_end=false;
+bool hdlc_flage_end = false;
 static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
 {
   // Initialise a return value. We start with the
@@ -456,7 +456,7 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
       hdlc->receiving = false;
       LED_RX_OFF();
       hdlc_flag_count = 0;
-      hdlc_flage_end=false;
+      hdlc_flage_end = false;
     }
 
     // Everytime we receive a HDLC_FLAG, we reset the
@@ -483,7 +483,7 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
     hdlc->receiving = false;
     LED_RX_OFF();
     hdlc_flag_count = 0;
-    hdlc_flage_end=false;
+    hdlc_flage_end = false;
     return ret;
   }
 
@@ -493,7 +493,7 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
   if (!hdlc->receiving)
     return ret;
 
-  hdlc_flage_end=true;
+  hdlc_flage_end = true;
 
   // First check if what we are seeing is a stuffed bit.
   // Since the different HDLC control characters like
@@ -597,10 +597,19 @@ void AFSK_adc_isr(Afsk *afsk, int8_t currentSample)
    */
 
   // BUTTERWORTH Filter
+  // afsk->iirX[0] = afsk->iirX[1];
+  // afsk->iirX[1] = ((int8_t)fifo_pop(&afsk->delayFifo) * currentSample) / 6.027339492F;
+  // afsk->iirY[0] = afsk->iirY[1];
+  // afsk->iirY[1] = afsk->iirX[0] + afsk->iirX[1] + afsk->iirY[0] * 0.6681786379F;
+
+  //Fast calcultor
+  int16_t tmp16t;
   afsk->iirX[0] = afsk->iirX[1];
-  afsk->iirX[1] = ((int8_t)fifo_pop(&afsk->delayFifo) * currentSample) / 6.027339492F;
+  tmp16t = (int16_t)((int8_t)fifo_pop(&afsk->delayFifo) * (int8_t)currentSample);
+  afsk->iirX[1] = (tmp16t >> 2) + (tmp16t >> 5);
   afsk->iirY[0] = afsk->iirY[1];
-  afsk->iirY[1] = afsk->iirX[0] + afsk->iirX[1] + afsk->iirY[0] * 0.6681786379F;
+  tmp16t = (afsk->iirY[0] >> 2) + (afsk->iirY[0] >> 3) + (afsk->iirY[0] >> 4);
+  afsk->iirY[1] = afsk->iirX[0] + afsk->iirX[1] + tmp16t;
 
   // We put the sampled bit in a delay-line:
   // First we bitshift everything 1 left
@@ -776,6 +785,8 @@ extern bool afskSync;
 
 long mVsum = 0;
 int mVsumCount = 0;
+long lastVrms=0;
+bool VrmsFlag=false;
 
 void AFSK_Poll()
 {
@@ -857,7 +868,7 @@ void AFSK_Poll()
         adcVal = (int)pcm_in[i];
         offset_new += adcVal;
         offset_count++;
-        if (offset_count >= 192)
+        if (offset_count >= 192) //192
         {
           offset = offset_new / offset_count;
           offset_count = 0;
@@ -867,29 +878,47 @@ void AFSK_Poll()
         }
         adcVal -= offset; // Convert unsinewave to sinewave
 
-        mV = abs((int)adcVal); //mVp-p
-        mV = (int)((float)mV / 3.68F); // mV=(mV*625)/36848;
-        mVsum += powl(mV, 2);
-        mVsumCount++;
-        int8_t adcR = (int8_t)((int16_t)(adcVal >> 4)); // Reduce 12bit to 8bit
-        
+        float adcF=hp_filter.Update((float)adcVal);
+        adcVal=(int)adcF;
+
+        if (afskSync == false)
+        {
+          mV = abs((int)adcVal);         // mVp-p
+          mV = (int)((float)mV / 3.68F); // mV=(mV*625)/36848;
+          mVsum += powl(mV, 2);
+          mVsumCount++;
+        }
+        //int8_t adcR = (int8_t)((int16_t)(adcVal >> 4)); // Reduce 12bit to 8bit
+        int8_t adcR=(int8_t)(adcVal/16);
+
         AFSK_adc_isr(AFSK_modem, adcR); // Process signal IIR
         if (i % 4 == 0)
           APRS_poll(); // Poll check every 1 bit
       }
-      //Get mVrms on Sync flage 0x7E
-      if (hdlc_flag_count > 3 && hdlc_flage_end==true)
+      // Get mVrms on Sync flage 0x7E
+      if (afskSync == false)
       {
-        if (mVsumCount > 1920){
-          mVrms = sqrtl(mVsum / mVsumCount);
-          mVsum=0;
-          mVsumCount=0;
-          
-          double Vrms=(double)mVrms/1000;
-          dBV = 20.0F * log10(Vrms);
-          //dBu = 20 * log10(Vrms / 0.7746);
-          Serial.printf("mVrms=%d dBV=%0.1f agc=%0.2f\n",mVrms,dBV);
-          afskSync=true;
+        if (hdlc_flag_count > 3 && hdlc_flage_end == true)
+        {
+          if (mVsumCount > 960)
+          {
+            mVrms = sqrtl(mVsum / mVsumCount);
+            mVsum = 0;
+            mVsumCount = 0;
+            lastVrms=millis()+500;
+            VrmsFlag=true;
+            //if(millis()>lastVrms){
+              // double Vrms=(double)mVrms/1000;
+              // dBV = 20.0F * log10(Vrms);
+              // //dBu = 20 * log10(Vrms / 0.7746);
+              // Serial.printf("mVrms=%d dBV=%0.1f agc=%0.2f\n",mVrms,dBV);
+              //afskSync = true;
+            //}
+          }
+        }
+        if(millis()>lastVrms && VrmsFlag){
+          afskSync = true;
+          VrmsFlag=false;
         }
       }
     }

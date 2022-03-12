@@ -204,7 +204,7 @@ void setHTML(byte page)
 	webString += "<li role=\"presentation\"" + strActiveP2 + ">\n<a href=\"/data\" id=\"channel_link_api_keys\">Storage</a>\n</li>\n";
 #endif
 	webString += "<li role=\"presentation\"" + strActiveP3 + ">\n<a href=\"/config\" id=\"channel_link_settings\">Setting</a>\n</li>\n";
-	webString += "<li role=\"presentation\"" + strActiveP4 + ">\n<a href=\"/service\" id=\"channel_link_service\">Server</a>\n</li>\n";
+	webString += "<li role=\"presentation\"" + strActiveP4 + ">\n<a href=\"/service\" id=\"channel_link_service\">Service</a>\n</li>\n";
 	webString += "<li role=\"presentation\"" + strActiveP5 + ">\n<a href=\"/system\" id=\"channel_link_system\">System</a>\n</li>\n";
 	webString += "<li role=\"presentation\"" + strActiveP7 + ">\n<a href=\"/test\" id=\"channel_link_system\">Test</a>\n</li>\n";
 	webString += "<li role=\"presentation\"" + strActiveP6 + ">\n<a href=\"/firmware\" id=\"channel_link_firmware\">Firmware</a>\n</li>\n";
@@ -224,7 +224,7 @@ void setHTML(byte page)
 
 		webString += "<div>CPU Temp: " + String((temprature_sens_read() - 32) / 1.8, 1) + "C</div> \n";
 		webString += "<div>Free Heap:" + String(ESP.getFreeHeap()) + " Byte</div> \n";
-		String uptime = String(hour(tn), DEC) + ":" + String(minute(tn), DEC) + ":" + String(second(tn), DEC);
+		String uptime = String(day(tn) - 1, DEC) + "D " + String(hour(tn), DEC) + ":" + String(minute(tn), DEC) + ":" + String(second(tn), DEC);
 		webString += "<div>System Uptime: " + uptime + "</div> \n";
 
 		webString += "</td></tr><tr><td>\n";
@@ -554,17 +554,17 @@ void handle_setting()
 	webString += "<div class = \"col-pad\">\n<h3>Fix Location</h3>\n";
 
 	webString += "<div class=\"form-group\">\n";
-	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Latitude</label>\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Latitude(Deg.)</label>\n";
 	webString += "<div class=\"col-sm-3 col-xs-6\"><input class=\"form-control\" id=\"gpsLat\" name=\"gpsLat\" type=\"text\" value=\"" + String(config.gps_lat, 5) + "\" /></div>\n";
 	webString += "</div>\n";
 
 	webString += "<div class=\"form-group\">\n";
-	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Longitude</label>\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Longitude(Deg.)</label>\n";
 	webString += "<div class=\"col-sm-3 col-xs-6\"><input class=\"form-control\" id=\"gpsLon\" name=\"gpsLon\" type=\"text\" value=\"" + String(config.gps_lon, 5) + "\" /></div>\n";
 	webString += "</div>\n";
 
 	webString += "<div class=\"form-group\">\n";
-	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Altitude</label>\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Altitude(M.)</label>\n";
 	webString += "<div class=\"col-sm-3 col-xs-6\"><input class=\"form-control\" id=\"gpsAlt\" name=\"gpsAlt\" type=\"text\" value=\"" + String(config.gps_alt) + "\" /></div>\n";
 	webString += "</div>\n";
 
@@ -579,12 +579,12 @@ void handle_setting()
 	webString += "</div>\n";
 
 	webString += "<div class=\"form-group\">\n";
-	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">APRS PATH</label>\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">APRS Path</label>\n";
 	webString += "<div class=\"col-sm-6 col-xs-8\"><input class=\"form-control\" id=\"aprsPath\" name=\"aprsPath\" type=\"text\" value=\"" + String(config.tnc_path) + "\" /></div>\n";
 	webString += "</div>\n";
 
 	webString += "<div class=\"form-group\">\n";
-	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Beacon interval</label>\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Beacon interval(mSec)</label>\n";
 	webString += "<div class=\"col-sm-2 col-xs-3\"><input class=\"form-control\" id=\"beaconIntv\" name=\"beaconIntv\" type=\"text\" value=\"" + String(config.aprs_beacon) + "\" /></div>\n";
 	webString += "</div>\n";
 
@@ -751,6 +751,26 @@ void handle_service()
 						inet2rfEn = true;
 				}
 			}
+			if (server.argName(i) == "digiDelay")
+			{
+				if (server.arg(i) != "")
+				{
+					if (isValidNumber(server.arg(i)))
+						config.digi_delay = server.arg(i).toInt();
+					if (config.digi_delay > 5000)
+						config.digi_delay = 5000;
+				}
+			}
+			if (server.argName(i) == "timeSlot")
+			{
+				if (server.arg(i) != "")
+				{
+					if (isValidNumber(server.arg(i)))
+						config.tx_timeslot = server.arg(i).toInt();
+					if (config.tx_timeslot > 10000)
+						config.tx_timeslot = 10000;
+				}
+			}
 
 			// if (server.argName(i) == "mqttEnable") {
 			// 	if (server.arg(i) != "")
@@ -826,7 +846,7 @@ void handle_service()
 
 	webString += "<div class=\"form-group\">\n";
 	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Pass Code</label>\n";
-	webString += "<div class=\"col-sm-2 col-xs-4\"><input class=\"form-control\" id=\"myPasscode\" name=\"myPasscode\" type=\"password\" value=\"" + String(config.aprs_passcode) + "\" /></div>\n";
+	webString += "<div class=\"col-sm-2 col-xs-4\"><input class=\"form-control\" id=\"myPasscode\" name=\"myPasscode\" type=\"password\" value=\"" + String(config.aprs_passcode) + "\" />From <a href=\"https://www.dprns.com/index.php?pid=5\">Here</a></div>\n";
 	webString += "</div>\n";
 
 	// webString += "<div class=\"form-group\">\n";
@@ -835,7 +855,7 @@ void handle_service()
 	// webString += "</div>\n";
 
 	webString += "<div class=\"form-group\">\n";
-	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">APRS Host</label>\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">APRS Server</label>\n";
 	webString += "<div class=\"col-sm-6 col-xs-8\"><input class=\"form-control\" id=\"aprsHost\" name=\"aprsHost\" type=\"text\" value=\"" + String(config.aprs_host) + "\" /><br />Web Service: <a href=\"http://aprs.dprns.com:14501\" target=\"_blank\">T2THAI</a></div>\n";
 	webString += "</div>\n";
 
@@ -877,6 +897,53 @@ void handle_service()
 	webString += "<div class=\"form-group\">\n";
 	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Inet->RF Enable</label>\n";
 	webString += "<div class=\"col-sm-4 col-xs-8\"><input class=\"field_checkbox\" id=\"inet2rfEnable\" name=\"inet2rfEnable\" type=\"checkbox\" value=\"OK\" " + inet2rfFlage + "/></div>\n";
+	webString += "</div>\n";
+	String digiFlage = "";
+	if (config.tnc_digi)
+		digiFlage = "checked";
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Digi Repeager</label>\n";
+	webString += "<div class=\"col-sm-4 col-xs-8\"><input class=\"field_checkbox\" id=\"digiEnable\" name=\"digiEnable\" type=\"checkbox\" value=\"OK\" " + digiFlage + "/></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Digi Delay(mSec)</label>\n";
+	webString += "<div class=\"col-sm-2 col-xs-6\"><select name=\"digiDelay\" id=\"digiDelay\">\n";
+	for (uint16_t delay = 0; delay <= 5000; delay += 500)
+	{
+		if (config.digi_delay == delay)
+		{
+			if (delay == 0)
+				webString += "<option value=\"" + String(delay) + "\" selected>Auto</option>\n";
+			else
+				webString += "<option value=\"" + String(delay) + "\" selected>" + String(delay) + "</option>\n";
+		}
+		else
+		{
+			if (delay == 0)
+				webString += "<option value=\"" + String(delay) + "\">Auto</option>\n";
+			else
+				webString += "<option value=\"" + String(delay) + "\">" + String(delay) + "</option>\n";
+		}
+	}
+	webString += "</select></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">TX Time Slot(mSec)</label>\n";
+	webString += "<div class=\"col-sm-2 col-xs-6\"><select name=\"timeSlot\" id=\"timeSlot\">\n";
+	for (uint16_t delay = 0; delay <= 10000; delay += 1000)
+	{
+		if (config.tx_timeslot == delay)
+		{
+			webString += "<option value=\"" + String(delay) + "\" selected>" + String(delay) + "</option>\n";
+		}
+		else
+		{
+			webString += "<option value=\"" + String(delay) + "\">" + String(delay) + "</option>\n";
+		}
+	}
+	webString += "</select></div>\n";
 	webString += "</div>\n";
 
 	webString += "</div>\n<hr>\n"; // div aprs

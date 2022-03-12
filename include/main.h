@@ -10,7 +10,7 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define VERSION "0.4"
+#define VERSION "0.5"
 
 #define DEBUG
 //#define DEBUG_IS
@@ -33,6 +33,7 @@
 #define FORMAT_SPIFFS_IF_FAILED true
 
 #define PKGLISTSIZE 10
+#define PKGTXSIZE 5
 
 const int timeZone = 7;  // Bangkok
 
@@ -41,6 +42,7 @@ const int timeZone = 7;  // Bangkok
 #include <SD.h>
 #include <SPIFFS.h>
 #include "soc/rtc_wdt.h"
+#include <AX25.h>
 
 #include "HardwareSerial.h"
 #include "EEPROM.h"
@@ -99,9 +101,12 @@ typedef struct Config_Struct {
 	char mqtt_user[10];
 	char mqtt_pass[10];
 	char wifi_power;
+	uint16_t tx_timeslot;
+	uint16_t digi_delay;
+
 }Configuration;
 
-typedef struct digiTLM_struct {
+typedef struct igateTLM_struct {
 	uint16_t Sequence;
 	unsigned long ParmTimeout;
 	unsigned long TeleTimeout;
@@ -110,7 +115,7 @@ typedef struct digiTLM_struct {
 	uint8_t RX;
 	uint8_t TX;
 	uint8_t DROP;
-}digiTLMType;
+}igateTLMType;
 
 typedef struct pkgListStruct {
 	time_t time;
@@ -134,6 +139,23 @@ typedef struct statisticStruct {
 	uint32_t inet2rf;
 }statusType;
 
+typedef struct digiTLM_struct{
+    unsigned int Sequence;
+    unsigned int ParmTimeout;
+    unsigned int TeleTimeout;
+    unsigned char RxPkts;
+    unsigned char TxPkts;
+    unsigned char DropRx; 
+    unsigned char ErPkts;    
+}digiTLMType;
+
+typedef struct txQueue_struct{
+	bool Active;
+	long timeStamp;
+	int Delay;
+	char Info[300];
+}txQueueType;
+
 const char PARM[] = { "PARM.RF->INET,INET->RF,RxPkts,TxPkts,IGateDropRx" };
 const char UNIT[] = { "UNIT.Pkts,Pkts,Pkts,Pkts,Pkts" };
 const char EQNS[] = { "EQNS.0,1,0,0,1,0,0,1,0,0,1,0,0,1,0" };
@@ -150,5 +172,7 @@ void sort(pkgListType a[], int size);
 void sortPkgDesc(pkgListType a[], int size);
 int processPacket(String &tnc2);
 String send_fix_location();
+int digiProcess(AX25Msg &Packet);
+void printTime();
 
 #endif

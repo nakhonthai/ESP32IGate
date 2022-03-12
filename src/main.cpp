@@ -57,16 +57,19 @@ bool aprsUpdate = false;
 boolean gotPacket = false;
 AX25Msg incomingPacket;
 
-bool lastPkg=false;
-bool afskSync=false;
-String lastPkgRaw="";
-float dBV=0;
-int mVrms=0;
+bool lastPkg = false;
+bool afskSync = false;
+String lastPkgRaw = "";
+float dBV = 0;
+int mVrms = 0;
 
 cppQueue PacketBuffer(sizeof(AX25Msg), 5, IMPLEMENTATION); // Instantiate queue
 
 statusType status;
-RTC_DATA_ATTR digiTLMType digiTLM;
+RTC_DATA_ATTR igateTLMType igateTLM;
+RTC_DATA_ATTR digiTLMType digiLog;
+RTC_DATA_ATTR txQueueType txQueue[PKGTXSIZE];
+RTC_DATA_ATTR uint8_t digiCount = 0;
 
 Configuration config;
 
@@ -177,6 +180,8 @@ void defaultConfig()
     config.tnc_beacon = 0;
     config.aprs_table = '/';
     config.aprs_symbol = '&';
+    config.digi_delay = 2000;
+    config.tx_timeslot = 5000;
     sprintf(config.aprs_path, "WIDE1-1");
     sprintf(config.aprs_comment, "ESP32 Internet Gateway");
     sprintf(config.tnc_comment, "ESP32 Build in TNC");
@@ -288,6 +293,64 @@ void pkgListUpdate(char *call, bool type)
     }
 }
 
+bool pkgTxUpdate(const char *info, int delay)
+{
+    char *ecs = strstr(info, ">");
+    if (ecs == NULL)
+        return false;
+    // Replace
+    for (int i = 0; i < PKGTXSIZE; i++)
+    {
+        if (txQueue[i].Active)
+        {
+            if (!(strncmp(&txQueue[i].Info[0], info, info - ecs)))
+            {
+                strcpy(&txQueue[i].Info[0], info);
+                txQueue[i].Delay = delay;
+                txQueue[i].timeStamp = millis();
+                return true;
+            }
+        }
+    }
+
+    // Add
+    for (int i = 0; i < PKGTXSIZE; i++)
+    {
+        if (txQueue[i].Active == false)
+        {
+            strcpy(&txQueue[i].Info[0], info);
+            txQueue[i].Delay = delay;
+            txQueue[i].Active = true;
+            txQueue[i].timeStamp = millis();
+            break;
+        }
+    }
+    return true;
+}
+
+bool pkgTxSend()
+{
+    for (int i = 0; i < PKGTXSIZE; i++)
+    {
+        if (txQueue[i].Active)
+        {
+            int decTime = millis() - txQueue[i].timeStamp;
+            if (decTime > txQueue[i].Delay)
+            {
+                APRS_setPreamble(350L);
+                APRS_sendTNC2Pkt(String(txQueue[i].Info)); // Send packet to RF
+                txQueue[i].Active = false;
+#ifdef DEBUG_TNC
+                printTime();
+                Serial.println("TX->RF: " + String(txQueue[i].Info));
+#endif
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 uint8_t *packetData;
 //ฟังชั่นถูกเรียกมาจาก ax25_decode
 void aprs_msg_callback(struct AX25Msg *msg)
@@ -301,13 +364,13 @@ void aprs_msg_callback(struct AX25Msg *msg)
 void printTime()
 {
     struct tm tmstruct;
-	getLocalTime(&tmstruct, 5000);
+    getLocalTime(&tmstruct, 5000);
     Serial.print("[");
     Serial.print(tmstruct.tm_hour);
     Serial.print(":");
     Serial.print(tmstruct.tm_min);
     Serial.print(":");
-    Serial.print( tmstruct.tm_sec);
+    Serial.print(tmstruct.tm_sec);
     Serial.print("]");
 }
 
@@ -467,7 +530,8 @@ void setup()
     {
         defaultConfig();
         Serial.println("Manual Default configure!");
-        while(digitalRead(0) == LOW);
+        while (digitalRead(0) == LOW)
+            ;
     }
 
     //ตรวจสอบคอนฟิกซ์ผิดพลาด
@@ -493,7 +557,7 @@ void setup()
     xTaskCreatePinnedToCore(
         taskAPRS,        /* Function to implement the task */
         "taskAPRS",      /* Name of the task */
-        8192,           /* Stack size in words */
+        8192,            /* Stack size in words */
         NULL,            /* Task input parameter */
         1,               /* Priority of the task */
         &taskAPRSHandle, /* Task handle. */
@@ -577,15 +641,11 @@ int processPacket(String &tnc2)
     for (int i = 0; i < incomingPacket.rpt_count; i++)
     {
         tnc2 += String(",");
-        char *rptcall = incomingPacket.rpt_list[i].call;
-        tnc2 += String(rptcall);
+        tnc2 += String(incomingPacket.rpt_list[i].call);
         if (incomingPacket.rpt_list[i].ssid > 0)
         {
             tnc2 += String("-");
-            char rssid[3];
-            itoa(incomingPacket.rpt_list[i].ssid, rssid, 3);
-            rssid[2] = 0;
-            tnc2 += String(rssid);
+            tnc2 += String(incomingPacket.rpt_list[i].ssid);
         }
         if (incomingPacket.rpt_flags & (1 << i))
             tnc2 += "*";
@@ -594,10 +654,10 @@ int processPacket(String &tnc2)
     tnc2 += String((const char *)incomingPacket.info);
     tnc2 += String("\n");
 
-#ifdef DEBUG_TNC
-    Serial.printf("[%d] ", ++pkgTNC_count);
-    Serial.print(tnc2);
-#endif
+    // #ifdef DEBUG_TNC
+    //     Serial.printf("[%d] ", ++pkgTNC_count);
+    //     Serial.print(tnc2);
+    // #endif
     return tnc2.length();
 }
 
@@ -635,10 +695,12 @@ void sendIsPkgMsg(char *raw)
     String tnc2Raw = String(str);
     if (aprsClient.connected())
         aprsClient.println(tnc2Raw); // Send packet to Inet
-    else
-        APRS_sendTNC2Pkt(tnc2Raw); // Send packet to RF
+    if (config.tnc)
+        pkgTxUpdate(str, 0);
+    // APRS_sendTNC2Pkt(tnc2Raw); // Send packet to RF
 }
 
+long timeSlot;
 void taskAPRS(void *pvParameters)
 {
     //	long start, stop;
@@ -653,8 +715,9 @@ void taskAPRS(void *pvParameters)
     APRS_setPreamble(300);
     APRS_setTail(0);
     sendTimer = millis() - (config.aprs_beacon * 1000) + 30000;
-    digiTLM.TeleTimeout = millis() + 60000; // 1Min
+    igateTLM.TeleTimeout = millis() + 60000; // 1Min
     AFSKInitAct = true;
+    timeSlot = millis();
     for (;;)
     {
         long now = millis();
@@ -663,6 +726,20 @@ void taskAPRS(void *pvParameters)
         time(&timeStamp);
         vTaskDelay(10 / portTICK_PERIOD_MS);
         // serviceHandle();
+        if (now > (timeSlot + 10))
+        {
+            if (!digitalRead(LED_PIN))
+            { // RX State Fail
+                if (pkgTxSend())
+                    timeSlot = millis() + config.tx_timeslot; // Tx Time Slot = 5sec.
+                else
+                    timeSlot = millis();
+            }
+            else
+            {
+                timeSlot = millis() + 500;
+            }
+        }
 
         if (digitalRead(0) == LOW)
         {
@@ -689,7 +766,8 @@ void taskAPRS(void *pvParameters)
                     if (config.tnc)
                     {
                         String tnc2Raw = send_fix_location();
-                        APRS_sendTNC2Pkt(tnc2Raw); // Send packet to RF
+                        pkgTxUpdate(tnc2Raw.c_str(), 0);
+                        // APRS_sendTNC2Pkt(tnc2Raw); // Send packet to RF
 #ifdef DEBUG_TNC
                         Serial.println("Manual TX: " + tnc2Raw);
 #endif
@@ -718,6 +796,8 @@ void taskAPRS(void *pvParameters)
         if (now > (sendTimer + (config.aprs_beacon * 1000)))
         {
             sendTimer = now;
+            if (digiCount > 0)
+                digiCount--;
 #ifdef SA818
             SA818_CHECK();
 #endif
@@ -728,9 +808,10 @@ void taskAPRS(void *pvParameters)
                     String tnc2Raw = send_fix_location();
                     if (aprsClient.connected())
                         aprsClient.println(tnc2Raw); // Send packet to Inet
-                    APRS_sendTNC2Pkt(tnc2Raw);       // Send packet to RF
+                    pkgTxUpdate(tnc2Raw.c_str(), 0);
+                    // APRS_sendTNC2Pkt(tnc2Raw);       // Send packet to RF
 #ifdef DEBUG_TNC
-                    Serial.println("TX: " + tnc2Raw);
+                    // Serial.println("TX: " + tnc2Raw);
 #endif
                 }
             }
@@ -744,10 +825,10 @@ void taskAPRS(void *pvParameters)
 
         if (config.tnc_telemetry)
         {
-            if (digiTLM.TeleTimeout < millis())
+            if (igateTLM.TeleTimeout < millis())
             {
-                digiTLM.TeleTimeout = millis() + 600000; // 10Min
-                if ((digiTLM.Sequence % 6) == 0)
+                igateTLM.TeleTimeout = millis() + 600000; // 10Min
+                if ((igateTLM.Sequence % 6) == 0)
                 {
                     sendIsPkgMsg((char *)&PARM[0]);
                     sendIsPkgMsg((char *)&UNIT[0]);
@@ -755,22 +836,23 @@ void taskAPRS(void *pvParameters)
                 }
                 char rawTlm[100];
                 if (config.aprs_ssid == 0)
-                    sprintf(rawTlm, "%s>APE32I:T#%03d,%d,%d,%d,%d,%d,00000000", config.aprs_mycall, digiTLM.Sequence, digiTLM.RF2INET, digiTLM.INET2RF, digiTLM.RX, digiTLM.TX, digiTLM.DROP);
+                    sprintf(rawTlm, "%s>APE32I:T#%03d,%d,%d,%d,%d,%d,00000000", config.aprs_mycall, igateTLM.Sequence, igateTLM.RF2INET, igateTLM.INET2RF, igateTLM.RX, igateTLM.TX, igateTLM.DROP);
                 else
-                    sprintf(rawTlm, "%s-%d>APE32I:T#%03d,%d,%d,%d,%d,%d,00000000", config.aprs_mycall,config.aprs_ssid, digiTLM.Sequence, digiTLM.RF2INET, digiTLM.INET2RF, digiTLM.RX, digiTLM.TX, digiTLM.DROP);
-                
+                    sprintf(rawTlm, "%s-%d>APE32I:T#%03d,%d,%d,%d,%d,%d,00000000", config.aprs_mycall, config.aprs_ssid, igateTLM.Sequence, igateTLM.RF2INET, igateTLM.INET2RF, igateTLM.RX, igateTLM.TX, igateTLM.DROP);
+
                 if (aprsClient.connected())
                     aprsClient.println(String(rawTlm)); // Send packet to Inet
-                else
-                    APRS_sendTNC2Pkt(String(rawTlm)); // Send packet to RF
-                digiTLM.Sequence++;
-                if (digiTLM.Sequence > 999)
-                    digiTLM.Sequence = 0;
-                digiTLM.DROP = 0;
-                digiTLM.INET2RF = 0;
-                digiTLM.RF2INET = 0;
-                digiTLM.RX = 0;
-                digiTLM.TX = 0;
+                if (config.tnc)
+                    pkgTxUpdate(rawTlm, 0);
+                // APRS_sendTNC2Pkt(String(rawTlm)); // Send packet to RF
+                igateTLM.Sequence++;
+                if (igateTLM.Sequence > 999)
+                    igateTLM.Sequence = 0;
+                igateTLM.DROP = 0;
+                igateTLM.INET2RF = 0;
+                igateTLM.RF2INET = 0;
+                igateTLM.RX = 0;
+                igateTLM.TX = 0;
                 // client.println(raw);
             }
         }
@@ -784,8 +866,43 @@ void taskAPRS(void *pvParameters)
                 //นำข้อมูลแพ็จเกจจาก TNC ออกจากคิว
                 PacketBuffer.pop(&incomingPacket);
                 processPacket(tnc2);
-                lastPkg=true;
-                lastPkgRaw=tnc2;
+
+                if (config.tnc_digi)
+                {
+                    int dlyFlag = digiProcess(incomingPacket);
+                    if (dlyFlag > 0)
+                    {
+                        int digiDelay;
+                        if (dlyFlag == 1)
+                        {
+                            digiDelay = 0;
+                        }
+                        else
+                        {
+                            if (config.digi_delay == 0)
+                            { // Auto mode
+                                if (digiCount > 20)
+                                    digiDelay = random(5000);
+                                else if (digiCount > 10)
+                                    digiDelay = random(3000);
+                                else if (digiCount > 0)
+                                    digiDelay = random(1500);
+                                else
+                                    digiDelay = random(500);
+                            }
+                            else
+                            {
+                                digiDelay = random(config.digi_delay);
+                            }
+                        }
+                        String digiPkg;
+                        processPacket(digiPkg);
+                        pkgTxUpdate(digiPkg.c_str(), digiDelay);
+                    }
+                }
+
+                lastPkg = true;
+                lastPkgRaw = tnc2;
                 // ESP_BT.println(tnc2);
                 status.allCount++;
 
@@ -797,10 +914,10 @@ void taskAPRS(void *pvParameters)
                     {
                         raw = (char *)malloc(tnc2.length() + 20);
                         status.tncCount++;
-                        if (tnc2.indexOf("RFONLY", 10) > 0) //PATH RFONLY จะไม่ส่งเข้า APRS-IS
+                        if (tnc2.indexOf("RFONLY", 10) > 0) // PATH RFONLY จะไม่ส่งเข้า APRS-IS
                         {
                             status.dropCount++;
-                            digiTLM.DROP++;
+                            igateTLM.DROP++;
                         }
                         else
                         {
@@ -823,23 +940,23 @@ void taskAPRS(void *pvParameters)
                                 tnc2 = String(raw);
                                 aprsClient.println(tnc2);
                                 status.rf2inet++;
-                                digiTLM.RF2INET++;
-                                digiTLM.TX++;
+                                igateTLM.RF2INET++;
+                                igateTLM.TX++;
 
 #ifdef DEBUG
                                 printTime();
-                                Serial.print("RF->INET ");
+                                Serial.print("RF->INET: ");
                                 Serial.println(tnc2);
 #endif
                             }
                             else
                             {
                                 status.errorCount++;
-                                digiTLM.DROP++;
+                                igateTLM.DROP++;
                             }
                             free(str);
                         }
-                        //memset(&raw[0], 0, sizeof(raw));
+                        // memset(&raw[0], 0, sizeof(raw));
                         tnc2.toCharArray(&raw[0], start_val + 1);
                         raw[start_val + 1] = 0;
                         pkgListUpdate(&raw[0], 1);
@@ -961,7 +1078,7 @@ void taskNetwork(void *pvParameters)
                     // Serial.println("Config NTP");
                     // setSyncProvider(getNtpTime);
                     Serial.println("Contacting Time Server");
-                    configTime(3600 * timeZone, 0, "203.150.19.26", "110.170.126.101","77.68.122.252");
+                    configTime(3600 * timeZone, 0, "203.150.19.26", "110.170.126.101", "77.68.122.252");
                     vTaskDelay(3000 / portTICK_PERIOD_MS);
                     time_t systemTime;
                     time(&systemTime);
@@ -998,7 +1115,7 @@ void taskNetwork(void *pvParameters)
                                 String msg_call = "::" + src_call;
 
                                 status.allCount++;
-                                digiTLM.RX++;
+                                igateTLM.RX++;
                                 if (config.tnc && config.inet2rf)
                                 {
                                     if (line.indexOf(msg_call) <= 0) // src callsign = msg callsign ไม่ใช่หัวข้อโทรมาตร
@@ -1008,14 +1125,15 @@ void taskNetwork(void *pvParameters)
                                             if (line.indexOf("::") > 0) //ข้อความเท่านั้น
                                             {                           // message only
                                                 // raw[0] = '}';
-                                                //line.toCharArray(&raw[1], line.length());
+                                                // line.toCharArray(&raw[1], line.length());
                                                 // tncTxEnable = false;
                                                 // SerialTNC.flush();
                                                 // SerialTNC.println(raw);
-                                                APRS_sendTNC2Pkt(line); // Send out RF by TNC build in
-                                                // tncTxEnable = true;
+                                                pkgTxUpdate(line.c_str(), 0);
+                                                // APRS_sendTNC2Pkt(line); // Send out RF by TNC build in
+                                                //  tncTxEnable = true;
                                                 status.inet2rf++;
-                                                digiTLM.INET2RF++;
+                                                igateTLM.INET2RF++;
                                                 printTime();
 #ifdef DEBUG
                                                 Serial.print("INET->RF ");
@@ -1026,7 +1144,7 @@ void taskNetwork(void *pvParameters)
                                     }
                                     else
                                     {
-                                        digiTLM.DROP++;
+                                        igateTLM.DROP++;
                                         Serial.print("INET Message TELEMETRY from ");
                                         Serial.println(src_call);
                                     }
@@ -1060,4 +1178,278 @@ void taskNetwork(void *pvParameters)
             }
         }
     }
+}
+
+int digiProcess(AX25Msg &Packet)
+{
+    int idx, j;
+    uint8_t ctmp;
+    // if(!DIGI) return;
+    // if(rx_data) return;
+    // if(digi_timeout<aprs_delay) return;
+    // digi_timeout = 65530;
+    // aprs_delay = 65535;
+
+    j = 0;
+    if (Packet.len < 5)
+    {
+        digiLog.ErPkts++;
+        return 0; // NO DST
+    }
+
+    if (!strncmp(&Packet.src.call[0], "NOCALL", 6))
+    {
+        digiLog.DropRx++;
+        return 0;
+    }
+    if (!strncmp(&Packet.src.call[0], "MYCALL", 6))
+    {
+        digiLog.DropRx++;
+        return 0;
+    }
+
+    // Destination SSID Trace
+    if (Packet.dst.ssid > 0)
+    {
+        uint8_t ctmp = Packet.dst.ssid & 0x1E; // Check DSSID
+
+        if (ctmp > 15)
+            ctmp = 0;
+        if (ctmp < 8)
+        { // Edit PATH Change to TRACEn-N
+            if (ctmp > 0)
+                ctmp--;
+            Packet.dst.ssid = ctmp;
+            if (Packet.rpt_count > 0)
+            {
+                for (idx = 0; idx < Packet.rpt_count; idx++)
+                {
+                    if (!strcmp(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0])) // Is path same callsign
+                    {
+                        if (Packet.rpt_list[idx].ssid == config.aprs_ssid) // IS path same SSID
+                        {
+                            if (Packet.rpt_flags & (1 << idx))
+                            {
+                                digiLog.DropRx++;
+                                return 0; // bypass flag *
+                            }
+                            Packet.rpt_flags |= (1 << idx);
+                            return 1;
+                        }
+                    }
+                    if (Packet.rpt_flags & (1 << idx))
+                        continue;
+                    for (j = idx; j < Packet.rpt_count; j++)
+                    {
+                        if (Packet.rpt_flags & (1 << j))
+                            break;
+                    }
+                    // Move current part to next part
+                    for (; j >= idx; j--)
+                    {
+                        int n = j + 1;
+                        strcpy(&Packet.rpt_list[n].call[0], &Packet.rpt_list[j].call[0]);
+                        Packet.rpt_list[n].ssid = Packet.rpt_list[j].ssid;
+                        if (Packet.rpt_flags & (1 << j))
+                            Packet.rpt_flags |= (1 << n);
+                        else
+                            Packet.rpt_flags &= ~(1 << n);
+                    }
+
+                    // Add new part
+                    Packet.rpt_count += 1;
+                    strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
+                    Packet.rpt_list[idx].ssid = config.aprs_ssid;
+                    Packet.rpt_flags |= (1 << idx);
+                    return 2;
+                    // j = 1;
+                    // break;
+                }
+            }
+            else
+            {
+                idx = 0;
+                strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
+                Packet.rpt_list[idx].ssid = config.aprs_ssid;
+                Packet.rpt_flags |= (1 << idx);
+                Packet.rpt_count += 1;
+                return 2;
+            }
+        }
+        else
+        {
+            digiLog.DropRx++;
+            return 0; // NO PATH
+        }
+    }
+
+    for (idx = 0; idx < Packet.rpt_count; idx++)
+    {
+        if (!strncmp(&Packet.rpt_list[idx].call[0], "qA", 2))
+        {
+            digiLog.DropRx++;
+            return 0;
+        }
+    }
+
+    for (idx = 0; idx < Packet.rpt_count; idx++)
+    {
+        if (!strncmp(&Packet.rpt_list[idx].call[0], "TCP", 3))
+        {
+            digiLog.DropRx++;
+            return 0;
+        }
+    }
+
+    for (idx = 0; idx < Packet.rpt_count; idx++)
+    {
+        if (Packet.rpt_flags & (1 << idx))
+        {
+            if (idx == (Packet.rpt_count - 1))
+                digiCount++;
+            continue; // bypass flag *
+        }
+        if (!strncmp(&Packet.rpt_list[idx].call[0], "WIDE", 4))
+        {
+            // Check WIDEn-N
+            if (Packet.rpt_list[idx].ssid > 0)
+            {
+                if (Packet.rpt_flags & (1 << idx))
+                    continue; // bypass flag *
+                ctmp = Packet.rpt_list[idx].ssid & 0x1F;
+                if (ctmp > 0)
+                    ctmp--;
+                if (ctmp > 15)
+                    ctmp = 0;
+                if (ctmp == 0)
+                {
+                    strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
+                    Packet.rpt_list[idx].ssid = config.aprs_ssid;
+                    Packet.rpt_flags |= (1 << idx);
+                    j = 2;
+                    break;
+                }
+                else
+                {
+                    Packet.rpt_list[idx].ssid = ctmp;
+                    Packet.rpt_flags &= ~(1 << idx);
+                    j = 2;
+                    break;
+                }
+            }
+            else
+            {
+                j = 2;
+                strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
+                Packet.rpt_list[idx].ssid = config.aprs_ssid;
+                Packet.rpt_flags |= (1 << idx);
+                break;
+            }
+        }
+        else if (!strncmp(&Packet.rpt_list[idx].call[0], "TRACE", 5))
+        {
+            if (Packet.rpt_flags & (1 << idx))
+                continue; // bypass flag *
+            ctmp = Packet.rpt_list[idx].ssid & 0x1F;
+            if (ctmp > 0)
+                ctmp--;
+            if (ctmp > 15)
+                ctmp = 0;
+            if (ctmp == 0)
+            {
+                strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
+                Packet.rpt_list[idx].ssid = config.aprs_ssid;
+                Packet.rpt_flags |= (1 << idx);
+                j = 2;
+                break;
+            }
+            else
+            {
+                for (j = idx; j < Packet.rpt_count; j++)
+                {
+                    if (Packet.rpt_flags & (1 << j))
+                        break;
+                }
+                // Move current part to next part
+                for (; j >= idx; j--)
+                {
+                    int n = j + 1;
+                    strcpy(&Packet.rpt_list[n].call[0], &Packet.rpt_list[j].call[0]);
+                    Packet.rpt_list[n].ssid = Packet.rpt_list[j].ssid;
+                    if (Packet.rpt_flags & (1 << j))
+                        Packet.rpt_flags |= (1 << n);
+                    else
+                        Packet.rpt_flags &= ~(1 << n);
+                }
+                // Reduce N part of TRACEn-N
+                Packet.rpt_list[idx + 1].ssid = ctmp;
+
+                // Add new part
+                Packet.rpt_count += 1;
+                strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
+                Packet.rpt_list[idx].ssid = config.aprs_ssid;
+                Packet.rpt_flags |= (1 << idx);
+                j = 2;
+                break;
+            }
+        }
+        else if (!strncmp(&Packet.rpt_list[idx].call[0], "RFONLY", 6))
+        {
+            j = 2;
+            // strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
+            // Packet.rpt_list[idx].ssid = config.aprs_ssid;
+            Packet.rpt_flags |= (1 << idx);
+            break;
+        }
+        else if (!strncmp(&Packet.rpt_list[idx].call[0], "RELAY", 5))
+        {
+            j = 2;
+            strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
+            Packet.rpt_list[idx].ssid = config.aprs_ssid;
+            Packet.rpt_flags |= (1 << idx);
+            break;
+        }
+        else if (!strncmp(&Packet.rpt_list[idx].call[0], "GATE", 4))
+        {
+            j = 2;
+            strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
+            Packet.rpt_list[idx].ssid = config.aprs_ssid;
+            Packet.rpt_flags |= (1 << idx);
+            break;
+        }
+        else if (!strncmp(&Packet.rpt_list[idx].call[0], "ECHO", 4))
+        {
+            j = 2;
+            strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
+            Packet.rpt_list[idx].ssid = config.aprs_ssid;
+            Packet.rpt_flags |= (1 << idx);
+            break;
+        }
+        else if (!strcmp(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0])) // Is path same callsign
+        {
+            ctmp = Packet.rpt_list[idx].ssid & 0x1F;
+            if (ctmp == config.aprs_ssid) // IS path same SSID
+            {
+                if (Packet.rpt_flags & (1 << idx))
+                {
+                    digiLog.DropRx++;
+                    break; // bypass flag *
+                }
+                Packet.rpt_flags |= (1 << idx);
+                j = 1;
+                break;
+            }
+            else
+            {
+                j = 0;
+                break;
+            }
+        }
+        else
+        {
+            j = 0;
+            break;
+        }
+    }
+    return j;
 }

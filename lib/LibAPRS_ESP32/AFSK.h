@@ -188,7 +188,7 @@ inline static uint8_t sinSample(uint16_t i)
 #include "driver/i2s.h"
 #include "driver/dac.h"
 
-#define SAMPLE_RATE 9580 //9600 ปรับชดเชยแซมปลิงค์ของ I2S
+#define SAMPLE_RATE 9600 //9580 ปรับชดเชยแซมปลิงค์ของ I2S
 #define PIN_I2S_BCLK 26
 #define PIN_I2S_LRC 27
 #define PIN_I2S_DIN 35
