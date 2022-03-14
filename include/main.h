@@ -10,12 +10,13 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define VERSION "0.5"
+#define VERSION "0.5a"
 
 #define DEBUG
 //#define DEBUG_IS
 
 //#define SDCARD
+//#define SA818
 
 #define WIFI_OFF_FIX	0
 #define WIFI_AP_FIX		1
@@ -103,7 +104,19 @@ typedef struct Config_Struct {
 	char wifi_power;
 	uint16_t tx_timeslot;
 	uint16_t digi_delay;
-
+	bool input_hpf;
+#ifdef SA818
+	float freq_rx;
+	float freq_tx;
+	int offset_rx;
+	int offset_tx;
+	int tone_rx;
+	int tone_tx;
+	uint8_t band;
+	uint8_t sql_level;
+	bool rf_power;
+	uint8_t volume;
+	#endif
 }Configuration;
 
 typedef struct igateTLM_struct {
@@ -160,6 +173,7 @@ const char PARM[] = { "PARM.RF->INET,INET->RF,RxPkts,TxPkts,IGateDropRx" };
 const char UNIT[] = { "UNIT.Pkts,Pkts,Pkts,Pkts,Pkts" };
 const char EQNS[] = { "EQNS.0,1,0,0,1,0,0,1,0,0,1,0,0,1,0" };
 
+const float ctcss[] = {0,67,71.9,74.4,77,79.7,82.5,85.4,88.5,91.5,94.8,97.4,100,103.5,107.2,110.9,114.8,118.8,123,127.3,131.8,136.5,141.3,146.2,151.4,156.7,162.2,167.9,173.8,179.9,186.2,192.8,203.5,210.7,218.1,225.7,233.6,241.8,250.3};
 const float wifiPwr[12][2]={{-4,-1},{8,2},{20,5},{28,7},{34,8.5},{44,11},{52,13},{60,15},{68,17},{74,18.5},{76,19},{78,19.5}};
 
 void saveEEPROM();
@@ -174,5 +188,6 @@ int processPacket(String &tnc2);
 String send_fix_location();
 int digiProcess(AX25Msg &Packet);
 void printTime();
+bool pkgTxUpdate(const char *info, int delay);
 
 #endif

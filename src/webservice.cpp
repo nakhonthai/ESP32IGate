@@ -132,7 +132,7 @@ void setHTML(byte page)
 		////////////
 		webString += "    </script> \n";
 	}
-	else if (page == 7)
+	else if (page == 6)
 	{
 		webString += "<script src=\"https://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js\"></script>\n";
 		webString += "<script src=\"https://code.highcharts.com/highcharts.js\"></script>\n";
@@ -180,8 +180,11 @@ void setHTML(byte page)
 	String strActiveP5 = "";
 	String strActiveP6 = "";
 	String strActiveP7 = "";
+	String strActiveP8 = "";
 
-	if (page == 6)
+	if (page == 7)
+		strActiveP8 = "class=active";
+	else if (page == 6)
 		strActiveP7 = "class=active";
 	else if (page == 5)
 		strActiveP6 = "class=active";
@@ -204,6 +207,9 @@ void setHTML(byte page)
 	webString += "<li role=\"presentation\"" + strActiveP2 + ">\n<a href=\"/data\" id=\"channel_link_api_keys\">Storage</a>\n</li>\n";
 #endif
 	webString += "<li role=\"presentation\"" + strActiveP3 + ">\n<a href=\"/config\" id=\"channel_link_settings\">Setting</a>\n</li>\n";
+#ifdef SA818
+	webString += "<li role=\"presentation\"" + strActiveP8 + ">\n<a href=\"/radio\" id=\"channel_link_radio\">Radio</a>\n</li>\n";
+#endif
 	webString += "<li role=\"presentation\"" + strActiveP4 + ">\n<a href=\"/service\" id=\"channel_link_service\">Service</a>\n</li>\n";
 	webString += "<li role=\"presentation\"" + strActiveP5 + ">\n<a href=\"/system\" id=\"channel_link_system\">System</a>\n</li>\n";
 	webString += "<li role=\"presentation\"" + strActiveP7 + ">\n<a href=\"/test\" id=\"channel_link_system\">Test</a>\n</li>\n";
@@ -625,6 +631,7 @@ void handle_service()
 	bool tlmEn = false;
 	bool rf2inetEn = false;
 	bool inet2rfEn = false;
+	bool hpfEn = false;
 
 	if (server.hasArg("commit"))
 	{
@@ -751,6 +758,14 @@ void handle_service()
 						inet2rfEn = true;
 				}
 			}
+			if (server.argName(i) == "hpfEnable")
+			{
+				if (server.arg(i) != "")
+				{
+					if (String(server.arg(i)) == "OK")
+						hpfEn = true;
+				}
+			}
 			if (server.argName(i) == "digiDelay")
 			{
 				if (server.arg(i) != "")
@@ -799,6 +814,8 @@ void handle_service()
 		config.tnc_telemetry = tlmEn;
 		config.rf2inet = rf2inetEn;
 		config.inet2rf = inet2rfEn;
+		config.input_hpf = hpfEn;
+		input_HPF = hpfEn;
 		saveEEPROM();
 // if(config.tnc) tncInit();
 #ifndef I2S_INTERNAL
@@ -898,6 +915,13 @@ void handle_service()
 	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Inet->RF Enable</label>\n";
 	webString += "<div class=\"col-sm-4 col-xs-8\"><input class=\"field_checkbox\" id=\"inet2rfEnable\" name=\"inet2rfEnable\" type=\"checkbox\" value=\"OK\" " + inet2rfFlage + "/></div>\n";
 	webString += "</div>\n";
+	String hpfFlage = "";
+	if (config.input_hpf)
+		hpfFlage = "checked";
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">AF Input HPF</label>\n";
+	webString += "<div class=\"col-sm-4 col-xs-8\"><input class=\"field_checkbox\" id=\"hpfEnable\" name=\"hpfEnable\" type=\"checkbox\" value=\"OK\" " + hpfFlage + "/></div>\n";
+	webString += "</div>\n";
 	String digiFlage = "";
 	if (config.tnc_digi)
 		digiFlage = "checked";
@@ -958,6 +982,266 @@ void handle_service()
 	webString += "</body></html>\n";
 	server.send(200, "text/html", webString); // send to someones browser when asked
 }
+
+#ifdef SA818
+void handle_radio()
+{
+	// bool noiseEn=false;
+	// bool agcEn=false;
+	if (server.hasArg("commit"))
+	{
+		for (uint8_t i = 0; i < server.args(); i++)
+		{
+			// Serial.print("SERVER ARGS ");
+			// Serial.print(server.argName(i));
+			// Serial.print("=");
+			// Serial.println(server.arg(i));
+
+			// if (server.argName(i) == "agcCheck")
+			// {
+			// 	if (server.arg(i) != "")
+			// 		{
+			// 			if (String(server.arg(i)) == "OK")
+			// 			{
+			// 				agcEn=true;
+			// 			}
+			// 		}
+			// }
+
+			if (server.argName(i) == "nw_band")
+			{
+				if (server.arg(i) != "")
+				{
+					if (isValidNumber(server.arg(i)))
+					{
+						config.band = server.arg(i).toInt();
+						// if (server.arg(i).toInt())
+						// 	config.band = 1;
+						// else
+						// 	config.band = 0;
+					}
+				}
+			}
+
+			if (server.argName(i) == "volume")
+			{
+				if (server.arg(i) != "")
+				{
+					if (isValidNumber(server.arg(i)))
+						config.volume = server.arg(i).toInt();
+				}
+			}
+
+			if (server.argName(i) == "rf_power")
+			{
+				if (server.arg(i) != "")
+				{
+					if (isValidNumber(server.arg(i)))
+					{
+						if (server.arg(i).toInt())
+							config.rf_power = true;
+						else
+							config.rf_power = false;
+					}
+				}
+			}
+
+			if (server.argName(i) == "sql_level")
+			{
+				if (server.arg(i) != "")
+				{
+					if (isValidNumber(server.arg(i)))
+						config.sql_level = server.arg(i).toInt();
+				}
+			}
+
+			if (server.argName(i) == "tx_freq")
+			{
+				if (server.arg(i) != "")
+				{
+					if (isValidNumber(server.arg(i)))
+						config.freq_tx = server.arg(i).toFloat();
+				}
+			}
+			if (server.argName(i) == "rx_freq")
+			{
+				if (server.arg(i) != "")
+				{
+					if (isValidNumber(server.arg(i)))
+						config.freq_rx = server.arg(i).toFloat();
+				}
+			}
+
+			if (server.argName(i) == "tx_offset")
+			{
+				if (server.arg(i) != "")
+				{
+					if (isValidNumber(server.arg(i)))
+						config.offset_tx = server.arg(i).toInt();
+				}
+			}
+			if (server.argName(i) == "rx_offset")
+			{
+				if (server.arg(i) != "")
+				{
+					if (isValidNumber(server.arg(i)))
+						config.offset_rx = server.arg(i).toInt();
+				}
+			}
+
+			if (server.argName(i) == "tx_ctcss")
+			{
+				if (server.arg(i) != "")
+				{
+					if (isValidNumber(server.arg(i)))
+						config.tone_tx = server.arg(i).toInt();
+				}
+			}
+			if (server.argName(i) == "rx_ctcss")
+			{
+				if (server.arg(i) != "")
+				{
+					if (isValidNumber(server.arg(i)))
+						config.tone_rx = server.arg(i).toInt();
+				}
+			}
+		}
+		// config.noise=noiseEn;
+		// config.agc=agcEn;
+		saveEEPROM();
+		// delay(100);
+		SA818_INIT(LOW);
+	}
+
+	setHTML(7);
+	webString += "<div class=\"col-xs-10\">\n";
+	webString += "<form accept-charset=\"UTF-8\" action=\"/radio\" class=\"form-horizontal\" id=\"radio_form\" method=\"post\">\n";
+
+	webString += "<div>\n<h3>RF Module SA818/SA868</h3>\n";
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-3 col-xs-12 control-label\">TX Frequency</label>\n";
+	webString += "<div class=\"col-sm-2 col-xs-6\"><input type=\"number\" id=\"tx_freq\" name=\"tx_freq\" min=\"144.0000\" max=\"148.0000\" step=\"0.0001\" value=\"" + String(config.freq_tx, 4) + "\" /></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-3 col-xs-12 control-label\">RX Frequency</label>\n";
+	webString += "<div class=\"col-sm-2 col-xs-6\"><input type=\"number\" id=\"rx_freq\" name=\"rx_freq\" min=\"144.0000\" max=\"148.0000\" step=\"0.0001\" value=\"" + String(config.freq_rx, 4) + "\" /></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-3 col-xs-12 control-label\">TX Offset</label>\n";
+	webString += "<div class=\"col-sm-2 col-xs-6\"><input type=\"number\" id=\"tx_offset\" name=\"tx_offset\" min=\"-5000\" max=\"5000\" step=\"100\" value=\"" + String(config.offset_tx) + "\" /></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-3 col-xs-12 control-label\">RX Offset</label>\n";
+	webString += "<div class=\"col-sm-2 col-xs-6\"><input type=\"number\" id=\"rx_offset\" name=\"rx_offset\" min=\"-5000\" max=\"5000\" step=\"100\" value=\"" + String(config.offset_rx) + "\" /></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-3 col-xs-12 control-label\">TX CTCSS</label>\n";
+	webString += "<div class=\"col-sm-2 col-xs-6\"><select name=\"tx_ctcss\" id=\"tx_ctcss\">\n";
+	for (int i = 0; i < 39; i++)
+	{
+		if (config.tone_tx == i)
+			webString += "<option value=\"" + String(i) + "\" selected>" + String(ctcss[i], 1) + "</option>\n";
+		else
+			webString += "<option value=\"" + String(i) + "\" >" + String(ctcss[i], 1) + "</option>\n";
+	}
+	webString += "</select></div>\n";
+	webString += "</div>\n";
+	// webString += "<div class=\"form-group\">\n";
+	// webString += "<label class=\"col-sm-3 col-xs-12 control-label\">TX CTCSS Ch</label>\n";
+	// webString += "<div class=\"col-sm-2 col-xs-6\"><input type=\"number\" id=\"tx_ctcss\" name=\"tx_ctcss\" min=\"0\" max=\"38\" step=\"1\" value=\"" + String(config.tone_tx) + "\" /></div>\n";
+	// webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-3 col-xs-12 control-label\">RX CTCSS</label>\n";
+	webString += "<div class=\"col-sm-2 col-xs-6\"><select name=\"rx_ctcss\" id=\"rx_ctcss\">\n";
+	for (int i = 0; i < 39; i++)
+	{
+		if (config.tone_rx == i)
+			webString += "<option value=\"" + String(i) + "\" selected>" + String(ctcss[i], 1) + "</option>\n";
+		else
+			webString += "<option value=\"" + String(i) + "\" >" + String(ctcss[i], 1) + "</option>\n";
+	}
+	webString += "</select></div>\n";
+	webString += "</div>\n";
+
+	// webString += "<div class=\"form-group\">\n";
+	// webString += "<label class=\"col-sm-3 col-xs-12 control-label\">RX CTCSS Ch</label>\n";
+	// webString += "<div class=\"col-sm-2 col-xs-6\"><input type=\"number\" id=\"rx_ctcss\" name=\"rx_ctcss\" min=\"0\" max=\"38\" step=\"1\" value=\"" + String(config.tone_rx) + "\" /></div>\n";
+	// webString += "</div>\n";
+
+	String cmSelSqlT = "";
+	String cmSelSqlF = "";
+	if (config.band)
+	{
+		cmSelSqlT = "selected";
+	}
+	else
+	{
+		cmSelSqlF = "selected";
+	}
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-3 col-xs-12 control-label\">Narrow/Wide</label>\n";
+	webString += "<div class=\"col-sm-2 col-xs-6\"><select name=\"nw_band\" id=\"nw_band\">\n<option value=\"1\" " + cmSelSqlT + ">25.0KHz</option>\n<option value=\"0\" " + cmSelSqlF + ">12.5KHz</option></select></div>\n";
+	webString += "</div>\n";
+
+	cmSelSqlF = "";
+	cmSelSqlT = "";
+	if (config.rf_power)
+	{
+		cmSelSqlT = "selected";
+	}
+	else
+	{
+		cmSelSqlF = "selected";
+	}
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-3 col-xs-12 control-label\">RF Power</label>\n";
+	webString += "<div class=\"col-sm-2 col-xs-6\"><select name=\"rf_power\" id=\"rf_power\">\n<option value=\"1\" " + cmSelSqlT + ">HIGH</option>\n<option value=\"0\" " + cmSelSqlF + ">LOW</option></select></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-3 col-xs-12 control-label\">VOLUME</label>\n";
+	webString += "<div class=\"col-sm-2 col-xs-6\"><input class=\"form-control\" id=\"volume\" name=\"volume\" type=\"range\" min=\"1\" max=\"8\" value=\"" + String(config.volume) + "\" onchange=\"showVoxValue(this.value)\" /><span id=\"voxShow\">" + String(config.volume) + "</span></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-3 col-xs-12 control-label\">SQL Level</label>\n";
+	webString += "<div class=\"col-sm-2 col-xs-6\"><input class=\"form-control\" id=\"sql_level\" name=\"sql_level\" type=\"range\" min=\"0\" max=\"8\" value=\"" + String(config.sql_level) + "\" onchange=\"showSqlValue(this.value)\" /><span id=\"sqlShow\">" + String(config.sql_level) + "</span></div>\n";
+	webString += "</div>\n";
+
+	// webString += "<div class=\"form-group\">\n";
+	// webString += "<label class=\"col-sm-3 col-xs-12 control-label\">MIC Gain</label>\n";
+	// webString += "<div class=\"col-sm-2 col-xs-6\"><input class=\"form-control\" id=\"mic_level\" name=\"mic_level\" type=\"range\" min=\"1\" max=\"20\" value=\"" + String(config.mic) + "\" onchange=\"showMicValue(this.value)\" /><span id=\"micShow\">" + String(config.mic) + "</span></div>\n";
+	// webString += "</div>\n";
+
+	// webString += "<div class=\"form-group\">\n";
+	// webString += "<label class=\"col-sm-3 col-xs-12 control-label\">AGC</label>\n";
+	// String agcFlage = "";
+	// if (config.agc)
+	// 	agcFlage = "checked";
+	// webString += "<div class=\"col-sm-2 col-xs-6\"><input class=\"field_checkbox\" id=\"field_checkbox_2\" name=\"agcCheck\" type=\"checkbox\" value=\"OK\" " + agcFlage + "/></div>\n";
+	// webString += "</div>\n";
+
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\"></label>\n";
+	// webString += "<div class=\"col-sm-2 col-xs-4\"><input class=\"btn btn-primary\" id=\"radio_set_sumbit\" name=\"commit\" type=\"submit\" value=\"SET\" maxlength=\"80\"/></div>\n";
+	webString += "<div class=\"col-sm-2 col-xs-4\"><input class=\"btn btn-primary\" id=\"radio_form_sumbit\" name=\"commit\" type=\"submit\" value=\"Save Config\" maxlength=\"80\"/></div>\n";
+	webString += "</div>\n";
+
+	webString += "</form></div>\n";
+
+	webString += "</body></html>\n";
+	server.send(200, "text/html", webString); // send to someones browser when asked
+
+	// delay(100);
+}
+#endif
 
 void handle_system()
 {
@@ -1393,7 +1677,9 @@ void handle_test()
 	if (server.hasArg("sendBeacon"))
 	{
 		String tnc2Raw = send_fix_location();
-		APRS_sendTNC2Pkt(tnc2Raw); // Send packet to RF
+		if (config.tnc)
+			pkgTxUpdate(tnc2Raw.c_str(), 0);
+		// APRS_sendTNC2Pkt(tnc2Raw); // Send packet to RF
 	}
 	else if (server.hasArg("sendRaw"))
 	{
@@ -1404,14 +1690,18 @@ void handle_test()
 				if (server.arg(i) != "")
 				{
 					String tnc2Raw = server.arg(i);
-					APRS_sendTNC2Pkt(server.arg(i)); // Send packet to RF
-					Serial.println("Send RAW: " + tnc2Raw);
+					if (config.tnc)
+					{
+						pkgTxUpdate(tnc2Raw.c_str(), 0);
+						// APRS_sendTNC2Pkt(server.arg(i)); // Send packet to RF
+						// Serial.println("Send RAW: " + tnc2Raw);
+					}
 				}
 				break;
 			}
 		}
 	}
-	setHTML(7);
+	setHTML(6);
 
 	webString += "<table>\n";
 	webString += "<tr><td><form accept-charset=\"UTF-8\" action=\"/test\" class=\"form-horizontal\" id=\"test_form\" method=\"post\">\n";
@@ -1676,6 +1966,9 @@ void webService()
 	server.on("/data", handle_storage);
 	server.on("/download", handle_download);
 	server.on("/delete", handle_delete);
+#endif
+#ifdef SA818
+	server.on("/radio", handle_radio);
 #endif
 	server.on("/default", handle_default);
 	server.on("/service", handle_service);

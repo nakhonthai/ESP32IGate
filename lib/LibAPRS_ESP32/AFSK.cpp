@@ -20,6 +20,8 @@ extern unsigned long custom_preamble;
 extern unsigned long custom_tail;
 int adcVal;
 
+bool input_HPF=false;
+
 static const adc_unit_t unit = ADC_UNIT_1;
 
 void sample_isr();
@@ -28,7 +30,7 @@ bool hw_afsk_dac_isr = false;
 Afsk *AFSK_modem;
 
 // //กรองความถี่สูงผ่าน >300Hz  HPF Butterworth Filter. 0-300Hz ช่วงความถี่ต่ำใช้กับโทน CTCSS/DCS ในวิทยุสื่อสารจะถูกรองทิ้ง
-ButterworthFilter hp_filter(1300, 9600, ButterworthFilter::ButterworthFilter::Highpass, 1);
+ButterworthFilter hp_filter(1600, 9600, ButterworthFilter::ButterworthFilter::Highpass, 1);
 // //กรองความถี่ต่ำผ่าน <3KHz  LPF Butterworth Filter. ความถี่เสียงที่มากกว่า 3.5KHz ไม่ใช่ความถี่เสียงคนพูดจะถูกกรองทิ้ง
 // ButterworthFilter lp_filter(3500, 9600, ButterworthFilter::ButterworthFilter::Lowpass, 2);
 
@@ -266,10 +268,12 @@ static void AFSK_txStart(Afsk *afsk)
 {
   if (!afsk->sending)
   {
+    fifo_flush(&AFSK_modem->txFifo);
+    //Serial.println("TX Start");
+    afsk->sending = true;
     afsk->phaseInc = MARK_INC;
     afsk->phaseAcc = 0;
     afsk->bitstuffCount = 0;
-    afsk->sending = true;
     // LED_TX_ON();
     digitalWrite(LED_TX_PIN, HIGH);
     digitalWrite(PTT_PIN, HIGH);
@@ -277,6 +281,7 @@ static void AFSK_txStart(Afsk *afsk)
     AFSK_DAC_IRQ_START();
 #ifdef I2S_INTERNAL
     i2s_zero_dma_buffer(I2S_NUM_0);
+    //i2s_adc_disable(I2S_NUM_0);
     dac_i2s_enable();
 #endif
   }
@@ -788,7 +793,7 @@ int mVsumCount = 0;
 long lastVrms=0;
 bool VrmsFlag=false;
 
-void AFSK_Poll()
+void AFSK_Poll(bool SA818,bool RFPower)
 {
   int mV;
   int x = 0;
@@ -809,6 +814,8 @@ void AFSK_Poll()
     {
       // LED_RX_ON();
       adcVal = (int)AFSK_dac_isr(AFSK_modem);
+// Serial.print(adcVal,HEX);
+// Serial.print(",");
       if (AFSK_modem->sending == false && adcVal == 0)
         break;
 
@@ -816,10 +823,14 @@ void AFSK_Poll()
       // Ref: https://lang-ship.com/blog/work/esp32-i2s-dac/#toc6
       // Left Channel GPIO 26
       pcm_out[x] = (uint16_t)adcVal; // MSB
-      pcm_out[x] <<= 8;
+      if(SA818){
+        pcm_out[x] <<= 7;
+        pcm_out[x]+=10000;
+      }else{
+        pcm_out[x] <<= 8;
+      }
       x++;
       // Right Channel GPIO 25
-      pcm_out[x] = 0;
       pcm_out[x] = 0;
     }
 
@@ -836,6 +847,7 @@ void AFSK_Poll()
     {
       int txEvents = 0;
       memset(pcm_out, 0, sizeof(pcm_out));
+      //Serial.println("TX TAIL");
       // Clear Delay DMA Buffer
       for (int i = 0; i < 5; i++)
         i2s_write_bytes(I2S_NUM_0, (char *)&pcm_out, (ADC_SAMPLES_COUNT * sizeof(uint16_t)), portMAX_DELAY);
@@ -846,14 +858,18 @@ void AFSK_Poll()
         {
           if (++txEvents > 6)
           {
-            // Serial.println("TX DONE");
+            //Serial.println("TX DONE");
             break;
           }
         }
       }
       dac_i2s_disable();
       i2s_zero_dma_buffer(I2S_NUM_0);
+      //i2s_adc_enable(I2S_NUM_0);
       digitalWrite(PTT_PIN, LOW);
+      if(SA818){
+        digitalWrite(12, LOW); //RF Power LOW
+      }
     }
 #endif
   }
@@ -878,8 +894,10 @@ void AFSK_Poll()
         }
         adcVal -= offset; // Convert unsinewave to sinewave
 
-        float adcF=hp_filter.Update((float)adcVal);
-        adcVal=(int)adcF;
+        if(input_HPF){
+          float adcF=hp_filter.Update((float)adcVal);
+          adcVal=(int)adcF;
+        }
 
         if (afskSync == false)
         {

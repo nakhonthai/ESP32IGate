@@ -161,7 +161,7 @@ inline static uint8_t sinSample(uint16_t i)
 #define CONFIG_AFSK_RX_BUFLEN 350
 #define CONFIG_AFSK_TX_BUFLEN 350
 #define CONFIG_AFSK_RXTIMEOUT 0
-#define CONFIG_AFSK_PREAMBLE_LEN 150UL
+#define CONFIG_AFSK_PREAMBLE_LEN 350UL
 #define CONFIG_AFSK_TRAILER_LEN 50UL
 #define CONFIG_AFSK_DAC_SAMPLERATE 9600
 #define SAMPLERATE 9600
@@ -285,13 +285,15 @@ typedef struct Afsk
 #define LED_RX_ON() digitalWrite(LED_PIN, HIGH);
 #define LED_RX_OFF() digitalWrite(LED_PIN, LOW);
 
+extern bool input_HPF;
+
 void AFSK_init(Afsk *afsk);
 void AFSK_transmit(char *buffer, size_t size);
 void AFSK_poll(Afsk *afsk);
 
 void afsk_putchar(char c);
 int afsk_getchar(void);
-void AFSK_Poll();
+void AFSK_Poll(bool SA818,bool RFPower);
 void AFSK_TimerEnable(bool sts);
 
 #endif

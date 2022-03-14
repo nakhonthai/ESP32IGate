@@ -24,7 +24,6 @@
 
 #include "AFSK.h"
 
-//#define SA818
 #define DEBUG_TNC
 
 #define EEPROM_SIZE 1024
@@ -188,7 +187,22 @@ void defaultConfig()
     sprintf(config.aprs_filter, "g/HS*/E2*");
     sprintf(config.tnc_path, "WIDE1-1");
     config.wifi_power = -4;
+    config.input_hpf = true;
+#ifdef SA818
+    config.freq_rx = 144.3900;
+    config.freq_tx = 144.3900;
+    config.offset_rx = 0;
+    config.offset_tx = 0;
+    config.tone_rx = 0;
+    config.tone_tx = 0;
+    config.band = 0;
+    config.sql_level = 1;
+    config.rf_power = LOW;
+    config.volume = 4;
+    config.input_hpf = false;
+#endif
     saveEEPROM();
+    input_HPF = config.input_hpf;
 }
 
 unsigned long NTP_Timeout;
@@ -337,6 +351,9 @@ bool pkgTxSend()
             int decTime = millis() - txQueue[i].timeStamp;
             if (decTime > txQueue[i].Delay)
             {
+                #ifdef SA818
+                    digitalWrite(POWER_PIN, config.rf_power); //RF Power LOW
+                #endif
                 APRS_setPreamble(350L);
                 APRS_sendTNC2Pkt(String(txQueue[i].Info)); // Send packet to RF
                 txQueue[i].Active = false;
@@ -409,7 +426,7 @@ uint8_t popGwRaw(uint8_t *raw)
 unsigned long SA818_Timeout = 0;
 void SA818_INIT(uint8_t HL)
 {
-
+    Serial.println("SA868 Init");
     pinMode(0, INPUT);
     pinMode(POWER_PIN, OUTPUT);
     pinMode(PULLDOWN_PIN, OUTPUT);
@@ -420,19 +437,38 @@ void SA818_INIT(uint8_t HL)
     digitalWrite(PULLDOWN_PIN, HIGH);
     digitalWrite(POWER_PIN, LOW);
     delay(500);
+    // SerialRF.println("AT+DMOSETVOLUME=2");
+    SerialRF.println();
+    delay(1000);
     // AT+DMOSETGROUP=1,144.3900,144.3900,0,1,0,0
-    SerialRF.println("AT+DMOSETGROUP=0,144.3900,144.3900,0,1,0,0");
-    delay(10);
-    SerialRF.println("AT+DMOAUTOPOWCONTR=1");
-    delay(10);
-    SerialRF.println("AT+DMOSETVOLUME=9");
-    delay(10);
-    SerialRF.println("AT+DMOSETVOX=0");
-    delay(10);
-    SerialRF.println("AT+DMOSETMIC=8,0,0");
-    delay(100);
-    // AFSK_TimerEnable(true);
-    digitalWrite(POWER_PIN, HL);
+    // SerialRF.println("AT+DMOSETGROUP=0,145.7625,145.7625,0,1,0,0");
+    char str[100];
+    if (config.sql_level > 8)
+        config.sql_level = 8;
+    sprintf(str, "AT+DMOSETGROUP=%01d,%0.4f,%0.4f,%04d,%01d,%04d", config.band, config.freq_tx + ((float)config.offset_tx / 1000000), config.freq_rx + ((float)config.offset_rx / 1000000), config.tone_tx, config.sql_level, config.tone_rx);
+    Serial.println(str);
+    SerialRF.println(str);
+    delay(500);
+    // SerialRF.println("AT+DMOAUTOPOWCONTR=1");
+    // delay(500);
+    if (config.volume > 8)
+        config.volume = 8;
+    SerialRF.printf("AT+DMOSETVOLUME=%d\r\n", config.volume);
+    delay(500);
+    // SerialRF.println("AT+DMOSETVOX=0");
+    // delay(500);
+    // SerialRF.println("AT+DMOSETMIC=1,0,0");
+    // delay(500);
+    SerialRF.println("AT+SETTAIL=0");
+    delay(500);
+    // APRS,4FSK
+    SerialRF.println("AT+SETFILTER=1,1,1");
+    // delay(500);
+    // M17
+    // SerialRF.println("AT+SETFILTER=0,0,0");
+    // delay(100);
+    //  AFSK_TimerEnable(true);
+    // digitalWrite(POWER_PIN, LOW);
 }
 
 void SA818_SLEEP()
@@ -473,6 +509,74 @@ void SA818_CHECK()
     // AFSK_TimerEnable(false);
 }
 #endif
+// #ifdef SA818
+// unsigned long SA818_Timeout = 0;
+// void SA818_INIT(uint8_t HL)
+// {
+
+//     pinMode(0, INPUT);
+//     pinMode(POWER_PIN, OUTPUT);
+//     pinMode(PULLDOWN_PIN, OUTPUT);
+//     pinMode(SQL_PIN, INPUT_PULLUP);
+
+//     SerialRF.begin(9600, SERIAL_8N1, 14, 13);
+
+//     digitalWrite(PULLDOWN_PIN, HIGH);
+//     digitalWrite(POWER_PIN, LOW);
+//     delay(500);
+//     // AT+DMOSETGROUP=1,144.3900,144.3900,0,1,0,0
+//     SerialRF.println("AT+DMOSETGROUP=0,144.3900,144.3900,0,1,0,0");
+//     delay(10);
+//     SerialRF.println("AT+DMOAUTOPOWCONTR=1");
+//     delay(10);
+//     SerialRF.println("AT+DMOSETVOLUME=9");
+//     delay(10);
+//     SerialRF.println("AT+DMOSETVOX=0");
+//     delay(10);
+//     SerialRF.println("AT+DMOSETMIC=8,0,0");
+//     delay(100);
+//     // AFSK_TimerEnable(true);
+//     digitalWrite(POWER_PIN, HL);
+// }
+
+// void SA818_SLEEP()
+// {
+//     digitalWrite(POWER_PIN, LOW);
+//     digitalWrite(PULLDOWN_PIN, LOW);
+//     // SerialGPS.print("$PMTK161,0*28\r\n");
+//     // AFSK_TimerEnable(false);
+// }
+
+// void SA818_CHECK()
+// {
+//     while (SerialRF.available() > 0)
+//         SerialRF.read();
+//     SerialRF.println("AT+DMOCONNECT");
+//     delay(100);
+//     if (SerialRF.available() > 0)
+//     {
+//         String ret = SerialRF.readString();
+//         if (ret.indexOf("DMOCONNECT") > 0)
+//         {
+//             SA818_Timeout = millis();
+// #ifdef DEBUG
+//             // Serial.println(SerialRF.readString());
+//             Serial.println("SA818 Activated");
+// #endif
+//         }
+//     }
+//     else
+//     {
+//         Serial.println("SA818 deActive");
+//         digitalWrite(POWER_PIN, LOW);
+//         digitalWrite(PULLDOWN_PIN, LOW);
+//         delay(500);
+//         SA818_INIT(LOW);
+//     }
+//     // SerialGPS.print("$PMTK161,0*28\r\n");
+//     // AFSK_TimerEnable(false);
+// }
+// #endif
 
 WiFiClient aprsClient;
 
@@ -544,6 +648,7 @@ void setup()
         Serial.println("Config EEPROM Error!");
         defaultConfig();
     }
+    input_HPF = config.input_hpf;
 
 #ifdef SA818
     SA818_INIT(LOW);
@@ -666,10 +771,20 @@ bool AFSKInitAct = false;
 int btn_count = 0;
 void loop()
 {
-    vTaskDelay(1 / portTICK_PERIOD_MS);
+    vTaskDelay(5 / portTICK_PERIOD_MS);
+#ifdef SA818
+    // if (SerialRF.available())
+    // {
+    //     Serial.print(Serial.readString());
+    // }
+#endif
     if (AFSKInitAct == true)
     {
-        AFSK_Poll();
+        #ifdef SA818
+        AFSK_Poll(true,config.rf_power);
+        #else
+        AFSK_Poll(false,LOW);
+        #endif
     }
 }
 
@@ -799,7 +914,7 @@ void taskAPRS(void *pvParameters)
             if (digiCount > 0)
                 digiCount--;
 #ifdef SA818
-            SA818_CHECK();
+            //SA818_CHECK();
 #endif
             if (AFSKInitAct == true)
             {

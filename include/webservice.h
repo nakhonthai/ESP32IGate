@@ -41,4 +41,8 @@ void handle_delete();
 void listDir(fs::FS& fs, const char* dirname, uint8_t levels);
 #endif
 void webService();
+#ifdef SA818
+void handle_radio();
+extern void SA818_INIT(uint8_t HL);
+#endif
 
