@@ -1029,7 +1029,7 @@ void taskAPRS(void *pvParameters)
                     {
                         raw = (char *)malloc(tnc2.length() + 20);
                         status.tncCount++;
-                        if (tnc2.indexOf("RFONLY", 10) > 0) // PATH RFONLY จะไม่ส่งเข้า APRS-IS
+                        if (tnc2.indexOf("RFONLY", 10) > 0) //NOGATE PATH RFONLY จะไม่ส่งเข้า APRS-IS
                         {
                             status.dropCount++;
                             igateTLM.DROP++;
