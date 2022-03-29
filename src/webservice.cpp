@@ -1110,7 +1110,7 @@ void handle_radio()
 		// config.agc=agcEn;
 		saveEEPROM();
 		// delay(100);
-		SA818_INIT(LOW);
+		SA818_INIT(false);
 	}
 
 	setHTML(7);

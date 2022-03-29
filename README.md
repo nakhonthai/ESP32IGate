@@ -124,3 +124,6 @@ for Handheld
 
 ## ESP32 Flash Download Tools
 https://www.espressif.com/en/support/download/other-tools
+
+## HITH
+This project implement by APRS text (TNC2 Raw) only,It not support null string(0x00) in the package.

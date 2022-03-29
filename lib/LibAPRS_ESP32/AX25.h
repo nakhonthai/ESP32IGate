@@ -1,6 +1,7 @@
 #ifndef PROTOCOL_AX25_H
 #define PROTOCOL_AX25_H
 
+#include <Arduino.h>
 #include <stdio.h>
 #include <stdbool.h>
 

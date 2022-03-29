@@ -19,6 +19,8 @@
 #include <WiFiClient.h>
 #include "cppQueue.h"
 #include "BluetoothSerial.h"
+#include "digirepeater.h"
+#include "igate.h"
 
 #include <WiFiClientSecure.h>
 
@@ -66,9 +68,9 @@ cppQueue PacketBuffer(sizeof(AX25Msg), 5, IMPLEMENTATION); // Instantiate queue
 
 statusType status;
 RTC_DATA_ATTR igateTLMType igateTLM;
-RTC_DATA_ATTR digiTLMType digiLog;
 RTC_DATA_ATTR txQueueType txQueue[PKGTXSIZE];
-RTC_DATA_ATTR uint8_t digiCount = 0;
+
+extern RTC_DATA_ATTR uint8_t digiCount;
 
 Configuration config;
 
@@ -186,7 +188,7 @@ void defaultConfig()
     sprintf(config.tnc_comment, "ESP32 Build in TNC");
     sprintf(config.aprs_filter, "g/HS*/E2*");
     sprintf(config.tnc_path, "WIDE1-1");
-    config.wifi_power = -4;
+    config.wifi_power = 44;
     config.input_hpf = true;
 #ifdef SA818
     config.freq_rx = 144.3900;
@@ -351,9 +353,9 @@ bool pkgTxSend()
             int decTime = millis() - txQueue[i].timeStamp;
             if (decTime > txQueue[i].Delay)
             {
-                #ifdef SA818
-                    digitalWrite(POWER_PIN, config.rf_power); //RF Power LOW
-                #endif
+#ifdef SA818
+                digitalWrite(POWER_PIN, config.rf_power); // RF Power LOW
+#endif
                 APRS_setPreamble(350L);
                 APRS_sendTNC2Pkt(String(txQueue[i].Info)); // Send packet to RF
                 txQueue[i].Active = false;
@@ -424,51 +426,56 @@ uint8_t popGwRaw(uint8_t *raw)
 
 #ifdef SA818
 unsigned long SA818_Timeout = 0;
-void SA818_INIT(uint8_t HL)
+void SA818_INIT(bool boot)
 {
-    Serial.println("SA868 Init");
-    pinMode(0, INPUT);
-    pinMode(POWER_PIN, OUTPUT);
-    pinMode(PULLDOWN_PIN, OUTPUT);
-    pinMode(SQL_PIN, INPUT_PULLUP);
+#ifdef SR_FRS
+    Serial.println("Radio Module SR_FRS Init");
+#else
+    Serial.println("Radio Module SA868 Init");
+#endif
+    if (boot)
+    {
+        SerialRF.begin(9600, SERIAL_8N1, 14, 13);
+        pinMode(POWER_PIN, OUTPUT);
+        pinMode(PULLDOWN_PIN, OUTPUT);
+        pinMode(SQL_PIN, INPUT_PULLUP);
 
-    SerialRF.begin(9600, SERIAL_8N1, 14, 13);
-
-    digitalWrite(PULLDOWN_PIN, HIGH);
-    digitalWrite(POWER_PIN, LOW);
-    delay(500);
-    // SerialRF.println("AT+DMOSETVOLUME=2");
+        digitalWrite(POWER_PIN, LOW);
+        digitalWrite(PULLDOWN_PIN, LOW);
+        delay(500);
+        digitalWrite(PULLDOWN_PIN, HIGH);
+        delay(1500);
+        SerialRF.println();
+        delay(500);
+    }
     SerialRF.println();
-    delay(1000);
-    // AT+DMOSETGROUP=1,144.3900,144.3900,0,1,0,0
-    // SerialRF.println("AT+DMOSETGROUP=0,145.7625,145.7625,0,1,0,0");
+    delay(500);
     char str[100];
     if (config.sql_level > 8)
         config.sql_level = 8;
-    sprintf(str, "AT+DMOSETGROUP=%01d,%0.4f,%0.4f,%04d,%01d,%04d", config.band, config.freq_tx + ((float)config.offset_tx / 1000000), config.freq_rx + ((float)config.offset_rx / 1000000), config.tone_tx, config.sql_level, config.tone_rx);
-    Serial.println(str);
+#ifdef SR_FRS
+    sprintf(str, "AT+DMOSETGROUP=%01d,%0.4f,%0.4f,%d,%01d,%d,4", config.band, config.freq_tx + ((float)config.offset_tx / 1000000), config.freq_rx + ((float)config.offset_rx / 1000000), config.tone_rx, config.sql_level, config.tone_tx);
     SerialRF.println(str);
     delay(500);
-    // SerialRF.println("AT+DMOAUTOPOWCONTR=1");
-    // delay(500);
+    // Module auto power save setting
+    SerialRF.println("AT+DMOAUTOPOWCONTR=1");
+    delay(500);
+    SerialRF.println("AT+DMOSETVOX=0");
+    delay(500);
+    SerialRF.println("AT+DMOSETMIC=1,0,0");
+#else
+    sprintf(str, "AT+DMOSETGROUP=%01d,%0.4f,%0.4f,%04d,%01d,%04d", config.band, config.freq_tx + ((float)config.offset_tx / 1000000), config.freq_rx + ((float)config.offset_rx / 1000000), config.tone_tx, config.sql_level, config.tone_rx);
+    SerialRF.println(str);
+    delay(500);
+    SerialRF.println("AT+SETTAIL=0");
+    delay(500);
+    SerialRF.println("AT+SETFILTER=1,1,1");
+#endif
+    // SerialRF.println(str);
+    delay(500);
     if (config.volume > 8)
         config.volume = 8;
     SerialRF.printf("AT+DMOSETVOLUME=%d\r\n", config.volume);
-    delay(500);
-    // SerialRF.println("AT+DMOSETVOX=0");
-    // delay(500);
-    // SerialRF.println("AT+DMOSETMIC=1,0,0");
-    // delay(500);
-    SerialRF.println("AT+SETTAIL=0");
-    delay(500);
-    // APRS,4FSK
-    SerialRF.println("AT+SETFILTER=1,1,1");
-    // delay(500);
-    // M17
-    // SerialRF.println("AT+SETFILTER=0,0,0");
-    // delay(100);
-    //  AFSK_TimerEnable(true);
-    // digitalWrite(POWER_PIN, LOW);
 }
 
 void SA818_SLEEP()
@@ -493,17 +500,17 @@ void SA818_CHECK()
             SA818_Timeout = millis();
 #ifdef DEBUG
             // Serial.println(SerialRF.readString());
-            Serial.println("SA818 Activated");
+            Serial.println("Radio SA818/SR_FRS Activated");
 #endif
         }
     }
     else
     {
-        Serial.println("SA818 deActive");
+        Serial.println("Radio SA818/SR_FRS deActive");
         digitalWrite(POWER_PIN, LOW);
         digitalWrite(PULLDOWN_PIN, LOW);
         delay(500);
-        SA818_INIT(LOW);
+        SA818_INIT(true);
     }
     // SerialGPS.print("$PMTK161,0*28\r\n");
     // AFSK_TimerEnable(false);
@@ -651,7 +658,7 @@ void setup()
     input_HPF = config.input_hpf;
 
 #ifdef SA818
-    SA818_INIT(LOW);
+    SA818_INIT(true);
 #endif
 
     enableLoopWDT();
@@ -726,37 +733,37 @@ String send_fix_location()
     return tnc2Raw;
 }
 
-int processPacket(String &tnc2)
+int packet2Raw(String &tnc2, AX25Msg &Packet)
 {
-    if (incomingPacket.len < 5)
+    if (Packet.len < 5)
         return 0;
-    tnc2 = String(incomingPacket.src.call);
-    if (incomingPacket.src.ssid > 0)
+    tnc2 = String(Packet.src.call);
+    if (Packet.src.ssid > 0)
     {
         tnc2 += String(F("-"));
-        tnc2 += String(incomingPacket.src.ssid);
+        tnc2 += String(Packet.src.ssid);
     }
     tnc2 += String(F(">"));
-    tnc2 += String(incomingPacket.dst.call);
-    if (incomingPacket.dst.ssid > 0)
+    tnc2 += String(Packet.dst.call);
+    if (Packet.dst.ssid > 0)
     {
         tnc2 += String(F("-"));
-        tnc2 += String(incomingPacket.dst.ssid);
+        tnc2 += String(Packet.dst.ssid);
     }
-    for (int i = 0; i < incomingPacket.rpt_count; i++)
+    for (int i = 0; i < Packet.rpt_count; i++)
     {
         tnc2 += String(",");
-        tnc2 += String(incomingPacket.rpt_list[i].call);
-        if (incomingPacket.rpt_list[i].ssid > 0)
+        tnc2 += String(Packet.rpt_list[i].call);
+        if (Packet.rpt_list[i].ssid > 0)
         {
             tnc2 += String("-");
-            tnc2 += String(incomingPacket.rpt_list[i].ssid);
+            tnc2 += String(Packet.rpt_list[i].ssid);
         }
-        if (incomingPacket.rpt_flags & (1 << i))
+        if (Packet.rpt_flags & (1 << i))
             tnc2 += "*";
     }
     tnc2 += String(F(":"));
-    tnc2 += String((const char *)incomingPacket.info);
+    tnc2 += String((const char *)Packet.info);
     tnc2 += String("\n");
 
     // #ifdef DEBUG_TNC
@@ -780,11 +787,11 @@ void loop()
 #endif
     if (AFSKInitAct == true)
     {
-        #ifdef SA818
-        AFSK_Poll(true,config.rf_power);
-        #else
-        AFSK_Poll(false,LOW);
-        #endif
+#ifdef SA818
+        AFSK_Poll(true, config.rf_power);
+#else
+        AFSK_Poll(false, LOW);
+#endif
     }
 }
 
@@ -914,7 +921,7 @@ void taskAPRS(void *pvParameters)
             if (digiCount > 0)
                 digiCount--;
 #ifdef SA818
-            //SA818_CHECK();
+            SA818_CHECK();
 #endif
             if (AFSKInitAct == true)
             {
@@ -980,8 +987,38 @@ void taskAPRS(void *pvParameters)
                 String tnc2;
                 //นำข้อมูลแพ็จเกจจาก TNC ออกจากคิว
                 PacketBuffer.pop(&incomingPacket);
-                processPacket(tnc2);
+                // igateProcess(incomingPacket);
+                packet2Raw(tnc2, incomingPacket);
 
+                // IGate Process
+                if (config.rf2inet && aprsClient.connected())
+                {
+                    int ret = igateProcess(incomingPacket);
+                    if (ret == 0)
+                    {
+                        status.dropCount++;
+                        igateTLM.DROP++;
+                    }
+                    else
+                    {
+                        status.rf2inet++;
+                        igateTLM.RF2INET++;
+                        igateTLM.TX++;
+#ifdef DEBUG
+                        printTime();
+                        Serial.print("RF->INET: ");
+                        Serial.println(tnc2);
+#endif
+                        char call[11];
+                        if (incomingPacket.src.ssid > 0)
+                            sprintf(call, "%s-%d", incomingPacket.src.call, incomingPacket.src.ssid);
+                        else
+                            sprintf(call, "%s", incomingPacket.src.call);
+                        pkgListUpdate(call, 1);
+                    }
+                }
+
+                // Digi Repeater Process
                 if (config.tnc_digi)
                 {
                     int dlyFlag = digiProcess(incomingPacket);
@@ -1011,7 +1048,7 @@ void taskAPRS(void *pvParameters)
                             }
                         }
                         String digiPkg;
-                        processPacket(digiPkg);
+                        packet2Raw(digiPkg, incomingPacket);
                         pkgTxUpdate(digiPkg.c_str(), digiDelay);
                     }
                 }
@@ -1020,73 +1057,6 @@ void taskAPRS(void *pvParameters)
                 lastPkgRaw = tnc2;
                 // ESP_BT.println(tnc2);
                 status.allCount++;
-
-                // String tnc2 = SerialTNC.readStringUntil('\n');
-                if (config.rf2inet && aprsClient.connected())
-                {
-                    int start_val = tnc2.indexOf(">", 0); // หาตำแหน่งแรกของ >
-                    if (start_val > 3)
-                    {
-                        raw = (char *)malloc(tnc2.length() + 20);
-                        status.tncCount++;
-                        if (tnc2.indexOf("RFONLY", 10) > 0) //NOGATE PATH RFONLY จะไม่ส่งเข้า APRS-IS
-                        {
-                            status.dropCount++;
-                            igateTLM.DROP++;
-                        }
-                        else
-                        {
-                            str = (char *)malloc(tnc2.length());
-                            tnc2.toCharArray(&str[0], tnc2.length());
-                            int i = tnc2.indexOf(":");
-                            int t = tnc2.indexOf("TCPIP*", 5);
-
-                            if (i > 10)
-                            {
-                                if (t > 0)
-                                    str[t - 1] = 0;
-                                else
-                                    str[i] = 0;
-                                if (config.aprs_ssid == 0)
-                                    sprintf(raw, "%s,qAR,%s:%s", &str[0], config.aprs_mycall, &str[i + 1]);
-                                else
-                                    sprintf(raw, "%s,qAR,%s-%d:%s", &str[0], config.aprs_mycall, config.aprs_ssid, &str[i + 1]);
-                                // sprintf(raw, "%s", &str[0]);
-                                tnc2 = String(raw);
-                                aprsClient.println(tnc2);
-                                status.rf2inet++;
-                                igateTLM.RF2INET++;
-                                igateTLM.TX++;
-
-#ifdef DEBUG
-                                printTime();
-                                Serial.print("RF->INET: ");
-                                Serial.println(tnc2);
-#endif
-                            }
-                            else
-                            {
-                                status.errorCount++;
-                                igateTLM.DROP++;
-                            }
-                            free(str);
-                        }
-                        // memset(&raw[0], 0, sizeof(raw));
-                        tnc2.toCharArray(&raw[0], start_val + 1);
-                        raw[start_val + 1] = 0;
-                        pkgListUpdate(&raw[0], 1);
-                        free(raw);
-                        // #ifdef DEBUG
-                        // 								printTime();
-                        // 								Serial.print("TNC ");
-                        // 								Serial.println(tnc2);
-                        // #endif
-                    }
-                    else
-                    {
-                        status.errorCount++;
-                    }
-                }
             }
         }
     }
@@ -1293,278 +1263,4 @@ void taskNetwork(void *pvParameters)
             }
         }
     }
-}
-
-int digiProcess(AX25Msg &Packet)
-{
-    int idx, j;
-    uint8_t ctmp;
-    // if(!DIGI) return;
-    // if(rx_data) return;
-    // if(digi_timeout<aprs_delay) return;
-    // digi_timeout = 65530;
-    // aprs_delay = 65535;
-
-    j = 0;
-    if (Packet.len < 5)
-    {
-        digiLog.ErPkts++;
-        return 0; // NO DST
-    }
-
-    if (!strncmp(&Packet.src.call[0], "NOCALL", 6))
-    {
-        digiLog.DropRx++;
-        return 0;
-    }
-    if (!strncmp(&Packet.src.call[0], "MYCALL", 6))
-    {
-        digiLog.DropRx++;
-        return 0;
-    }
-
-    // Destination SSID Trace
-    if (Packet.dst.ssid > 0)
-    {
-        uint8_t ctmp = Packet.dst.ssid & 0x1E; // Check DSSID
-
-        if (ctmp > 15)
-            ctmp = 0;
-        if (ctmp < 8)
-        { // Edit PATH Change to TRACEn-N
-            if (ctmp > 0)
-                ctmp--;
-            Packet.dst.ssid = ctmp;
-            if (Packet.rpt_count > 0)
-            {
-                for (idx = 0; idx < Packet.rpt_count; idx++)
-                {
-                    if (!strcmp(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0])) // Is path same callsign
-                    {
-                        if (Packet.rpt_list[idx].ssid == config.aprs_ssid) // IS path same SSID
-                        {
-                            if (Packet.rpt_flags & (1 << idx))
-                            {
-                                digiLog.DropRx++;
-                                return 0; // bypass flag *
-                            }
-                            Packet.rpt_flags |= (1 << idx);
-                            return 1;
-                        }
-                    }
-                    if (Packet.rpt_flags & (1 << idx))
-                        continue;
-                    for (j = idx; j < Packet.rpt_count; j++)
-                    {
-                        if (Packet.rpt_flags & (1 << j))
-                            break;
-                    }
-                    // Move current part to next part
-                    for (; j >= idx; j--)
-                    {
-                        int n = j + 1;
-                        strcpy(&Packet.rpt_list[n].call[0], &Packet.rpt_list[j].call[0]);
-                        Packet.rpt_list[n].ssid = Packet.rpt_list[j].ssid;
-                        if (Packet.rpt_flags & (1 << j))
-                            Packet.rpt_flags |= (1 << n);
-                        else
-                            Packet.rpt_flags &= ~(1 << n);
-                    }
-
-                    // Add new part
-                    Packet.rpt_count += 1;
-                    strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-                    Packet.rpt_list[idx].ssid = config.aprs_ssid;
-                    Packet.rpt_flags |= (1 << idx);
-                    return 2;
-                    // j = 1;
-                    // break;
-                }
-            }
-            else
-            {
-                idx = 0;
-                strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-                Packet.rpt_list[idx].ssid = config.aprs_ssid;
-                Packet.rpt_flags |= (1 << idx);
-                Packet.rpt_count += 1;
-                return 2;
-            }
-        }
-        else
-        {
-            digiLog.DropRx++;
-            return 0; // NO PATH
-        }
-    }
-
-    for (idx = 0; idx < Packet.rpt_count; idx++)
-    {
-        if (!strncmp(&Packet.rpt_list[idx].call[0], "qA", 2))
-        {
-            digiLog.DropRx++;
-            return 0;
-        }
-    }
-
-    for (idx = 0; idx < Packet.rpt_count; idx++)
-    {
-        if (!strncmp(&Packet.rpt_list[idx].call[0], "TCP", 3))
-        {
-            digiLog.DropRx++;
-            return 0;
-        }
-    }
-
-    for (idx = 0; idx < Packet.rpt_count; idx++)
-    {
-        if (Packet.rpt_flags & (1 << idx))
-        {
-            if (idx == (Packet.rpt_count - 1))
-                digiCount++;
-            continue; // bypass flag *
-        }
-        if (!strncmp(&Packet.rpt_list[idx].call[0], "WIDE", 4))
-        {
-            // Check WIDEn-N
-            if (Packet.rpt_list[idx].ssid > 0)
-            {
-                if (Packet.rpt_flags & (1 << idx))
-                    continue; // bypass flag *
-                ctmp = Packet.rpt_list[idx].ssid & 0x1F;
-                if (ctmp > 0)
-                    ctmp--;
-                if (ctmp > 15)
-                    ctmp = 0;
-                if (ctmp == 0)
-                {
-                    strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-                    Packet.rpt_list[idx].ssid = config.aprs_ssid;
-                    Packet.rpt_flags |= (1 << idx);
-                    j = 2;
-                    break;
-                }
-                else
-                {
-                    Packet.rpt_list[idx].ssid = ctmp;
-                    Packet.rpt_flags &= ~(1 << idx);
-                    j = 2;
-                    break;
-                }
-            }
-            else
-            {
-                j = 2;
-                strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-                Packet.rpt_list[idx].ssid = config.aprs_ssid;
-                Packet.rpt_flags |= (1 << idx);
-                break;
-            }
-        }
-        else if (!strncmp(&Packet.rpt_list[idx].call[0], "TRACE", 5))
-        {
-            if (Packet.rpt_flags & (1 << idx))
-                continue; // bypass flag *
-            ctmp = Packet.rpt_list[idx].ssid & 0x1F;
-            if (ctmp > 0)
-                ctmp--;
-            if (ctmp > 15)
-                ctmp = 0;
-            if (ctmp == 0)
-            {
-                strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-                Packet.rpt_list[idx].ssid = config.aprs_ssid;
-                Packet.rpt_flags |= (1 << idx);
-                j = 2;
-                break;
-            }
-            else
-            {
-                for (j = idx; j < Packet.rpt_count; j++)
-                {
-                    if (Packet.rpt_flags & (1 << j))
-                        break;
-                }
-                // Move current part to next part
-                for (; j >= idx; j--)
-                {
-                    int n = j + 1;
-                    strcpy(&Packet.rpt_list[n].call[0], &Packet.rpt_list[j].call[0]);
-                    Packet.rpt_list[n].ssid = Packet.rpt_list[j].ssid;
-                    if (Packet.rpt_flags & (1 << j))
-                        Packet.rpt_flags |= (1 << n);
-                    else
-                        Packet.rpt_flags &= ~(1 << n);
-                }
-                // Reduce N part of TRACEn-N
-                Packet.rpt_list[idx + 1].ssid = ctmp;
-
-                // Add new part
-                Packet.rpt_count += 1;
-                strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-                Packet.rpt_list[idx].ssid = config.aprs_ssid;
-                Packet.rpt_flags |= (1 << idx);
-                j = 2;
-                break;
-            }
-        }
-        else if (!strncmp(&Packet.rpt_list[idx].call[0], "RFONLY", 6))
-        {
-            j = 2;
-            // strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-            // Packet.rpt_list[idx].ssid = config.aprs_ssid;
-            Packet.rpt_flags |= (1 << idx);
-            break;
-        }
-        else if (!strncmp(&Packet.rpt_list[idx].call[0], "RELAY", 5))
-        {
-            j = 2;
-            strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-            Packet.rpt_list[idx].ssid = config.aprs_ssid;
-            Packet.rpt_flags |= (1 << idx);
-            break;
-        }
-        else if (!strncmp(&Packet.rpt_list[idx].call[0], "GATE", 4))
-        {
-            j = 2;
-            strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-            Packet.rpt_list[idx].ssid = config.aprs_ssid;
-            Packet.rpt_flags |= (1 << idx);
-            break;
-        }
-        else if (!strncmp(&Packet.rpt_list[idx].call[0], "ECHO", 4))
-        {
-            j = 2;
-            strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-            Packet.rpt_list[idx].ssid = config.aprs_ssid;
-            Packet.rpt_flags |= (1 << idx);
-            break;
-        }
-        else if (!strcmp(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0])) // Is path same callsign
-        {
-            ctmp = Packet.rpt_list[idx].ssid & 0x1F;
-            if (ctmp == config.aprs_ssid) // IS path same SSID
-            {
-                if (Packet.rpt_flags & (1 << idx))
-                {
-                    digiLog.DropRx++;
-                    break; // bypass flag *
-                }
-                Packet.rpt_flags |= (1 << idx);
-                j = 1;
-                break;
-            }
-            else
-            {
-                j = 0;
-                break;
-            }
-        }
-        else
-        {
-            j = 0;
-            break;
-        }
-    }
-    return j;
 }

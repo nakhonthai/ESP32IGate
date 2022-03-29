@@ -10,33 +10,40 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define VERSION "0.5a"
+#define VERSION "0.6"
 
 #define DEBUG
 //#define DEBUG_IS
 
 //#define SDCARD
 //#define SA818
+//#define SR_FRS
 
-#define WIFI_OFF_FIX	0
-#define WIFI_AP_FIX		1
-#define WIFI_STA_FIX	2
-#define WIFI_AP_STA_FIX	3
+#ifdef SR_FRS
+#ifndef SA818
+#define SA818
+#endif
+#endif
 
-#define	IMPLEMENTATION	FIFO
+#define WIFI_OFF_FIX 0
+#define WIFI_AP_FIX 1
+#define WIFI_STA_FIX 2
+#define WIFI_AP_STA_FIX 3
 
-#define TZ              0       // (utc+) TZ in hours
-#define DST_MN          0      // use 60mn for summer time in some countries
-#define TZ_MN           ((TZ)*60)
-#define TZ_SEC          ((TZ)*3600)
-#define DST_SEC         ((DST_MN)*60)
+#define IMPLEMENTATION FIFO
+
+#define TZ 0	 // (utc+) TZ in hours
+#define DST_MN 0 // use 60mn for summer time in some countries
+#define TZ_MN ((TZ)*60)
+#define TZ_SEC ((TZ)*3600)
+#define DST_SEC ((DST_MN)*60)
 
 #define FORMAT_SPIFFS_IF_FAILED true
 
 #define PKGLISTSIZE 10
 #define PKGTXSIZE 5
 
-const int timeZone = 7;  // Bangkok
+const int timeZone = 7; // Bangkok
 
 #include <Arduino.h>
 #include <FS.h>
@@ -59,12 +66,13 @@ enum M17Flags
 	CONNECTED_RO = 1 << 6
 };
 
-typedef struct Config_Struct {
+typedef struct Config_Struct
+{
 	bool synctime;
 	bool aprs;
 	bool wifi_client;
 	bool wifi;
-	char wifi_mode; //WIFI_AP,WIFI_STA,WIFI_AP_STA,WIFI_OFF
+	char wifi_mode; // WIFI_AP,WIFI_STA,WIFI_AP_STA,WIFI_OFF
 	char wifi_ch;
 	float gps_lat;
 	float gps_lon;
@@ -116,10 +124,11 @@ typedef struct Config_Struct {
 	uint8_t sql_level;
 	bool rf_power;
 	uint8_t volume;
-	#endif
-}Configuration;
+#endif
+} Configuration;
 
-typedef struct igateTLM_struct {
+typedef struct igateTLM_struct
+{
 	uint16_t Sequence;
 	unsigned long ParmTimeout;
 	unsigned long TeleTimeout;
@@ -128,18 +137,20 @@ typedef struct igateTLM_struct {
 	uint8_t RX;
 	uint8_t TX;
 	uint8_t DROP;
-}igateTLMType;
+} igateTLMType;
 
-typedef struct pkgListStruct {
+typedef struct pkgListStruct
+{
 	time_t time;
 	char calsign[11];
 	char ssid[5];
 	unsigned int pkg;
 	bool type;
 	uint8_t symbol;
-}pkgListType;
+} pkgListType;
 
-typedef struct statisticStruct {
+typedef struct statisticStruct
+{
 	uint32_t allCount;
 	uint32_t tncCount;
 	uint32_t isCount;
@@ -150,38 +161,40 @@ typedef struct statisticStruct {
 	uint32_t dropCount;
 	uint32_t rf2inet;
 	uint32_t inet2rf;
-}statusType;
+} statusType;
 
-typedef struct digiTLM_struct{
-    unsigned int Sequence;
-    unsigned int ParmTimeout;
-    unsigned int TeleTimeout;
-    unsigned char RxPkts;
-    unsigned char TxPkts;
-    unsigned char DropRx; 
-    unsigned char ErPkts;    
-}digiTLMType;
+typedef struct digiTLM_struct
+{
+	unsigned int Sequence;
+	unsigned int ParmTimeout;
+	unsigned int TeleTimeout;
+	unsigned char RxPkts;
+	unsigned char TxPkts;
+	unsigned char DropRx;
+	unsigned char ErPkts;
+} digiTLMType;
 
-typedef struct txQueue_struct{
+typedef struct txQueue_struct
+{
 	bool Active;
 	long timeStamp;
 	int Delay;
 	char Info[300];
-}txQueueType;
+} txQueueType;
 
-const char PARM[] = { "PARM.RF->INET,INET->RF,RxPkts,TxPkts,IGateDropRx" };
-const char UNIT[] = { "UNIT.Pkts,Pkts,Pkts,Pkts,Pkts" };
-const char EQNS[] = { "EQNS.0,1,0,0,1,0,0,1,0,0,1,0,0,1,0" };
+const char PARM[] = {"PARM.RF->INET,INET->RF,RxPkts,TxPkts,IGateDropRx"};
+const char UNIT[] = {"UNIT.Pkts,Pkts,Pkts,Pkts,Pkts"};
+const char EQNS[] = {"EQNS.0,1,0,0,1,0,0,1,0,0,1,0,0,1,0"};
 
-const float ctcss[] = {0,67,71.9,74.4,77,79.7,82.5,85.4,88.5,91.5,94.8,97.4,100,103.5,107.2,110.9,114.8,118.8,123,127.3,131.8,136.5,141.3,146.2,151.4,156.7,162.2,167.9,173.8,179.9,186.2,192.8,203.5,210.7,218.1,225.7,233.6,241.8,250.3};
-const float wifiPwr[12][2]={{-4,-1},{8,2},{20,5},{28,7},{34,8.5},{44,11},{52,13},{60,15},{68,17},{74,18.5},{76,19},{78,19.5}};
+const float ctcss[] = {0, 67, 71.9, 74.4, 77, 79.7, 82.5, 85.4, 88.5, 91.5, 94.8, 97.4, 100, 103.5, 107.2, 110.9, 114.8, 118.8, 123, 127.3, 131.8, 136.5, 141.3, 146.2, 151.4, 156.7, 162.2, 167.9, 173.8, 179.9, 186.2, 192.8, 203.5, 210.7, 218.1, 225.7, 233.6, 241.8, 250.3};
+const float wifiPwr[12][2] = {{-4, -1}, {8, 2}, {20, 5}, {28, 7}, {34, 8.5}, {44, 11}, {52, 13}, {60, 15}, {68, 17}, {74, 18.5}, {76, 19}, {78, 19.5}};
 
 void saveEEPROM();
 void defaultConfig();
 String getValue(String data, char separator, int index);
 boolean isValidNumber(String str);
-void taskAPRS(void * pvParameters);
-void taskNetwork(void * pvParameters);
+void taskAPRS(void *pvParameters);
+void taskNetwork(void *pvParameters);
 void sort(pkgListType a[], int size);
 void sortPkgDesc(pkgListType a[], int size);
 int processPacket(String &tnc2);
