@@ -2,21 +2,21 @@
  Name:		ESP32 APRS Internet Gateway
  Created:	1-Nov-2021 14:27:23
  Author:	HS5TQA/Atten
- Support IS: host:aprs.dprns.com port:14580
- Support IS monitor: http://aprs.dprns.com:14501
+ Support IS: host:aprs.dprns.com port:14580 or aprs.hs5tqa.ampr.org:14580
+ Support IS monitor: http://aprs.dprns.com:14501 or http://aprs.hs5tqa.ampr.org:14501
  Support in LINE Group APRS Only
 */
 
 #ifndef MAIN_H
 #define MAIN_H
 
-#define VERSION "0.6a"
+#define VERSION "0.7"
 
 #define DEBUG
 //#define DEBUG_IS
 
 //#define SDCARD
-//#define SA818
+#define SA818
 //#define SR_FRS
 
 #ifdef SR_FRS
@@ -98,10 +98,10 @@ typedef struct Config_Struct
 	char aprs_filter[30];
 	char aprs_comment[50];
 	char aprs_path[72];
-	char wifi_ssid[20];
-	char wifi_pass[15];
-	char wifi_ap_ssid[20];
-	char wifi_ap_pass[15];
+	char wifi_ssid[32];
+	char wifi_pass[63];
+	char wifi_ap_ssid[32];
+	char wifi_ap_pass[63];
 	char tnc_path[50];
 	char tnc_btext[50];
 	char tnc_comment[50];
@@ -125,6 +125,17 @@ typedef struct Config_Struct
 	bool rf_power;
 	uint8_t volume;
 #endif
+	bool vpn;
+	bool modem;
+	uint16_t wg_port;
+	char wg_peer_address[16];
+	char wg_local_address[16];
+	char wg_netmask_address[16];
+	char wg_gw_address[16];
+	char wg_public_key[45];
+	char wg_private_key[45];
+	int8_t timeZone;
+
 } Configuration;
 
 typedef struct igateTLM_struct
@@ -182,7 +193,7 @@ typedef struct txQueue_struct
 	char Info[300];
 } txQueueType;
 
-const char PARM[] = {"PARM.RF->INET,INET->RF,RxPkts,TxPkts,IGateDropRx"};
+const char PARM[] = {"PARM.RF->INET,INET->RF,TxPkts,RxPkts,IGateDropRx"};
 const char UNIT[] = {"UNIT.Pkts,Pkts,Pkts,Pkts,Pkts"};
 const char EQNS[] = {"EQNS.0,1,0,0,1,0,0,1,0,0,1,0,0,1,0"};
 

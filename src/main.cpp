@@ -21,10 +21,17 @@
 #include "BluetoothSerial.h"
 #include "digirepeater.h"
 #include "igate.h"
+#include "wireguardif.h"
+#include "wireguard.h"
+
+#include "wireguard_vpn.h"
+#include <WiFiUdp.h>
 
 #include <WiFiClientSecure.h>
 
 #include "AFSK.h"
+
+#include <PPPoS.h>
 
 #define DEBUG_TNC
 
@@ -48,6 +55,16 @@
 #define SQL_PIN 33
 HardwareSerial SerialRF(1);
 #endif
+
+#define MODEM_PWRKEY 5
+#define MODEM_TX 17
+#define MODEM_RX 16
+
+#define PPP_APN "internet"
+#define PPP_USER ""
+#define PPP_PASS ""
+
+PPPoS ppp;
 
 time_t systemUptime = 0;
 time_t wifiUptime = 0;
@@ -87,6 +104,8 @@ BluetoothSerial SerialBT;
 IPAddress local_IP(192, 168, 4, 1);
 IPAddress gateway(192, 168, 4, 254);
 IPAddress subnet(255, 255, 255, 0);
+
+IPAddress vpn_IP(192, 168, 44, 195);
 
 int pkgTNC_count = 0;
 
@@ -203,8 +222,18 @@ void defaultConfig()
     config.volume = 4;
     config.input_hpf = false;
 #endif
-    saveEEPROM();
     input_HPF = config.input_hpf;
+    config.vpn = false;
+    config.modem = false;
+    config.wg_port = 51820;
+    sprintf(config.wg_peer_address, "203.150.19.23");
+    sprintf(config.wg_local_address, "192.168.44.200");
+    sprintf(config.wg_netmask_address, "255.255.255.255");
+    sprintf(config.wg_gw_address, "192.168.44.254");
+    sprintf(config.wg_public_key, "");
+    sprintf(config.wg_private_key, "");
+    config.timeZone = 7;
+    saveEEPROM();
 }
 
 unsigned long NTP_Timeout;
@@ -661,8 +690,8 @@ void setup()
     SA818_INIT(true);
 #endif
 
-    enableLoopWDT();
-    enableCore0WDT();
+    // enableLoopWDT();
+    // enableCore0WDT();
     enableCore1WDT();
 
     // Task 1
@@ -673,17 +702,17 @@ void setup()
         NULL,            /* Task input parameter */
         1,               /* Priority of the task */
         &taskAPRSHandle, /* Task handle. */
-        1);              /* Core where the task should run */
+        0);              /* Core where the task should run */
 
     // Task 2
     xTaskCreatePinnedToCore(
         taskNetwork,        /* Function to implement the task */
         "taskNetwork",      /* Name of the task */
-        20000,              /* Stack size in words */
+        32768,              /* Stack size in words */
         NULL,               /* Task input parameter */
         1,                  /* Priority of the task */
         &taskNetworkHandle, /* Task handle. */
-        0);                 /* Core where the task should run */
+        1);                 /* Core where the task should run */
 }
 
 int pkgCount = 0;
@@ -776,9 +805,17 @@ int packet2Raw(String &tnc2, AX25Msg &Packet)
 long sendTimer = 0;
 bool AFSKInitAct = false;
 int btn_count = 0;
+long timeCheck = 0;
 void loop()
 {
     vTaskDelay(5 / portTICK_PERIOD_MS);
+    if (millis() > timeCheck)
+    {
+        timeCheck = millis() + 10000;
+        if (ESP.getFreeHeap() < 70000)
+            esp_restart();
+        // Serial.println(String(ESP.getFreeHeap()));
+    }
 #ifdef SA818
     // if (SerialRF.available())
     // {
@@ -817,7 +854,7 @@ void sendIsPkgMsg(char *raw)
     String tnc2Raw = String(str);
     if (aprsClient.connected())
         aprsClient.println(tnc2Raw); // Send packet to Inet
-    if (config.tnc)
+    if (config.tnc && config.tnc_digi)
         pkgTxUpdate(str, 0);
     // APRS_sendTNC2Pkt(tnc2Raw); // Send packet to RF
 }
@@ -964,7 +1001,7 @@ void taskAPRS(void *pvParameters)
 
                 if (aprsClient.connected())
                     aprsClient.println(String(rawTlm)); // Send packet to Inet
-                if (config.tnc)
+                if (config.tnc && config.tnc_digi)
                     pkgTxUpdate(rawTlm, 0);
                 // APRS_sendTNC2Pkt(String(rawTlm)); // Send packet to RF
                 igateTLM.Sequence++;
@@ -1069,6 +1106,26 @@ void taskNetwork(void *pvParameters)
 {
     int c = 0;
     Serial.println("Task Network has been start");
+    //     pinMode(MODEM_PWRKEY, OUTPUT);
+    //         // Pull down PWRKEY for more than 1 second according to manual requirements
+    //     digitalWrite(MODEM_PWRKEY, HIGH);
+    //     delay(100);
+    //     digitalWrite(MODEM_PWRKEY, LOW);
+    //     delay(1000);
+    //     digitalWrite(MODEM_PWRKEY, HIGH);
+
+    // Serial1.begin(115200, SERIAL_8N1, MODEM_RX, MODEM_TX);
+    //   Serial1.setTimeout(10);
+    //   Serial1.setRxBufferSize(2048);
+    //   ppp.begin(&Serial1);
+
+    //   Serial.print("Connecting PPPoS");
+    //   ppp.connect(PPP_APN, PPP_USER, PPP_PASS);
+    //   while (!ppp.status()) {
+    //     delay(500);
+    //     Serial.print(".");
+    //   }
+    //   Serial.println("OK");
 
     if (config.wifi_mode == WIFI_AP_STA_FIX || config.wifi_mode == WIFI_AP_FIX)
     { // AP=false
@@ -1105,10 +1162,11 @@ void taskNetwork(void *pvParameters)
     }
 
     webService();
+    pingTimeout = millis() + 10000;
     for (;;)
     {
         // wdtNetworkTimer = millis();
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        vTaskDelay(5 / portTICK_PERIOD_MS);
         serviceHandle();
 
         if (config.wifi_mode == WIFI_AP_STA_FIX || config.wifi_mode == WIFI_STA_FIX)
@@ -1122,12 +1180,14 @@ void taskNetwork(void *pvParameters)
                     AFSK_TimerEnable(false);
 #endif
                     wifiTTL = tw + 60000;
-                    Serial.print("WiFi connecting..");
+                    Serial.println("WiFi connecting..");
                     // udp.endPacket();
                     WiFi.disconnect();
                     WiFi.setTxPower((wifi_power_t)config.wifi_power);
                     WiFi.setHostname("ESP32IGate");
                     WiFi.begin(config.wifi_ssid, config.wifi_pass);
+                    if (config.vpn)
+                        wireguard_remove();
                     // Wait up to 1 minute for connection...
                     for (c = 0; (c < 30) && (WiFi.status() != WL_CONNECTED); c++)
                     {
@@ -1139,12 +1199,17 @@ void taskNetwork(void *pvParameters)
                     { // If it didn't connect within 1 min
                         Serial.println("Failed. Will retry...");
                         WiFi.disconnect();
+                        // WiFi.mode(WIFI_OFF);
+                        delay(3000);
+                        // WiFi.mode(WIFI_STA);
+                        WiFi.reconnect();
                         continue;
                     }
 
                     Serial.println("WiFi connected");
-                    Serial.println("IP address: ");
+                    Serial.print("IP address: ");
                     Serial.println(WiFi.localIP());
+
                     vTaskDelay(1000 / portTICK_PERIOD_MS);
                     NTP_Timeout = millis() + 5000;
 // Serial.println("Contacting Time Server");
@@ -1157,13 +1222,14 @@ void taskNetwork(void *pvParameters)
             }
             else
             {
+
                 if (millis() > NTP_Timeout)
                 {
                     NTP_Timeout = millis() + 86400000;
                     // Serial.println("Config NTP");
                     // setSyncProvider(getNtpTime);
                     Serial.println("Contacting Time Server");
-                    configTime(3600 * timeZone, 0, "203.150.19.26", "110.170.126.101", "77.68.122.252");
+                    configTime(3600 * config.timeZone, 0, "203.150.19.26", "110.170.126.101", "77.68.122.252");
                     vTaskDelay(3000 / portTICK_PERIOD_MS);
                     time_t systemTime;
                     time(&systemTime);
@@ -1171,6 +1237,15 @@ void taskNetwork(void *pvParameters)
                     if (systemUptime == 0)
                     {
                         systemUptime = now();
+                    }
+                    pingTimeout = millis() + 2000;
+                    if (config.vpn)
+                    {
+                        if (!wireguard_active())
+                        {
+                            Serial.println("Setup Wiregurad VPN!");
+                            wireguard_setup();
+                        }
                     }
                 }
 
@@ -1184,7 +1259,7 @@ void taskNetwork(void *pvParameters)
                     {
                         if (aprsClient.available())
                         {
-                            pingTimeout = millis() + 300000;                // Reset ping timout
+                            // pingTimeout = millis() + 300000;                // Reset ping timout
                             String line = aprsClient.readStringUntil('\n'); //อ่านค่าที่ Server ตอบหลับมาทีละบรรทัด
 #ifdef DEBUG_IS
                             printTime();
@@ -1245,19 +1320,50 @@ void taskNetwork(void *pvParameters)
                     }
                 }
 
+                // if (millis() > pingTimeout)
+                //                 {
+                //                     pingTimeout = millis() + 3000;
+                //                     Serial.print("Ping to " + vpn_IP.toString());
+                //                     if (ping_start(vpn_IP, 3, 0, 0, 10) == true)
+                //                     {
+                //                         Serial.println("VPN Ping Success!!");
+                //                     }
+                //                     else
+                //                     {
+                //                         Serial.println("VPN Ping Fail!");
+                //                     }
+                //                 }
+
                 if (millis() > pingTimeout)
                 {
                     pingTimeout = millis() + 300000;
-                    Serial.print("Ping to " + WiFi.gatewayIP().toString());
-                    if (ping_start(WiFi.gatewayIP(), 3, 0, 0, 10) == true)
+                    Serial.println("Ping GW to " + WiFi.gatewayIP().toString());
+                    if (ping_start(WiFi.gatewayIP(), 3, 0, 0, 5) == true)
                     {
-                        Serial.println(" Success!!");
+                        Serial.println("GW Success!!");
                     }
                     else
                     {
-                        Serial.println(" Fail!");
+                        Serial.println("GW Fail!");
                         WiFi.disconnect();
                         wifiTTL = 0;
+                    }
+                    if (config.vpn)
+                    {
+                        IPAddress vpnIP;
+                        vpnIP.fromString(String(config.wg_gw_address));
+                        Serial.println("Ping VPN to " + vpnIP.toString());
+                        if (ping_start(vpnIP, 2, 0, 0, 10) == true)
+                        {
+                            Serial.println("VPN Ping Success!!");
+                        }
+                        else
+                        {
+                            Serial.println("VPN Ping Fail!");
+                            wireguard_remove();
+                            delay(3000);
+                            wireguard_setup();
+                        }
                     }
                 }
             }

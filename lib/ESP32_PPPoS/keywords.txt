@@ -1,0 +1,16 @@
+#######################################
+# Data types (KEYWORD1)
+#######################################
+PPPoS	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+connect	KEYWORD2
+begin	KEYWORD2
+status	KEYWORD2
+
+#######################################
+# Literals (LITERAL1)
+#######################################
+PPP_CONNECTED	LITERAL1
