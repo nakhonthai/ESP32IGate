@@ -59,8 +59,12 @@ int igateProcess(AX25Msg &Packet)
             header += "*";
     }
     header += String(F(":"));
-    aprsClient.print(header);
-    aprsClient.write(&Packet.info[0], Packet.len); // info binary write aprsc support
+    uint8_t Raw[500];
+    memset(Raw,0,sizeof(Raw));
+    size_t hSize=strlen(header.c_str());
+    memcpy(&Raw[0],header.c_str(),hSize);
+    memcpy(&Raw[hSize],&Packet.info[0], Packet.len);
+    aprsClient.write(&Raw[0], hSize+Packet.len); // info binary write aprsc support
     aprsClient.println();
     return 1;
 }

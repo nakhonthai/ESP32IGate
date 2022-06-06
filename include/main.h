@@ -10,14 +10,14 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define VERSION "0.7"
+#define VERSION "0.7a"
 
 #define DEBUG
 //#define DEBUG_IS
 
 //#define SDCARD
-#define SA818
-//#define SR_FRS
+//#define SA818
+#define SR_FRS
 
 #ifdef SR_FRS
 #ifndef SA818
