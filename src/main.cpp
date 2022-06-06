@@ -460,7 +460,7 @@ void SA818_INIT(bool boot)
 #ifdef SR_FRS
     Serial.println("Radio Module SR_FRS Init");
 #else
-    Serial.println("Radio Module SA868 Init");
+    Serial.println("Radio Module SA818/SA868 Init");
 #endif
     if (boot)
     {

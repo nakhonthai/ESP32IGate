@@ -1,11 +1,11 @@
 #include "igate.h"
 
 extern WiFiClient aprsClient;
+extern Configuration config;
 
 int igateProcess(AX25Msg &Packet)
 {
     int idx, j;
-    uint8_t ctmp;
     String header;
 
     j = 0;
@@ -46,6 +46,8 @@ int igateProcess(AX25Msg &Packet)
         header += String(F("-"));
         header += String(Packet.dst.ssid);
     }
+
+    //Add Path
     for (int i = 0; i < Packet.rpt_count; i++)
     {
         header += String(",");
@@ -58,6 +60,17 @@ int igateProcess(AX25Msg &Packet)
         if (Packet.rpt_flags & (1 << i))
             header += "*";
     }
+
+    //Add qAR,callSSID
+    header += String(F(",qAR,"));
+    header += String(config.aprs_mycall);
+    if (config.aprs_ssid > 0)
+    {
+        header += String(F("-"));
+        header += String(config.aprs_ssid);
+    }
+
+    //Add Infomation
     header += String(F(":"));
     uint8_t Raw[500];
     memset(Raw,0,sizeof(Raw));
