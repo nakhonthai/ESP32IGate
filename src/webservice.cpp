@@ -530,7 +530,7 @@ void handle_setting()
 				{
 					if (server.arg(i) != "")
 					{
-						strcpy(config.tnc_path, server.arg(i).c_str());
+						strcpy(config.aprs_path, server.arg(i).c_str());
 					}
 				}
 
@@ -595,7 +595,7 @@ void handle_setting()
 
 	webString += "<div class=\"form-group\">\n";
 	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">APRS Path</label>\n";
-	webString += "<div class=\"col-sm-6 col-xs-8\"><input class=\"form-control\" id=\"aprsPath\" name=\"aprsPath\" type=\"text\" value=\"" + String(config.tnc_path) + "\" /></div>\n";
+	webString += "<div class=\"col-sm-6 col-xs-8\"><input class=\"form-control\" id=\"aprsPath\" name=\"aprsPath\" type=\"text\" value=\"" + String(config.aprs_path) + "\" /></div>\n";
 	webString += "</div>\n";
 
 	webString += "<div class=\"form-group\">\n";

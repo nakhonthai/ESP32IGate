@@ -227,9 +227,9 @@ void defaultConfig()
     config.modem = false;
     config.wg_port = 51820;
     sprintf(config.wg_peer_address, "203.150.19.23");
-    sprintf(config.wg_local_address, "192.168.44.200");
+    sprintf(config.wg_local_address, "44.63.31.223");
     sprintf(config.wg_netmask_address, "255.255.255.255");
-    sprintf(config.wg_gw_address, "192.168.44.254");
+    sprintf(config.wg_gw_address, "44.63.31.193");
     sprintf(config.wg_public_key, "");
     sprintf(config.wg_private_key, "");
     config.timeZone = 7;
