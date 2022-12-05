@@ -10,11 +10,12 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define VERSION "0.7b"
+#define VERSION "0.8"
 
-#define DEBUG
+//#define DEBUG
 //#define DEBUG_IS
 
+#define OLED
 //#define SDCARD
 //#define SA818
 #define SR_FRS
@@ -135,6 +136,20 @@ typedef struct Config_Struct
 	char wg_public_key[45];
 	char wg_private_key[45];
 	int8_t timeZone;
+	bool oled_enable;
+	int oled_timeout;
+	unsigned int dispDelay;
+	bool dispTNC;
+	bool dispINET;
+	bool filterMessage;
+	bool filterStatus;
+	bool filterTelemetry;
+	bool filterWeather;
+	bool filterTracker;
+	bool filterMove;
+	bool filterPosition;
+	unsigned int filterDistant;
+	bool mygps;
 
 } Configuration;
 
@@ -156,7 +171,7 @@ typedef struct pkgListStruct
 	char calsign[11];
 	char ssid[5];
 	unsigned int pkg;
-	bool type;
+	uint8_t type;
 	uint8_t symbol;
 } pkgListType;
 
@@ -185,15 +200,31 @@ typedef struct digiTLM_struct
 	unsigned char ErPkts;
 } digiTLMType;
 
+#define TLMLISTSIZE 20
+
+typedef struct Telemetry_struct
+{
+	time_t time;
+	char callsign[10];
+	char PARM[5][10];
+	char UNIT[5][10];
+	float VAL[5];
+	float RAW[5];
+	float EQNS[15];
+	uint8_t BITS;
+	uint8_t BITS_FLAG;
+	bool EQNS_FLAG;
+} TelemetryType;
+
 typedef struct txQueue_struct
 {
 	bool Active;
 	long timeStamp;
 	int Delay;
 	char Info[300];
-} txQueueType;
+} txQueueType; 
 
-const char PARM[] = {"PARM.RF->INET,INET->RF,TxPkts,RxPkts,IGateDropRx"};
+const char PARM[] = {"PARM.RF->INET,INET->RF,DigiRpt,TX2RF,DropRx"};
 const char UNIT[] = {"UNIT.Pkts,Pkts,Pkts,Pkts,Pkts"};
 const char EQNS[] = {"EQNS.0,1,0,0,1,0,0,1,0,0,1,0,0,1,0"};
 
@@ -213,5 +244,10 @@ String send_fix_location();
 int digiProcess(AX25Msg &Packet);
 void printTime();
 bool pkgTxUpdate(const char *info, int delay);
+void dispWindow(String line, uint8_t mode, bool filter);
+void systemDisp();
+void pkgCountDisp();
+void pkgLastDisp();
+void statisticsDisp();
 
 #endif

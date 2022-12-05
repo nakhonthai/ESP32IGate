@@ -182,8 +182,11 @@ void setHTML(byte page)
 	String strActiveP7 = "";
 	String strActiveP8 = "";
 	String strActiveP9 = "";
+	String strActiveP10 = "";
 
-	if (page == 8)
+	if (page == 9)
+		strActiveP10 = "class=active";
+	else if (page == 8)
 		strActiveP9 = "class=active";
 	else if (page == 7)
 		strActiveP8 = "class=active";
@@ -219,6 +222,7 @@ void setHTML(byte page)
 	webString += "<li role=\"presentation\"" + strActiveP8 + ">\n<a href=\"/radio\" id=\"channel_link_radio\">Radio</a>\n</li>\n";
 #endif
 	webString += "<li role=\"presentation\"" + strActiveP9 + ">\n<a href=\"/vpn\" id=\"channel_link_radio\">VPN</a>\n</li>\n";
+	webString += "<li role=\"presentation\"" + strActiveP10 + ">\n<a href=\"/display\" id=\"channel_link_radio\">Display</a>\n</li>\n";
 	webString += "<li role=\"presentation\"" + strActiveP4 + ">\n<a href=\"/service\" id=\"channel_link_service\">Service</a>\n</li>\n";
 	webString += "<li role=\"presentation\"" + strActiveP5 + ">\n<a href=\"/system\" id=\"channel_link_system\">System</a>\n</li>\n";
 	webString += "<li role=\"presentation\"" + strActiveP7 + ">\n<a href=\"/test\" id=\"channel_link_system\">Test</a>\n</li>\n";
@@ -270,6 +274,24 @@ void setHTML(byte page)
 				pkgList[i].calsign[10] = 0;
 				time_t tm = pkgList[i].time;
 				localtime_r(&pkgList[i].time, &tmstruct);
+			// 	switch (pkgList[i].type) {
+			// case PKG_OBJECT: display.print("O");
+			// 	break;
+			// case PKG_ITEM: display.print("I");
+			// 	break;
+			// case PKG_MESSAGE: display.print("M");
+			// 	break;
+			// case PKG_WX: display.print("W");
+			// 	break;
+			// case PKG_TELEMETRY: display.print("T");
+			// 	break;
+			// case PKG_QUERY: display.print("Q");
+			// 	break;
+			// case PKG_STATUS: display.print("S");
+			// 	break;
+			// default: display.print("*");
+			// 	break;
+			// }
 				String str = String(tmstruct.tm_hour, DEC) + ":" + String(tmstruct.tm_min, DEC) + ":" + String(tmstruct.tm_sec, DEC);
 				// String str = String(hour(pkgList[i].time), DEC) + ":" + String(minute(pkgList[i].time), DEC) + ":" + String(second(pkgList[i].time), DEC);
 				webString += "<tr><td align=\"left\">" + String(pkgList[i].calsign) + "</td><td align=\"right\">" + str + "</td></tr>";
@@ -930,7 +952,7 @@ void handle_service()
 	if (config.input_hpf)
 		hpfFlage = "checked";
 	webString += "<div class=\"form-group\">\n";
-	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">AF Input HPF</label>\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">AF Input BPF</label>\n";
 	webString += "<div class=\"col-sm-4 col-xs-8\"><input class=\"field_checkbox\" id=\"hpfEnable\" name=\"hpfEnable\" type=\"checkbox\" value=\"OK\" " + hpfFlage + "/></div>\n";
 	webString += "</div>\n";
 	String digiFlage = "";
@@ -977,6 +999,286 @@ void handle_service()
 		{
 			webString += "<option value=\"" + String(delay) + "\">" + String(delay) + "</option>\n";
 		}
+	}
+	webString += "</select></div>\n";
+	webString += "</div>\n";
+
+	webString += "</div>\n<hr>\n"; // div aprs
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\"></label>\n";
+	webString += "<div class=\"col-sm-2 col-xs-4\"><input class=\"btn btn-primary\" id=\"setting_form_sumbit\" name=\"commit\" type=\"submit\" value=\"Save Config\" maxlength=\"80\"/></div>\n";
+	webString += "</div>\n";
+
+	webString += "</form></div>\n";
+
+	webString += "</body></html>\n";
+	server.send(200, "text/html", webString); // send to someones browser when asked
+	delay(100);
+	webString.clear();
+}
+
+void handle_display()
+{
+	bool filterMessage = false;
+	bool filterStatus = false;
+	bool filterTelemetry = false;
+	bool filterWeather = false;
+	bool filterTracker = false;
+	bool filterMove = false;
+	bool filterPosition = false;
+	bool dispTNC = false;
+	bool dispINET = false;
+	bool oledEN = false;
+
+	if (server.hasArg("commit"))
+	{
+		for (uint8_t i = 0; i < server.args(); i++)
+		{
+			// Serial.print("SERVER ARGS ");
+			// Serial.print(server.argName(i));
+			// Serial.print("=");
+			// Serial.println(server.arg(i));
+			if (server.argName(i) == "oledEnable")
+			{
+				if (server.arg(i) != "")
+				{
+					if (String(server.arg(i)) == "OK")
+					{
+						oledEN = true;
+					}
+				}
+			}
+			if (server.argName(i) == "filterMessage")
+			{
+				if (server.arg(i) != "")
+				{
+					if (String(server.arg(i)) == "OK")
+						filterMessage = true;
+				}
+			}
+
+			if (server.argName(i) == "filterTelemetry")
+			{
+				if (server.arg(i) != "")
+				{
+					if (String(server.arg(i)) == "OK")
+						filterTelemetry = true;
+				}
+			}
+
+			if (server.argName(i) == "filterStatus")
+			{
+				if (server.arg(i) != "")
+				{
+					if (String(server.arg(i)) == "OK")
+						filterStatus = true;
+				}
+			}
+
+			if (server.argName(i) == "filterWeather")
+			{
+				if (server.arg(i) != "")
+				{
+					if (String(server.arg(i)) == "OK")
+						filterWeather = true;
+				}
+			}
+
+			if (server.argName(i) == "filterTracker")
+			{
+				if (server.arg(i) != "")
+				{
+					if (String(server.arg(i)) == "OK")
+						filterTracker = true;
+				}
+			}
+
+			if (server.argName(i) == "filterMove")
+			{
+				if (server.arg(i) != "")
+				{
+					if (String(server.arg(i)) == "OK")
+						filterMove = true;
+				}
+			}
+
+			if (server.argName(i) == "filterPosition")
+			{
+				if (server.arg(i) != "")
+				{
+					if (String(server.arg(i)) == "OK")
+						filterPosition = true;
+				}
+			}
+
+			if (server.argName(i) == "dispTNC")
+			{
+				if (server.arg(i) != "")
+				{
+					if (String(server.arg(i)) == "OK")
+						dispTNC = true;
+				}
+			}
+
+			if (server.argName(i) == "dispINET")
+			{
+				if (server.arg(i) != "")
+				{
+					if (String(server.arg(i)) == "OK")
+						dispINET = true;
+				}
+			}
+
+			if (server.argName(i) == "dispDelay")
+			{
+				if (server.arg(i) != "")
+				{
+					if (isValidNumber(server.arg(i)))
+					{
+						config.dispDelay = server.arg(i).toInt();
+						if (config.dispDelay < 0)
+							config.dispDelay = 0;
+					}
+				}
+			}
+
+			if (server.argName(i) == "oled_timeout")
+			{
+				if (server.arg(i) != "")
+				{
+					if (isValidNumber(server.arg(i)))
+					{
+						config.oled_timeout = server.arg(i).toInt();
+						if (config.oled_timeout < 0)
+							config.oled_timeout = 0;
+					}
+				}
+			}
+		}
+
+		config.oled_enable = oledEN;
+		config.dispINET = dispINET;
+		config.dispTNC = dispTNC;
+		config.filterMessage = filterMessage;
+		config.filterStatus = filterStatus;
+		config.filterTelemetry = filterTelemetry;
+		config.filterWeather = filterWeather;
+		config.filterTracker = filterTracker;
+		config.filterMove = filterMove;
+		config.filterPosition = filterPosition;
+		saveEEPROM();
+	}
+
+	// getMoisture();       // read sensor
+	// webMessage = "";
+	setHTML(10);
+	webString += "<div class=\"col-xs-10\">\n";
+	webString += "<form accept-charset=\"UTF-8\" action=\"/display\" class=\"form-horizontal\" id=\"setting_form\" method=\"post\">\n";
+
+	webString += "<div class = \"col-pad\">\n<h3>Display Configuation</h3>\n";
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">OLED Enable</label>\n";
+	String oledFlageEn = "";
+	if (config.oled_enable == true)
+		oledFlageEn = "checked";
+	webString += "<div class=\"col-sm-4 col-xs-6\"><input class=\"field_checkbox\" id=\"field_checkbox_0\" name=\"oledEnable\" type=\"checkbox\" value=\"OK\" " + oledFlageEn + "/></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">From RF</label>\n";
+	String rfFlageEn = "";
+	if (config.dispTNC == true)
+		rfFlageEn = "checked";
+	webString += "<div class=\"col-sm-4 col-xs-6\"><input class=\"field_checkbox\" id=\"dispTNC\" name=\"dispTNC\" type=\"checkbox\" value=\"OK\" " + rfFlageEn + "/></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">From INET</label>\n";
+	String inetFlageEn = "";
+	if (config.dispINET == true)
+		inetFlageEn = "checked";
+	webString += "<div class=\"col-sm-4 col-xs-6\"><input class=\"field_checkbox\" id=\"dispINET\" name=\"dispINET\" type=\"checkbox\" value=\"OK\" " + inetFlageEn + "/></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Message</label>\n";
+	String filterMessageFlageEn = "";
+	if (config.filterMessage == true)
+		filterMessageFlageEn = "checked";
+	webString += "<div class=\"col-sm-4 col-xs-6\"><input class=\"field_checkbox\" id=\"filterMessage\" name=\"filterMessage\" type=\"checkbox\" value=\"OK\" " + filterMessageFlageEn + "/></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Status</label>\n";
+	String filterStatusFlageEn = "";
+	if (config.filterStatus == true)
+		filterStatusFlageEn = "checked";
+	webString += "<div class=\"col-sm-4 col-xs-6\"><input class=\"field_checkbox\" id=\"filterStatus\" name=\"filterStatus\" type=\"checkbox\" value=\"OK\" " + filterStatusFlageEn + "/></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Telemetry</label>\n";
+	String filterTelemetryFlageEn = "";
+	if (config.filterTelemetry == true)
+		filterTelemetryFlageEn = "checked";
+	webString += "<div class=\"col-sm-4 col-xs-6\"><input class=\"field_checkbox\" id=\"filterTelemetry\" name=\"filterTelemetry\" type=\"checkbox\" value=\"OK\" " + filterTelemetryFlageEn + "/></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Weather</label>\n";
+	String filterWeatherFlageEn = "";
+	if (config.filterWeather == true)
+		filterWeatherFlageEn = "checked";
+	webString += "<div class=\"col-sm-4 col-xs-6\"><input class=\"field_checkbox\" id=\"filterWeather\" name=\"filterWeather\" type=\"checkbox\" value=\"OK\" " + filterWeatherFlageEn + "/></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Tracker</label>\n";
+	String filterTrackerFlageEn = "";
+	if (config.filterTracker == true)
+		filterTrackerFlageEn = "checked";
+	webString += "<div class=\"col-sm-4 col-xs-6\"><input class=\"field_checkbox\" id=\"filterTracker\" name=\"filterTracker\" type=\"checkbox\" value=\"OK\" " + filterTrackerFlageEn + "/></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Move</label>\n";
+	String filterMoveFlageEn = "";
+	if (config.filterMove == true)
+		filterMoveFlageEn = "checked";
+	webString += "<div class=\"col-sm-4 col-xs-6\"><input class=\"field_checkbox\" id=\"filterMove\" name=\"filterMove\" type=\"checkbox\" value=\"OK\" " + filterMoveFlageEn + "/></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Position</label>\n";
+	String filterPositionFlageEn = "";
+	if (config.filterPosition == true)
+		filterPositionFlageEn = "checked";
+	webString += "<div class=\"col-sm-4 col-xs-6\"><input class=\"field_checkbox\" id=\"filterPosition\" name=\"filterPosition\" type=\"checkbox\" value=\"OK\" " + filterPositionFlageEn + "/></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Display Timeout</label>\n";
+	webString += "<div class=\"col-sm-4 col-xs-6\"><select name=\"dispDelay\" id=\"dispDelay\">\n";
+	for (int i = 0; i < 16; i += 1)
+	{
+		if (config.dispDelay == i)
+			webString += "<option value=\"" + String(i) + "\" selected>" + String(i) + " Sec</option>\n";
+		else
+			webString += "<option value=\"" + String(i) + "\" >" + String(i) + " Sec</option>\n";
+	}
+	webString += "</select></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">OLED Sleep</label>\n";
+	webString += "<div class=\"col-sm-4 col-xs-6\"><select name=\"oled_timeout\" id=\"oled_timeout\">\n";
+	for (int i = 0; i <= 600; i += 30)
+	{
+		if (config.oled_timeout == i)
+			webString += "<option value=\"" + String(i) + "\" selected>" + String(i) + " Sec</option>\n";
+		else
+			webString += "<option value=\"" + String(i) + "\" >" + String(i) + " Sec</option>\n";
 	}
 	webString += "</select></div>\n";
 	webString += "</div>\n";
@@ -1686,7 +1988,6 @@ void handle_system()
 	webString += "<td><label class=\"col-sm-2 col-xs-12 control-label\">SYSTEM</label></td>\n";
 	webString += "<td><input type='submit' class=\"btn btn-danger\" name=\"REBOOT\" value='REBOOT'></td>\n";
 	webString += "</div>\n</form>\n</tr></table>\n";
-	;
 
 	webString += "</div><hr>\n";
 
@@ -2284,6 +2585,7 @@ void webService()
 	server.on("/radio", handle_radio);
 #endif
 	server.on("/vpn", handle_vpn);
+	server.on("/display", handle_display);
 	server.on("/default", handle_default);
 	server.on("/service", handle_service);
 	server.on("/system", handle_system);
