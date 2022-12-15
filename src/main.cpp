@@ -262,6 +262,7 @@ void defaultConfig()
     sprintf(config.tnc_comment, "ESP32 Build in TNC");
     sprintf(config.aprs_filter, "g/HS*/E2*");
     sprintf(config.tnc_path, "WIDE1-1");
+    memset(config.aprs_object,0,sizeof(config.aprs_object));
     config.wifi_power = 44;
     config.input_hpf = true;
 #ifdef SA818
@@ -799,10 +800,15 @@ boolean APRSConnect()
                 return false;
         }
         // ขอเชื่อมต่อกับ aprsc
+        if(strlen(config.aprs_object)>=3){
+            uint16_t passcode=aprsParse.passCode(config.aprs_object);
+            login = "user " + String(config.aprs_object) + " pass " + String(passcode,DEC) + " vers ESP32IGate V" + String(VERSION) + " filter " + String(config.aprs_filter);
+        }else{
         if (config.aprs_ssid == 0)
             login = "user " + String(config.aprs_mycall) + " pass " + String(config.aprs_passcode) + " vers ESP32IGate V" + String(VERSION) + " filter " + String(config.aprs_filter);
         else
             login = "user " + String(config.aprs_mycall) + "-" + String(config.aprs_ssid) + " pass " + String(config.aprs_passcode) + " vers ESP32IGate V" + String(VERSION) + " filter " + String(config.aprs_filter);
+        }
         aprsClient.println(login);
         // Serial.println(login);
         // Serial.println("Success");
@@ -993,7 +999,11 @@ String send_fix_location()
     memset(strtmp, 0, 300);
     DD_DDDDDtoDDMMSS(config.gps_lat, &lat_dd, &lat_mm, &lat_ss);
     DD_DDDDDtoDDMMSS(config.gps_lon, &lon_dd, &lon_mm, &lon_ss);
-    sprintf(loc, "=%02d%02d.%02dN%c%03d%02d.%02dE%c", lat_dd, lat_mm, lat_ss, config.aprs_table, lon_dd, lon_mm, lon_ss, config.aprs_symbol);
+    if(strlen(config.aprs_object)>=3){
+        sprintf(loc, ")%s!%02d%02d.%02dN%c%03d%02d.%02dE%c",config.aprs_object,lat_dd, lat_mm, lat_ss, config.aprs_table, lon_dd, lon_mm, lon_ss, config.aprs_symbol);
+    }else{
+        sprintf(loc, "!%02d%02d.%02dN%c%03d%02d.%02dE%c", lat_dd, lat_mm, lat_ss, config.aprs_table, lon_dd, lon_mm, lon_ss, config.aprs_symbol);
+    }
     if (config.aprs_ssid == 0)
         sprintf(strtmp, "%s>APE32I", config.aprs_mycall);
     else

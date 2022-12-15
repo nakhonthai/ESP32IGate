@@ -418,6 +418,7 @@ class ParseAPRS {
 		int parse_aprs_message(struct pbuf_t *pb);
 		double direction(double lon0, double lat0, double lon1, double lat1);
 		double distance(double lon0, double lat0, double lon1, double lat1);
+		uint16_t passCode(char *theCall);
 	private:
 		float filter_lat2rad(float lat);
 		float filter_lon2rad(float lon);

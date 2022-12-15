@@ -63,11 +63,15 @@ int igateProcess(AX25Msg &Packet)
 
     //Add qAR,callSSID
     header += String(F(",qAR,"));
-    header += String(config.aprs_mycall);
-    if (config.aprs_ssid > 0)
-    {
-        header += String(F("-"));
-        header += String(config.aprs_ssid);
+    if(strlen(config.aprs_object)>=3){
+        header += String(config.aprs_object);
+    }else{
+        header += String(config.aprs_mycall);    
+        if (config.aprs_ssid > 0)
+        {
+            header += String(F("-"));
+            header += String(config.aprs_ssid);
+        }
     }
 
     //Add Infomation

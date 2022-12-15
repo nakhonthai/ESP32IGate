@@ -210,7 +210,12 @@ void setHTML(byte page)
 		myStation = String(config.aprs_mycall);
 	else
 		myStation = String(config.aprs_mycall) + "-" + String(config.aprs_ssid);
-	webString += "<div class='w3-card-2 topnav notranslate' id='topnav'><b>ESP32 APRS Internet Gateway by " + myStation + "</div>\n";
+	
+	if(strlen(config.aprs_object)>=3){
+		webString += "<div class='w3-card-2 topnav notranslate' id='topnav'><b>ESP32 APRS Internet Gateway Station "+ String(config.aprs_object) +" (by " + myStation + ")</div>\n";
+	}else{
+		webString += "<div class='w3-card-2 topnav notranslate' id='topnav'><b>ESP32 APRS Internet Gateway by " + myStation + "</div>\n";
+	}
 	webString += "<div class=\"row\">\n";
 	webString += "<ul class=\"nav nav-tabs\" style=\"margin: 25px;\">\n";
 	webString += "<li role=\"presentation\"" + strActiveP1 + ">\n<a href=\"/\" id=\"channel_link_private_view\">Dash Board</a>\n</li>\n";
@@ -899,10 +904,10 @@ void handle_service()
 	webString += "<div class=\"col-sm-2 col-xs-4\"><input class=\"form-control\" id=\"myPasscode\" name=\"myPasscode\" type=\"password\" value=\"" + String(config.aprs_passcode) + "\" />From <a href=\"https://www.dprns.com/index.php?pid=5\">Here</a></div>\n";
 	webString += "</div>\n";
 
-	// webString += "<div class=\"form-group\">\n";
-	// webString += "<label class=\"col-sm-4 col-xs-12 control-label\">APRS OBJECT</label>\n";
-	// webString += "<div class=\"col-sm-3 col-xs-4\"><input class=\"form-control\" id=\"myobject\" name=\"myobject\" type=\"text\" value=\"" + String(config.aprs_object) + "\" /></div>\n";
-	// webString += "</div>\n";
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">APRS ITEM</label>\n";
+	webString += "<div class=\"col-sm-3 col-xs-4\"><input class=\"form-control\" id=\"myobject\" name=\"myobject\" type=\"text\" maxlength=\"9\" value=\"" + String(config.aprs_object) + "\" /></div>\n";
+	webString += "</div>\n";
 
 	webString += "<div class=\"form-group\">\n";
 	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">APRS Server</label>\n";
