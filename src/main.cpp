@@ -153,6 +153,7 @@ TaskHandle_t taskAPRSHandle;
 
 HardwareSerial SerialTNC(2);
 
+WeatherData weather;
 // BluetoothSerial SerialBT;
 
 // Set your Static IP address for wifi AP
@@ -1065,10 +1066,155 @@ bool AFSKInitAct = false;
 int btn_count = 0;
 long timeCheck = 0;
 int timeHalfSec = 0;
+long int wxTimeout=0;
+
+#ifdef WX
+
+int GetAPRSDataAvg(char *strData)
+{
+unsigned int i;
+
+int lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss;
+    char strtmp[300], obj[13];
+
+    //readData();
+    //gmtime(timeStamp);
+    //#asm("wdr");
+    memset(&obj[0],0,sizeof(obj));
+    memset(&strData[0],0,sizeof(strData));
+
+    DD_DDDDDtoDDMMSS(config.gps_lat, &lat_dd, &lat_mm, &lat_ss);
+    DD_DDDDDtoDDMMSS(config.gps_lon, &lon_dd, &lon_mm, &lon_ss);
+    if(strlen(config.aprs_object)>=3){
+        sprintf(obj,";%s",config.aprs_object);
+        for(i=strlen(config.aprs_object)+1;i<10;i++){
+            obj[i]=0x20;
+        }
+        obj[i]='*';
+        //sprintf(loc, ";%s!%02d%02d.%02dN%c%03d%02d.%02dE%c",config.aprs_object,lat_dd, lat_mm, lat_ss, config.aprs_table, lon_dd, lon_mm, lon_ss, config.aprs_symbol);
+    }else{
+        sprintf(obj,"!");
+        obj[1]=0;
+        //sprintf(loc, "!%02d%02d.%02dN%c%03d%02d.%02dE%c", lat_dd, lat_mm, lat_ss, config.aprs_table, lon_dd, lon_mm, lon_ss, config.aprs_symbol);
+    }
+    if (config.aprs_ssid == 0)
+        sprintf(strtmp, "%s>APE32I,IGATE:", config.aprs_mycall);
+    else
+        sprintf(strtmp, "%s-%d>APE32I,IGATE:", config.aprs_mycall, config.aprs_ssid);
+
+    strcat(strData,strtmp);
+    strcat(strData,obj);
+
+    struct tm br_time;
+	getLocalTime(&br_time, 5000);
+    sprintf(strtmp,"%02d%02d%02dz%02d%02d.%02dN/%03d%02d.%02dE_",br_time.tm_mday,br_time.tm_hour,br_time.tm_min,lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss);
+    //sprintf(strtmp,"%02d%02d.%02dN/%03d%02d.%02dE_",lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss);
+    strcat(strData,strtmp);
+
+    sprintf(strtmp,"%03u/%03ug%03u",weather.winddirection,(unsigned int)(weather.windspeed*0.621),(unsigned int)(weather.windgust*0.621));
+    strcat(strData,strtmp);
+
+    sprintf(strtmp,"t%03u",(int)((weather.temperature*9/5)+32));
+    strcat(strData,strtmp);
+
+    sprintf(strtmp,"r%03up%03uP...",(unsigned int)((weather.rain*100.0F)/25.6F),(unsigned int)((weather.rain24hr*100.0F)/25.6F));
+    strcat(strData,strtmp);
+
+     if(weather.solar<1000)
+        sprintf(strtmp,"L%03u",(unsigned int)weather.solar);
+    else
+        sprintf(strtmp,"l%03u",(unsigned int)weather.solar-1000);
+    strcat(strData,strtmp);
+
+    sprintf(strtmp,"h%02u",(unsigned int)weather.humidity);
+    strcat(strData,strtmp);
+
+    sprintf(strtmp,"b%05u",(unsigned int)(weather.barometric*10));
+    strcat(strData,strtmp);
+
+    // sprintf(strtmp,"m%03u",(int)((weather.soitemp*9/5)+32));
+    // strcat(strData,strtmp);
+
+    // sprintf(strtmp,"M%03u",(unsigned int)(weather.soihum/10));
+    // strcat(strData,strtmp);
+
+    // sprintf(strtmp,"W%04u",(unsigned int)(weather.water));
+    // strcat(strData,strtmp);
+
+    sprintf(strtmp," BAT:%0.2fV/%0.2fA",weather.vbat,weather.ibat);
+    strcat(strData,strtmp);
+    sprintf(strtmp,",SOLAR:%0.1fV",weather.vsolar);
+    strcat(strData,strtmp);
+
+    i=strlen(strData);
+    return i;
+}
+
+bool weatherUpdate=false;
+void getWeather()
+{
+    String stream,weatherRaw;
+	int st = 0;
+	if (SerialTNC.available()>30) {
+		stream=SerialTNC.readString();
+        //Serial.println(stream);
+        //delay(100);
+		st = stream.indexOf("DATA:");
+		//Serial.printf("Found ModBus > %d",st);
+		//Serial.println(stream);
+		if (st>=0){
+			//String data = stream.substring(st+5);
+			weatherRaw = stream.substring(st + 5);
+			weatherUpdate = true;
+			//Serial.println("Weather DATA: " + weatherRaw);
+		}
+		else {
+			st = stream.indexOf(",");
+			if (st > 10) {
+				//String data = stream.substring(st + 5);
+				weatherRaw = stream;
+				weatherUpdate = true;
+			}
+		}
+
+		if (weatherUpdate) {
+			//String value;
+			weather.rain = getValue(weatherRaw, ',', 2).toFloat();
+			weather.windspeed = getValue(weatherRaw, ',', 3).toFloat();
+			weather.winddirection = getValue(weatherRaw, ',', 4).toInt();
+			weather.solar = getValue(weatherRaw, ',', 5).toInt();
+			weather.barometric = getValue(weatherRaw, ',', 6).toFloat()*10.0F;
+			weather.temperature = getValue(weatherRaw, ',', 7).toFloat();
+			weather.humidity = getValue(weatherRaw, ',', 8).toFloat();
+			weather.windgust = getValue(weatherRaw, ',', 13).toFloat();
+            weather.vbat = getValue(weatherRaw, ',', 9).toFloat();
+            weather.vsolar = getValue(weatherRaw, ',', 10).toFloat();
+            weather.ibat = getValue(weatherRaw, ',', 11).toFloat();
+            weather.pbat = getValue(weatherRaw, ',', 12).toFloat();
+
+            weatherUpdate=false;
+            wxTimeout=millis();
+            char strData[300];
+            size_t lng=GetAPRSDataAvg(strData);
+            if (aprsClient.connected())
+                    aprsClient.println(String(strData)); // Send packet to Inet
+            else
+                    pkgTxUpdate(strData, 0);
+            
+//Serial.printf("APRS: %s\r\n",strData);
+		}
+		SerialTNC.flush();
+	}
+	//ModbusSerial.flush();
+}
+#endif
 
 void loop()
 {
     vTaskDelay(5 / portTICK_PERIOD_MS);
+#ifdef WX
+    getWeather();
+#endif
 
     if (digitalRead(0) == LOW)
     {
@@ -1348,17 +1494,23 @@ void taskAPRS(void *pvParameters)
 #endif
             if (AFSKInitAct == true)
             {
+                #ifdef WX
+                if((millis()-wxTimeout)>(config.aprs_beacon * 1000)){
+                #endif
+                String tnc2Raw = send_fix_location();
+                if (aprsClient.connected())
+                    aprsClient.println(tnc2Raw); // Send packet to Inet
                 if (config.tnc)
-                {
-                    String tnc2Raw = send_fix_location();
-                    if (aprsClient.connected())
-                        aprsClient.println(tnc2Raw); // Send packet to Inet
+                {                    
                     pkgTxUpdate(tnc2Raw.c_str(), 0);
                     // APRS_sendTNC2Pkt(tnc2Raw);       // Send packet to RF
 #ifdef DEBUG_TNC
                     // Serial.println("TX: " + tnc2Raw);
 #endif
                 }
+                #ifdef WX
+                }
+                #endif
             }
             // send_fix_location();
             //  APRS_setCallsign(config.aprs_mycall, config.aprs_ssid);

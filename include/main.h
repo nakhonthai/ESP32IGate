@@ -14,11 +14,12 @@
 
 //#define DEBUG
 //#define DEBUG_IS
+//#define WX
 
 #define OLED
 //#define SDCARD
 //#define SA818
-//#define SR_FRS
+#define SR_FRS
 
 #ifdef SR_FRS
 #ifndef SA818
@@ -223,6 +224,26 @@ typedef struct txQueue_struct
 	int Delay;
 	char Info[300];
 } txQueueType; 
+
+typedef struct Weather_Struct {
+	unsigned long int timeStamp;
+	unsigned int winddirection;
+	float windspeed;
+	float windgust;
+	float temperature;
+	float rain;
+	float rain24hr;
+	float humidity;
+	float barometric;
+	unsigned int solar;
+	float soitemp;
+	unsigned int soihum; //0-100%
+	unsigned int water;   //centiment
+	float vbat;
+	float vsolar;
+	float ibat;
+	float pbat;
+}WeatherData;
 
 const char PARM[] = {"PARM.RF->INET,INET->RF,DigiRpt,TX2RF,DropRx"};
 const char UNIT[] = {"UNIT.Pkts,Pkts,Pkts,Pkts,Pkts"};
