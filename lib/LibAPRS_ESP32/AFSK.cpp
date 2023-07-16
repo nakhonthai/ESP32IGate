@@ -247,7 +247,7 @@ void AFSK_init(Afsk *afsk)
   // BPF
   flt.size = FIR_BPF_N;
   flt.pass_freq = 1000;
-  flt.cutoff_freq = 2500;
+  flt.cutoff_freq = 2700;
   bpf_an = filter_coeff(&flt);
 
   // LPF

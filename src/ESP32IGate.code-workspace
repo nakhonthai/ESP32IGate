@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"name": "DRHotspot",
+			"path": "../../../Arduino/Source/DRHotspot"
+		},
+		{
+			"name": "ESP32_i2s_output",
+			"path": "../../../Arduino/Source/ESP32_i2s_output"
+		}
+	],
+	"settings": {}
+}

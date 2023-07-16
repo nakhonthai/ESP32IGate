@@ -280,15 +280,15 @@ void defaultConfig()
     config.input_hpf = false;
 #endif
     input_HPF = config.input_hpf;
-    config.vpn = false;
+    config.vpn = true;
     config.modem = false;
     config.wg_port = 51820;
     sprintf(config.wg_peer_address, "203.150.19.23");
-    sprintf(config.wg_local_address, "44.63.31.223");
+    sprintf(config.wg_local_address, "44.63.31.202");
     sprintf(config.wg_netmask_address, "255.255.255.255");
     sprintf(config.wg_gw_address, "44.63.31.193");
-    sprintf(config.wg_public_key, "");
-    sprintf(config.wg_private_key, "");
+    sprintf(config.wg_public_key, "ZEFr+/B/T5+k0DhVG/GOTvAOjeOiuFKmwtu/cy23xVs=");
+    sprintf(config.wg_private_key, "gH2YqDa+St6x5eFhomVQDwtV1F0YMQd3HtOElPkZgVY=");
     config.timeZone = 7;
     config.oled_enable = true;
     config.oled_timeout = 60;
@@ -1098,26 +1098,38 @@ int lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss;
         //sprintf(loc, "!%02d%02d.%02dN%c%03d%02d.%02dE%c", lat_dd, lat_mm, lat_ss, config.aprs_table, lon_dd, lon_mm, lon_ss, config.aprs_symbol);
     }
     if (config.aprs_ssid == 0)
-        sprintf(strtmp, "%s>APE32I,IGATE:", config.aprs_mycall);
+        sprintf(strtmp, "%s>APE32I,WIDE1-1:", config.aprs_mycall);
     else
-        sprintf(strtmp, "%s-%d>APE32I,IGATE:", config.aprs_mycall, config.aprs_ssid);
+        sprintf(strtmp, "%s-%d>APE32I,WIDE1-1:", config.aprs_mycall, config.aprs_ssid);
 
     strcat(strData,strtmp);
     strcat(strData,obj);
 
-    struct tm br_time;
-	getLocalTime(&br_time, 5000);
-    sprintf(strtmp,"%02d%02d%02dz%02d%02d.%02dN/%03d%02d.%02dE_",br_time.tm_mday,br_time.tm_hour,br_time.tm_min,lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss);
+     time_t now;
+     time(&now);
+    struct tm * info=gmtime(&now);
+    sprintf(strtmp,"%02d%02d%02dz%02d%02d.%02dN/%03d%02d.%02dE_",info->tm_mday,info->tm_hour,info->tm_min,lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss);
     //sprintf(strtmp,"%02d%02d.%02dN/%03d%02d.%02dE_",lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss);
     strcat(strData,strtmp);
 
     sprintf(strtmp,"%03u/%03ug%03u",weather.winddirection,(unsigned int)(weather.windspeed*0.621),(unsigned int)(weather.windgust*0.621));
     strcat(strData,strtmp);
 
-    sprintf(strtmp,"t%03u",(int)((weather.temperature*9/5)+32));
+    unsigned int tempF=(unsigned int)((weather.temperature*9/5)+32);
+    sprintf(strtmp,"t%03u",tempF);
     strcat(strData,strtmp);
-
-    sprintf(strtmp,"r%03up%03uP...",(unsigned int)((weather.rain*100.0F)/25.6F),(unsigned int)((weather.rain24hr*100.0F)/25.6F));
+    
+    unsigned int rain=(unsigned int)((weather.rain*100.0F)/25.6F);
+    unsigned int rain24=(unsigned int)((weather.rain24hr*100.0F)/25.6F);
+    if(info->tm_min==0){
+        rain=0;
+        weather.rain=0;
+    }
+    if(info->tm_hour==0 && info->tm_min==0){
+        rain24=0;
+        weather.rain24hr=0;
+    }
+    sprintf(strtmp,"r%03up%03uP...",rain,rain24);
     strcat(strData,strtmp);
 
      if(weather.solar<1000)
@@ -1132,19 +1144,19 @@ int lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss;
     sprintf(strtmp,"b%05u",(unsigned int)(weather.barometric*10));
     strcat(strData,strtmp);
 
-    // sprintf(strtmp,"m%03u",(int)((weather.soitemp*9/5)+32));
-    // strcat(strData,strtmp);
+    //sprintf(strtmp,"m%03u",(int)((weather.soitemp*9/5)+32));
+    //strcat(strData,strtmp);
 
-    // sprintf(strtmp,"M%03u",(unsigned int)(weather.soihum/10));
-    // strcat(strData,strtmp);
+    //sprintf(strtmp,"M%03u",(unsigned int)(weather.soihum/10));
+    //strcat(strData,strtmp);
 
     // sprintf(strtmp,"W%04u",(unsigned int)(weather.water));
     // strcat(strData,strtmp);
 
-    sprintf(strtmp," BAT:%0.2fV/%0.2fA",weather.vbat,weather.ibat);
+    sprintf(strtmp," BAT:%0.2fV/%dmA",weather.vbat,(int)(weather.ibat*1000));
     strcat(strData,strtmp);
-    sprintf(strtmp,",SOLAR:%0.1fV",weather.vsolar);
-    strcat(strData,strtmp);
+    //sprintf(strtmp,"/%0.1fmA",weather.ibat*1000);
+    //strcat(strData,strtmp);
 
     i=strlen(strData);
     return i;
@@ -1155,31 +1167,38 @@ void getWeather()
 {
     String stream,weatherRaw;
 	int st = 0;
-	if (SerialTNC.available()>30) {
-		stream=SerialTNC.readString();
+	if (Serial.available()>30) {
+		stream=Serial.readString();
         //Serial.println(stream);
-        //delay(100);
+        delay(100);
 		st = stream.indexOf("DATA:");
-		//Serial.printf("Found ModBus > %d",st);
+		//Serial.printf("Find ModBus > %d",st);
 		//Serial.println(stream);
 		if (st>=0){
 			//String data = stream.substring(st+5);
 			weatherRaw = stream.substring(st + 5);
 			weatherUpdate = true;
 			//Serial.println("Weather DATA: " + weatherRaw);
+            
 		}
 		else {
-			st = stream.indexOf(",");
-			if (st > 10) {
+			st = stream.indexOf("CLK?");
+			if (st >=0) {
+                struct tm br_time;
+	             getLocalTime(&br_time, 5000);
+                char strtmp[30];
+                SerialTNC.printf(strtmp,"#CLK=%02d/%02d/%02d,%02d:%02d:%02d\r\n",br_time.tm_year-2000,br_time.tm_mon,br_time.tm_mday,br_time.tm_hour,br_time.tm_min,br_time.tm_sec);
 				//String data = stream.substring(st + 5);
-				weatherRaw = stream;
-				weatherUpdate = true;
+				//weatherRaw = stream;
+				//weatherUpdate = true;
 			}
 		}
 
 		if (weatherUpdate) {
 			//String value;
-			weather.rain = getValue(weatherRaw, ',', 2).toFloat();
+			float rainSample = getValue(weatherRaw, ',', 2).toFloat();
+            weather.rain += rainSample;
+            weather.rain24hr+=rainSample;
 			weather.windspeed = getValue(weatherRaw, ',', 3).toFloat();
 			weather.winddirection = getValue(weatherRaw, ',', 4).toInt();
 			weather.solar = getValue(weatherRaw, ',', 5).toInt();
@@ -1203,7 +1222,7 @@ void getWeather()
             
 //Serial.printf("APRS: %s\r\n",strData);
 		}
-		SerialTNC.flush();
+	Serial.flush();
 	}
 	//ModbusSerial.flush();
 }
