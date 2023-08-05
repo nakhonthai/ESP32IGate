@@ -438,12 +438,13 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
       // the buffer and indicate that we are now
       // receiving data. For bling we also turn
       // on the RX LED.
-      fifo_push(fifo, HDLC_FLAG);
       hdlc->receiving = true;
       if (++hdlc_flag_count >= 3)
       {
+        fifo_flush(fifo);
         LED_RX_ON();
       }
+      fifo_push(fifo, HDLC_FLAG);
     }
     else
     {

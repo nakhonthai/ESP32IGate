@@ -624,11 +624,17 @@ uint8_t popGwRaw(uint8_t *raw)
 unsigned long SA818_Timeout = 0;
 void SA818_INIT(bool boot)
 {
+
+#ifdef SR_RF_2WVS
+	Serial.println("Radio Module SR_FRS_2WVS Init");
+#endif
+
 #ifdef SR_FRS
     Serial.println("Radio Module SR_FRS Init");
 #else
     Serial.println("Radio Module SA818/SA868 Init");
 #endif
+
     if (boot)
     {
         SerialRF.begin(9600, SERIAL_8N1, 14, 13);
@@ -647,8 +653,22 @@ void SA818_INIT(bool boot)
     SerialRF.println();
     delay(500);
     char str[100];
-    if (config.sql_level > 8)
-        config.sql_level = 8;
+    if (config.sql_level > 9)
+        config.sql_level = 9;
+
+#ifdef SR_RF_2WVS
+	SerialRF.printf("AT+DMOGRP=144.39000,144.39000,RR,TT,2,1\r\n");
+	delay(500);
+	SerialRF.printf("AT+DMOSAV=1\r\n");
+	delay(500);
+	SerialRF.printf("AT+DMOVOX=0\r\n");
+	delay(500);
+	SerialRF.printf("AT+DMOFUN=%d,3,1,0,0\r\n",config.sql_level);
+	delay(500);
+    if (config.volume > 8)
+        config.volume = 8;
+    SerialRF.printf("AT+DMOVOL=%d\r\n", config.volume);
+#endif
 #ifdef SR_FRS
     sprintf(str, "AT+DMOSETGROUP=%01d,%0.4f,%0.4f,%d,%01d,%d,0", config.band, config.freq_tx + ((float)config.offset_tx / 1000000), config.freq_rx + ((float)config.offset_rx / 1000000), config.tone_rx, config.sql_level, config.tone_tx);
     SerialRF.println(str);
@@ -659,19 +679,23 @@ void SA818_INIT(bool boot)
     SerialRF.println("AT+DMOSETVOX=0");
     delay(500);
     SerialRF.println("AT+DMOSETMIC=1,0,0");
-#else
-    sprintf(str, "AT+DMOSETGROUP=%01d,%0.4f,%0.4f,%04d,%01d,%04d", config.band, config.freq_tx + ((float)config.offset_tx / 1000000), config.freq_rx + ((float)config.offset_rx / 1000000), config.tone_tx, config.sql_level, config.tone_rx);
-    SerialRF.println(str);
-    delay(500);
-    SerialRF.println("AT+SETTAIL=0");
-    delay(500);
-    SerialRF.println("AT+SETFILTER=1,1,1");
-#endif
-    // SerialRF.println(str);
     delay(500);
     if (config.volume > 8)
         config.volume = 8;
     SerialRF.printf("AT+DMOSETVOLUME=%d\r\n", config.volume);
+#else
+    // sprintf(str, "AT+DMOSETGROUP=%01d,%0.4f,%0.4f,%04d,%01d,%04d", config.band, config.freq_tx + ((float)config.offset_tx / 1000000), config.freq_rx + ((float)config.offset_rx / 1000000), config.tone_tx, config.sql_level, config.tone_rx);
+    // SerialRF.println(str);
+    // delay(500);
+    // SerialRF.println("AT+SETTAIL=0");
+    // delay(500);
+    // SerialRF.println("AT+SETFILTER=1,1,1");
+    // delay(500);
+    // if (config.volume > 8)
+    //     config.volume = 8;
+    // SerialRF.printf("AT+DMOSETVOLUME=%d\r\n", config.volume);
+#endif
+    // SerialRF.println(str);
 }
 
 void SA818_SLEEP()
