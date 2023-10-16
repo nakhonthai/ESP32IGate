@@ -249,7 +249,7 @@ void defaultConfig()
     config.aprs = true;
     config.wifi = true;
     config.wifi_mode = WIFI_AP_STA_FIX;
-    config.wifi_ch = 1;
+        config.wifi_ch = 1;
     config.tnc_digi = true;
     config.tnc_telemetry = true;
     config.tnc_btext[0] = 0;
@@ -986,10 +986,10 @@ float conv_coords(float in_coords)
 
 void DD_DDDDDtoDDMMSS(float DD_DDDDD, int *DD, int *MM, int *SS)
 {
-
-    *DD = (int)DD_DDDDD;                       // сделали из 37.45545 это 37 т.е. Градусы
-    *MM = (int)((DD_DDDDD - *DD) * 60);        // получили минуты
-    *SS = ((DD_DDDDD - *DD) * 60 - *MM) * 100; // получили секунды
+    float uDD_DDDDD = abs(DD_DDDDD);
+    *DD = (int)uDD_DDDDD;                       // сделали из 37.45545 это 37 т.е. Градусы
+    *MM = (int)((uDD_DDDDD - *DD) * 60);        // получили минуты
+    *SS = ((uDD_DDDDD - *DD) * 60 - *MM) * 100; // получили секунды
 }
 
 String send_fix_location()
@@ -997,13 +997,22 @@ String send_fix_location()
     String tnc2Raw = "";
     int lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss;
     char strtmp[300], loc[30];
+    char lon_ew, lat_ns;
+    lon_ew = 'E';
+    lat_ns = 'N';
     memset(strtmp, 0, 300);
     DD_DDDDDtoDDMMSS(config.gps_lat, &lat_dd, &lat_mm, &lat_ss);
     DD_DDDDDtoDDMMSS(config.gps_lon, &lon_dd, &lon_mm, &lon_ss);
+    if(config.gps_lat < 0){
+        lat_ns = 'S';
+    }
+    if(config.gps_lon < 0){
+        lon_ew = 'W';
+    }
     if(strlen(config.aprs_object)>=3){
-        sprintf(loc, ")%s!%02d%02d.%02dN%c%03d%02d.%02dE%c",config.aprs_object,lat_dd, lat_mm, lat_ss, config.aprs_table, lon_dd, lon_mm, lon_ss, config.aprs_symbol);
+        sprintf(loc, ")%s!%02d%02d.%02d%c%c%03d%02d.%02d%c%c",config.aprs_object,lat_dd, lat_mm, lat_ss, lat_ns, config.aprs_table, lon_dd, lon_mm, lon_ss, lon_ew,config.aprs_symbol);
     }else{
-        sprintf(loc, "!%02d%02d.%02dN%c%03d%02d.%02dE%c", lat_dd, lat_mm, lat_ss, config.aprs_table, lon_dd, lon_mm, lon_ss, config.aprs_symbol);
+        sprintf(loc, "!%02d%02d.%02d%c%c%03d%02d.%02d%c%c", lat_dd, lat_mm, lat_ss, lat_ns, config.aprs_table, lon_dd, lon_mm, lon_ss, lon_ew, config.aprs_symbol);
     }
     if (config.aprs_ssid == 0)
         sprintf(strtmp, "%s>APE32I", config.aprs_mycall);
