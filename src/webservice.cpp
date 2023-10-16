@@ -911,7 +911,7 @@ void handle_service()
 
 	webString += "<div class=\"form-group\">\n";
 	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">APRS Server</label>\n";
-	webString += "<div class=\"col-sm-6 col-xs-8\"><input class=\"form-control\" id=\"aprsHost\" name=\"aprsHost\" type=\"text\" value=\"" + String(config.aprs_host) + "\" /><br />Web Service: <a href=\"http://aprs.dprns.com:14501\" target=\"_blank\">T2THAI</a></div>\n";
+	webString += "<div class=\"col-sm-6 col-xs-8\"><input class=\"form-control\" id=\"aprsHost\" name=\"aprsHost\" type=\"text\" value=\"" + String(config.aprs_host) + "\" /><br />Web Service: <a href=\"" + String(config.aprs_host) + ":" + String(config.aprs_port) + "\" target=\"_blank\">T2 Server</a></div>\n";
 	webString += "</div>\n";
 
 	webString += "<div class=\"form-group\">\n";
