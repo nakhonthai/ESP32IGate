@@ -1,23 +1,36 @@
 # ESP32IGate Simple Project
 
-ESP32IGate is a Internet Gateway + TNC Built in that is implemented for Espressif ESP32 processor.
-The development of ESP32IGate is for the study of converting analog signals to digital data. using the LibAPRS library to further develop
-To receive signals via ADC SAR using interrupt sampling or using I2S to read sampling signals at 9600 sample/sec on ESP32 microcontrollers and improve data conductivity. Access to the Internet Gateway (APRS-IS) for further applications or developments. 
+ESP32IGate is a Internet Gateway(IGate)/Dital Repeater(DiGi) with TNC Built in that is implemented for Espressif ESP32 processor.
+ 
 
 ## Feature
 
-* supported hardware: ESP32DR Simple or ESP32DR_SA818 by Module ESP32 DevKit
-* using ESP-Arduino development on Visual studio code IDE
-* support Bell202 1200bps AFSK
-* implementing software modem, decoding and encoding
-  * about >800 packets can be decoded against WA8LMF TNC TEST CD Track 1 (MP3)
-* support TNC2 Raw protocol only
-* using USB serial for host connection and power supply
-* support Wi-Fi connection (TCP and UDP) to APRS-IS
+* Supported hardware: ESP32DR Simple,ESP32DR,D.I.Y Other
+* Supported RF: SA868/FRS VHF/UHF/350 model
+* Support APRS internet gateway (IGATE)
+* Support APRS digital repeater (DIGI)
+* Support APRS IGATE/DIGI/WX with fix position for move position from GNSS
+* Using ESP-Arduino development on Visual studio code + Platform IO
+* Support Bell202 1200bps AFSK (It has a very good sine wave signal.)
+* Implementing software modem, decoding and encoding
+* Support monitor display information and statistices
+* Support Wi-Fi multi station or WiFi Access point
 * support Web Service config and control system
-* display received and transmit packet on the LED
+* support filter packet rx/tx on igate,digi,display
+* support audio filter BPF,HPF
+* support VPN wireguard
+* support global time zone
+* support web service auth login
+* display received and transmit packet on the LED and display OLED
 
-![esp32dr-test](image/ESP32DR_Simple_Test.png)
+## Hardware screen short
+![esp32dr_simple](image/ESP32DR_Simple_Test.png) ![esp32dr_sa868](image/ESP32DR_SA868_2.jpg)
+![esp32dr_simple](doc/ESP32DR_SA868/ESP32DR_SA868.jpg) ![esp32dr_simple](doc/ESP32DR_SA868/ESP32DR_SA868_Block.png)
+
+## ESP32DR_SA868
+
+Schematic [here](doc/ESP32DR_SA868/ESP32DR_SA868_sch.pdf)
+PCB Gerber [hare](doc/ESP32DR_SA868/ESP32DR_SA868_Gerber.zip)
 
 ## ESP32DR Simple
 
@@ -111,19 +124,53 @@ for Handheld
 
 ![HT-RX](image/ESP32DR_RxOnly.png)
 
-## Howto Devellop
--Pull and Compile by PlatformIO on the Visual Studio Code.
 
-## ESP32IGate firmware installation (do it first, next, update via web)
+## ESP32IGate firmware installation (do it first time, next time via the web browser)
 - 1.Connect the USB cable to the ESP32 Module.
 - 2.Download firmware and open the program ESP32 DOWNLOAD TOOL, set it in the firmware upload program, set the firmware to ESP32IGate_Vxx.bin, location 0x10000 and partitions.bin at 0x8000 and bootloader.bin at 0x1000 and boot.bin at 0xe000, if not loaded, connect GPIO0 cable to GND, press START button finished, press power button or reset (red) again.
 - 3.Then go to WiFi AP SSID: ESP32IGate and open a browser to the website. http://192.168.4.1 password: aprsthnetwork Can be fixed Or turn on your Wi-Fi router.
-- 4.Push BOOT button long >100ms to TX Position and >10Sec to Factory Default
+- 4.Push **BOOT** button long >100ms to TX Position and >10Sec to Factory Default
 
 ![ESP32Tool](image/ESP32Tool.png)
 
 ## ESP32 Flash Download Tools
 https://www.espressif.com/en/support/download/other-tools
+
+
+## PlatformIO Quick Start
+
+1. Install [Visual Studio Code](https://code.visualstudio.com/) and [Python](https://www.python.org/)
+2. Search for the `PlatformIO` plugin in the `VisualStudioCode` extension and install it.
+3. After the installation is complete, you need to restart `VisualStudioCode`
+4. After restarting `VisualStudioCode`, select `File` in the upper left corner of `VisualStudioCode` -> `Open Folder` -> select the `ESP32APRS_T-TWR` directory
+5. Click on the `platformio.ini` file, and in the `platformio` column, cancel the sample line that needs to be used, please make sure that only one line is valid
+6. Click the (✔) symbol in the lower left corner to compile
+7. Connect the board to the computer USB
+8. Click (→) to upload firmware and reboot again
+9. After reboot display monitor and reconfig
+
+## APRS Server service
+
+- APRS SERVER of T2THAI at [aprs.dprns.com:14580](http://aprs.dprns.com:14501)
+- APRS SERVER of T2THAI ampr host at [aprs.hs5tqa.ampr.org:14580](http://aprs.hs5tqa.ampr.org:14501)
+- APRS MAP SERVICE [http://aprs.nakhonthai.net](http://aprs.nakhonthai.net)
+
+## Donate
+
+To support the development of ESP32APRS you can make us a donation using [github sponsors](https://github.com/sponsors/nakhonthai). \
+If you want to donate some hardware to facilitate APRS porting and development, [contact us](https://www.facebook.com/atten). \
+<a href="https://www.paypal.me/hs5tqa"><img src="blue.svg" height="40"></a> 
+
+## ESP32 Flash Download Tools
+https://www.espressif.com/en/support/download/other-tools
+
+## Credits & Reference
+
+- Thank you for support device hardware chakphanu [E24OUW](https://github.com/chakphanu)
+- ESP32TNC project by amedes [ESP32TNC](https://github.com/amedes/ESP32TNC)
+- APRS Library by markqvist [LibAPRS](https://github.com/markqvist/LibAPRS)
+- Hardware & Software LILYGO [T-TWR](https://github.com/Xinyuan-LilyGO/T-TWR)
+- Online UUID Generator [UUID-Gen](https://www.uuidgenerator.net/)
 
 ## HITH
 This project implement by APRS text (TNC2 Raw) only,It not support null string(0x00) in the package.

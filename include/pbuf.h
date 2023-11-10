@@ -73,6 +73,7 @@
 #define T_CWOP       (1 << 10) // packet is recognized as CWOP
 #define T_STATCAPA   (1 << 11) // packet is station capability response
 #define T_THIRDPARTY (1 << 12)
+#define T_WAVE       (1 << 13) // packet is WAVE data
 #define T_ALL	     (1 << 15) // set on _all_ packets
 
 #define F_DUPE    	(1 << 0) // Duplicate of a previously seen packet
@@ -99,6 +100,12 @@
 #define W_BAR	(1 << 8)
 #define W_PAR	(1 << 9)
 #define W_UV	(1 << 10)
+
+#define O_TEMP	(1 << 0)
+#define O_HS	(1 << 1)
+#define O_TC	(1 << 2)
+#define O_TZ	(1 << 3)
+#define O_BAT	(1 << 4)
 
 /// Weather report type.
 typedef struct
@@ -142,6 +149,22 @@ typedef struct
 	//char* soft;
 } fap_wx_report_t;
 
+/// Wave ocean report type.
+typedef struct
+{
+	uint8_t flags;		/* bitmask: one or more of O_* */
+	/// Temperature in degrees Celcius.
+	double Temp;
+	/// significant wave heigh -> cm
+	double Hs;
+	// Mean zero up-crossing period Tz/10 -> Sec
+	double Tz;
+	// Average crest period Tc/10 -> Sec.
+	double Tc;
+	/// Battery Bat/100 -> Volte
+	double Bat;
+
+} fap_wave_report_t;
 
 
 /// Telemetry report type.
@@ -242,7 +265,7 @@ struct pbuf_t {
 	int packet_len;		/* the actual length of the TNC2 packet */
 	int buf_len;		/* the length of this buffer */
 
-	char* comment;
+	char *comment;
 	/// Length of comment.
 	unsigned int comment_len;
 	
@@ -279,6 +302,9 @@ struct pbuf_t {
 
 	/// Weather report.
 	fap_wx_report_t wx_report;
+
+	// Wave report
+	fap_wave_report_t wave_report;
 
 	/// Telemetry report.
 	fap_telemetry_t telemetry;

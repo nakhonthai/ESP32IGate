@@ -190,7 +190,7 @@ inline static uint8_t sinSample(uint16_t i)
 #include "driver/i2s.h"
 #include "driver/dac.h"
 
-#define SAMPLE_RATE SAMPLERATE //9580 ปรับชดเชยแซมปลิงค์ของ I2S
+#define SAMPLE_RATE SAMPLERATE
 #define PIN_I2S_BCLK 26
 #define PIN_I2S_LRC 27
 #define PIN_I2S_DIN 35
@@ -284,6 +284,7 @@ typedef struct Afsk
 #define LED_RX_OFF() digitalWrite(LED_PIN, LOW);
 
 extern bool input_HPF;
+extern bool input_BPF;
 
 void AFSK_init(Afsk *afsk);
 void AFSK_transmit(char *buffer, size_t size);
@@ -291,7 +292,11 @@ void AFSK_poll(Afsk *afsk);
 
 void afsk_putchar(char c);
 int afsk_getchar(void);
+void afskSetSQL(int8_t val,bool act);
 void AFSK_Poll(bool SA818,bool RFPower);
 void AFSK_TimerEnable(bool sts);
+void afskSetHPF(bool val);
+void afskSetBPF(bool val);
+int read_adc_dma(uint32_t *ret_num, uint8_t *result);
 
 #endif

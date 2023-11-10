@@ -419,6 +419,8 @@ class ParseAPRS {
 		double direction(double lon0, double lat0, double lon1, double lat1);
 		double distance(double lon0, double lat0, double lon1, double lat1);
 		uint16_t passCode(char *theCall);
+		String deg2lon(double deg);
+		String deg2lat(double deg);
 	private:
 		float filter_lat2rad(float lat);
 		float filter_lon2rad(float lon);
@@ -439,6 +441,8 @@ class ParseAPRS {
 		int parse_aprs_wx(struct pbuf_t* pb, char const* input, unsigned int const input_len);
 		int is_number(char const* input);
 		uint8_t pkgType(const char* raw);
+		size_t getNumberUntil(char const* input,char *output,size_t length);
+		int parse_aprs_wave(struct pbuf_t *pb, char const *input, unsigned int const input_len);
 };
 
 #endif

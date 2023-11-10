@@ -21,6 +21,10 @@ extern unsigned long custom_tail;
 int adcVal;
 
 bool input_HPF = false;
+bool input_BPF = false;
+
+int8_t sql_pin;
+bool sql_active;
 
 static const adc_unit_t unit = ADC_UNIT_1;
 
@@ -29,6 +33,7 @@ bool hw_afsk_dac_isr = false;
 
 static filter_t bpf;
 static filter_t lpf;
+static filter_t hpf;
 
 Afsk *AFSK_modem;
 
@@ -123,7 +128,7 @@ void I2S_Init(i2s_mode_t MODE, i2s_bits_per_sample_t BPS)
 
   if (MODE == I2S_MODE_RX || MODE == I2S_MODE_TX)
   {
-    Serial.println("using I2S_MODE");
+    log_d("using I2S_MODE");
     i2s_pin_config_t pin_config;
     pin_config.bck_io_num = PIN_I2S_BCLK;
     pin_config.ws_io_num = PIN_I2S_LRC;
@@ -144,11 +149,11 @@ void I2S_Init(i2s_mode_t MODE, i2s_bits_per_sample_t BPS)
   }
   else if (MODE == I2S_MODE_DAC_BUILT_IN || MODE == I2S_MODE_ADC_BUILT_IN)
   {
-    Serial.println("Using I2S DAC/ADC_builtin");
+    log_d("Using I2S DAC/ADC_builtin");
     // install and start i2s driver
     if (i2s_driver_install(I2S_NUM_0, &i2s_config, 5, &i2s_event_queue) != ESP_OK)
     {
-      Serial.println("ERROR: Unable to install I2S drives");
+      log_d("ERROR: Unable to install I2S drives");
     }
     // GPIO36, VP
     // init ADC pad
@@ -189,6 +194,30 @@ void AFSK_TimerEnable(bool sts)
 
 #endif
 
+bool getReceive()
+{
+  bool ret = false;
+  if (digitalRead(PTT_PIN) == 0)
+    return true; // PTT Protection receive
+  if (AFSK_modem->hdlc.receiving == true)
+    ret = true;
+  return ret;
+}
+
+void afskSetHPF(bool val)
+{
+  input_HPF = val;
+}
+void afskSetBPF(bool val)
+{
+  input_BPF = val;
+}
+void afskSetSQL(int8_t val, bool act)
+{
+  sql_pin = val;
+  sql_active = act;
+}
+
 void AFSK_hw_init(void)
 {
   // Set up ADC
@@ -212,7 +241,7 @@ void AFSK_hw_init(void)
   adc1_config_channel_atten(SPK_PIN, ADC_ATTEN_DB_0); // Input 1.24Vp-p,Use R 33K-(10K//10K) divider input power 1.2Vref
   // adc1_config_channel_atten(SPK_PIN, ADC_ATTEN_DB_11); //Input 3.3Vp-p,Use R 10K divider input power 3.3V
   // esp_adc_cal_get_characteristics(V_REF, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, &characteristics);
-  // Serial.printf("v_ref routed to 3.3V\n");
+  // log_d("v_ref routed to 3.3V\n");
 
   // Start a timer at 9.6kHz to sample the ADC and play the audio on the DAC.
   timer = timerBegin(3, 10, true);                // 80 MHz / 10 = 8MHz hardware clock
@@ -241,7 +270,7 @@ void AFSK_init(Afsk *afsk)
       .pass_freq = 0,
       .cutoff_freq = 1200,
   };
-  int16_t *lpf_an, *bpf_an;
+  int16_t *lpf_an, *bpf_an, *hpf_an;
   // LPF
   lpf_an = filter_coeff(&flt);
   // BPF
@@ -255,6 +284,13 @@ void AFSK_init(Afsk *afsk)
   // BPF
   filter_init(&bpf, bpf_an, FIR_BPF_N);
 
+  // HPF
+  flt.size = FIR_BPF_N;
+  flt.pass_freq = 1000;
+  flt.cutoff_freq = 10000;
+  hpf_an = filter_coeff(&flt);
+  filter_init(&hpf, hpf_an, FIR_BPF_N);
+
   AFSK_hw_init();
 }
 
@@ -263,7 +299,7 @@ static void AFSK_txStart(Afsk *afsk)
   if (!afsk->sending)
   {
     fifo_flush(&AFSK_modem->txFifo);
-    // Serial.println("TX Start");
+    // log_dn("TX Start");
     afsk->sending = true;
     afsk->phaseInc = MARK_INC;
     afsk->phaseAcc = 0;
@@ -412,6 +448,7 @@ uint8_t AFSK_dac_isr(Afsk *afsk)
 
 int hdlc_flag_count = 0;
 bool hdlc_flage_end = false;
+bool sync_flage = false;
 static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
 {
   // Initialise a return value. We start with the
@@ -443,6 +480,7 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
       {
         fifo_flush(fifo);
         LED_RX_ON();
+        sync_flage = true;
       }
       fifo_push(fifo, HDLC_FLAG);
     }
@@ -468,6 +506,7 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
     hdlc->bitIndex = 0;
     return ret;
   }
+  sync_flage = false;
 
   // Check if we have received a RESET flag (01111111)
   // In this comparison we also detect when no transmission
@@ -549,9 +588,7 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
         LED_RX_OFF();
         hdlc_flag_count = 0;
         ret = false;
-#ifdef DEBUG_TNC
-        Serial.println("FIFO IS FULL");
-#endif
+        log_d("FIFO IS FULL");
       }
     }
 
@@ -568,9 +605,7 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
       LED_RX_OFF();
       hdlc_flag_count = 0;
       ret = false;
-#ifdef DEBUG_TNC
-      Serial.println("FIFO IS FULL");
-#endif
+      log_d("FIFO IS FULL");
     }
 
     // Wipe received byte and reset bit index to 0
@@ -586,14 +621,14 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
 
   return ret;
 }
- 
- #define DECODE_DELAY 4.458981479161393e-4 // sample delay
+
+#define DECODE_DELAY 4.458981479161393e-4 // sample delay
 #define DELAY_DIVIDEND 325
 #define DELAY_DIVISOR 728866
-#define DELAYED_N ((DELAY_DIVIDEND * SAMPLERATE + DELAY_DIVISOR/2) / DELAY_DIVISOR)
+#define DELAYED_N ((DELAY_DIVIDEND * SAMPLERATE + DELAY_DIVISOR / 2) / DELAY_DIVISOR)
 
- static int delayed[DELAYED_N];
- static int delay_idx = 0;
+static int delayed[DELAYED_N];
+static int delay_idx = 0;
 
 void AFSK_adc_isr(Afsk *afsk, int16_t currentSample)
 {
@@ -619,12 +654,12 @@ void AFSK_adc_isr(Afsk *afsk, int16_t currentSample)
   // tmp16t = (afsk->iirY[0] >> 2) + (afsk->iirY[0] >> 3) + (afsk->iirY[0] >> 4);
   // afsk->iirY[1] = afsk->iirX[0] + afsk->iirX[1] + tmp16t;
 
-// deocde bell 202 AFSK from ADC value
-	int m = (int)currentSample * delayed[delay_idx];
+  // deocde bell 202 AFSK from ADC value
+  int m = (int)currentSample * delayed[delay_idx];
   // Put the current raw sample in the delay FIFO
   delayed[delay_idx] = (int)currentSample;
   delay_idx = (delay_idx + 1) % DELAYED_N;
-   afsk->iirY[1] = filter(&lpf, m>>7);
+  afsk->iirY[1] = filter(&lpf, m >> 7);
 
   // We put the sampled bit in a delay-line:
   // First we bitshift everything 1 left
@@ -633,7 +668,7 @@ void AFSK_adc_isr(Afsk *afsk, int16_t currentSample)
   afsk->sampledBits |= (afsk->iirY[1] > 0) ? 1 : 0;
 
   // Put the current raw sample in the delay FIFO
-  //fifo_push16(&afsk->delayFifo, currentSample);
+  // fifo_push16(&afsk->delayFifo, currentSample);
 
   // We need to check whether there is a signal transition.
   // If there is, we can recalibrate the phase of our
@@ -729,9 +764,7 @@ void AFSK_adc_isr(Afsk *afsk, int16_t currentSample)
       {
         fifo_flush(&afsk->rxFifo);
         afsk->status = 0;
-#ifdef DEBUG_TNC
-        Serial.println("FIFO IS FULL");
-#endif
+        log_d("FIFO IS FULL");
       }
     }
   }
@@ -762,7 +795,7 @@ void IRAM_ATTR sample_isr()
     //   abufPos += 45;
     // sinwave =(uint8_t)(127+(sin((float)abufPos/57)*128));
     // if(abufPos>=315) abufPos=0;
-    // if(x++<16) Serial.printf("%d,",sinwave);
+    // if(x++<16) log_d("%d,",sinwave);
     dacWrite(MIC_PIN, sinwave);
     if (AFSK_modem->sending == false)
       digitalWrite(PTT_PIN, LOW);
@@ -839,6 +872,18 @@ void AFSK_Poll(bool SA818, bool RFPower)
   int8_t adc;
 #endif
 
+  if (sql_pin > 0)
+  {                                               // Set SQL pin active
+    if ((digitalRead(sql_pin) ^ sql_active) == 0) // signal active with sql_active
+      sqlActive = true;
+    else
+      sqlActive = false;
+  }
+  else
+  {
+    sqlActive = true;
+  }
+
   if (hw_afsk_dac_isr)
   {
 #ifdef I2S_INTERNAL
@@ -847,8 +892,8 @@ void AFSK_Poll(bool SA818, bool RFPower)
     {
       // LED_RX_ON();
       adcVal = (int)AFSK_dac_isr(AFSK_modem);
-      //  Serial.print(adcVal,HEX);
-      //  Serial.print(",");
+      //  log_d(adcVal,HEX);
+      //  log_d(",");
       if (AFSK_modem->sending == false && adcVal == 0)
         break;
 
@@ -879,7 +924,7 @@ void AFSK_Poll(bool SA818, bool RFPower)
       if (i2s_write_bytes(I2S_NUM_0, (char *)&pcm_out, (x * sizeof(uint16_t)), portMAX_DELAY) == ESP_OK)
       // if (i2s_write(I2S_NUM_0, (char *)&pcm_out, (x * sizeof(uint16_t)),&writeByte, portMAX_DELAY) == ESP_OK)
       {
-        Serial.println("I2S Write Error");
+        log_d("I2S Write Error");
       }
     }
     // size_t writeByte;
@@ -908,7 +953,7 @@ void AFSK_Poll(bool SA818, bool RFPower)
     {
       int txEvents = 0;
       memset(pcm_out, 0, sizeof(pcm_out));
-      // Serial.println("TX TAIL");
+      // log_d("TX TAIL");
       //  Clear Delay DMA Buffer
       // size_t writeByte;
       for (int i = 0; i < 5; i++)
@@ -921,7 +966,7 @@ void AFSK_Poll(bool SA818, bool RFPower)
         {
           if (++txEvents > 6)
           {
-            // Serial.println("TX DONE");
+            // log_d("TX DONE");
             break;
           }
           delay(10);
@@ -941,18 +986,22 @@ void AFSK_Poll(bool SA818, bool RFPower)
   else
   {
 #ifdef I2S_INTERNAL
-#ifdef SQL
-    if (digitalRead(33) == LOW)
+    // #ifdef SQL
+    //     if (digitalRead(sql_pin) == LOW)
+    //     {
+    //       if (sqlActive == false)
+    //       { // Falling Edge SQL
+    //         log_d("RX Signal");
+    //         sqlActive = true;
+    //         mVsum = 0;
+    //         mVsumCount = 0;
+    //       }
+    // #endif
+    if (sqlActive == true)
     {
-      if (sqlActive == false)
-      { // Falling Edge SQL
-        log_d("RX Signal");
-        sqlActive = true;
-        mVsum = 0;
-        mVsumCount = 0;
-      }
-#endif
-      // if (i2s_read(I2S_NUM_0, (char *)&pcm_in, (ADC_SAMPLES_COUNT * sizeof(uint16_t)), &bytesRead, portMAX_DELAY) == ESP_OK)
+      // log_d("RX Signal");
+      sqlActive = false;
+
       if (i2s_read(I2S_NUM_0, (char *)&pcm_in, (ADC_SAMPLES_COUNT * sizeof(uint16_t)), &bytesRead, portMAX_DELAY) == ESP_OK)
       {
         // log_d("%i,%i,%i,%i", pcm_in[0], pcm_in[1], pcm_in[2], pcm_in[3]);
@@ -971,11 +1020,11 @@ void AFSK_Poll(bool SA818, bool RFPower)
           }
           adcVal -= offset; // Convert unsinewave to sinewave
 
-          if (afskSync == false)
+          if (sync_flage == true)
           {
-            mV = abs((int)adcVal);         // mVp-p
-            mV = (int)((float)mV / 3.68F); // mV=(mV*625)/36848;
-            mVsum += powl(mV, 2);
+            //mV = (int)((float)adcVal / 1.1862F); // ADC Raw to mV
+            mV = (int)((float)adcVal / 3.7533F); // ADC_RAW ADC_ATTEN_DB_0 to mV
+            mVsum += powl(mV, 2);                // VRMS = √(1/n)(V1^2 +V2^2 + … + Vn^2)
             mVsumCount++;
           }
 
@@ -983,33 +1032,35 @@ void AFSK_Poll(bool SA818, bool RFPower)
           {
             adcVal = (int)filter(&bpf, (int16_t)adcVal);
           }
+          if (input_BPF)
+          {
+            adcVal = (int)filter(&bpf, (int16_t)adcVal);
+          }
 
           int16_t adcR = (int16_t)(adcVal);
 
           AFSK_adc_isr(AFSK_modem, adcR); // Process signal IIR
+
           if (i % 32 == 0)
             APRS_poll(); // Poll check every 1 bit
+          
         }
         // Get mVrms on Sync flage 0x7E
-        if (afskSync == false)
+        // if (afskSync == false)
+        if (sync_flage == false)
         {
-          if (hdlc_flag_count > 5 && hdlc_flage_end == true)
+          // if (hdlc_flag_count > 5 && hdlc_flage_end == true)
+          // {
+          if (mVsumCount > ADC_SAMPLES_COUNT)
           {
-            if (mVsumCount > 3840)
-            {
-              mVrms = sqrtl(mVsum / mVsumCount);
-              mVsum = 0;
-              mVsumCount = 0;
-              lastVrms = millis() + 500;
-              VrmsFlag = true;
-              // if(millis()>lastVrms){
-              //  double Vrms=(double)mVrms/1000;
-              //  dBV = 20.0F * log10(Vrms);
-              //  //dBu = 20 * log10(Vrms / 0.7746);
-              //  Serial.printf("mVrms=%d dBV=%0.1f agc=%0.2f\n",mVrms,dBV);
-              // afskSync = true;
-              //}
-            }
+            mVrms = sqrtl(mVsum / mVsumCount);
+            mVsum = 0;
+            mVsumCount = 0;
+            lastVrms = millis() + 500;
+            VrmsFlag = true;
+            // Tool conversion dBv <--> Vrms at http://sengpielaudio.com/calculator-db-volt.htm
+            // dBV = 20.0F * log10(Vrms);
+            log_d("Audio dc_offset=%d mVrms=%d", offset, mVrms);
           }
           if (millis() > lastVrms && VrmsFlag)
           {
@@ -1018,6 +1069,16 @@ void AFSK_Poll(bool SA818, bool RFPower)
           }
         }
       }
+    }
+    else
+    {
+      hdlc_flag_count = 0;
+      hdlc_flage_end = false;
+      mVsum = 0;
+      mVsumCount = 0;
+      LED_RX_OFF();
+      sqlActive = false;
+    }
 #else
     if (adcq.getCount() >= ADC_SAMPLES_COUNT)
     {
@@ -1026,7 +1087,7 @@ void AFSK_Poll(bool SA818, bool RFPower)
         if (!adcq.pop(&adc)) // Pull queue buffer
           break;
         // audiof[x] = (float)adc;
-        //  Serial.printf("%02x ", (unsigned char)adc);
+        //  log_d("%02x ", (unsigned char)adc);
         AFSK_adc_isr(AFSK_modem, adc); // Process signal IIR
         if (x % 4 == 0)
           APRS_poll(); // Poll check every 1 byte
@@ -1034,18 +1095,15 @@ void AFSK_Poll(bool SA818, bool RFPower)
       APRS_poll();
     }
 #endif
-#ifdef SQL
-    }
-    else
-    {
-      // if(sqlActive==true){
-      //   i2s_stop(I2S_NUM_0);
-      // }
-      hdlc_flag_count = 0;
-      hdlc_flage_end = false;
-      LED_RX_OFF();
-      sqlActive = false;
-    }
-#endif
+    // #ifdef SQL
+    //     }
+    //     else
+    //     {
+    //       hdlc_flag_count = 0;
+    //       hdlc_flage_end = false;
+    //       LED_RX_OFF();
+    //       sqlActive = false;
+    //     }
+    // #endif
   }
 }

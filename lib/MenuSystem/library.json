@@ -1,0 +1,13 @@
+{
+  "name": "MenuSystem",
+  "keywords": "display, menu",
+  "description": "A library for implementing a menu system",
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/jonblack/arduino-menusystem.git"
+  },
+  "version": "2.1.1",
+  "frameworks": "arduino",
+  "platforms": "atmelavr"
+}

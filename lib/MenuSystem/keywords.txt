@@ -1,0 +1,6 @@
+Menu            KEYWORD1
+MenuItem        KEYWORD1
+NumericMenuItem KEYWORD1
+BackMenuItem    KEYWORD1
+MenuSystem      KEYWORD1
+MenuComponent   KEYWORD1
