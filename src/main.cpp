@@ -1168,7 +1168,7 @@ void RF_MODULE(bool boot)
     digitalWrite(config.rf_ptt_gpio, !config.rf_ptt_active); // PTT HIGH
     if (boot)
     {
-        SerialRF.begin(9600, SERIAL_8N1, config.rf_rx_gpio, config.rf_tx_gpio);
+        SerialRF.begin(config.rf_baudrate, SERIAL_8N1, config.rf_rx_gpio, config.rf_tx_gpio);
     }
 
     delay(1500);

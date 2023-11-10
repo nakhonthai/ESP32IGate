@@ -326,7 +326,10 @@ void handle_sidebar()
 		html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\">DIGI</th>\n";
 	html += "</tr>\n";
 	html += "<tr>\n";
-	html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\">WX</th>\n";
+	if	(config.wx_en)
+		html += "<th style=\"background:#0b0; color:#030; width:50%;border-radius: 10px;border: 2px solid white;\">WX</th>\n";
+	else
+		html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\">WX</th>\n";
 	html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\">SAT</th>\n";
 	html += "</tr>\n";
 	html += "</table>\n";
@@ -3711,7 +3714,7 @@ void handle_wx()
 				}
 			}
 		}
-		config.wx_2inet = En;
+		config.wx_en = En;
 		config.wx_gps = posGPS;
 		config.wx_2rf = pos2RF;
 		config.wx_2inet = pos2INET;
