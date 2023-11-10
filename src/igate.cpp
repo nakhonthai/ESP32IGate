@@ -33,7 +33,7 @@ int igateProcess(AX25Msg &Packet)
             status.dropCount++;
             return 0;
         }
-    }
+    }  
 
     for (idx = 0; idx < Packet.rpt_count; idx++)
     {

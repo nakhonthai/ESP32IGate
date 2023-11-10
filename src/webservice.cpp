@@ -2732,6 +2732,7 @@ void handle_igate()
 			if (((i % 16) == 0) && (i < 126))
 				html += "newWindow.document.write(\"</tr><tr>\");\n";
 		}
+<<<<<<< HEAD
 		html += "newWindow.document.write(\"</tr></table>\");\n";
 
 		// html += "newWindow.document.write(\"</select>\");\");\n";
@@ -2787,6 +2788,87 @@ void handle_igate()
 		html += "<td style=\"text-align: left;\">\n";
 		html += "<select name=\"mySSID\" id=\"mySSID\">\n";
 		for (uint8_t ssid = 0; ssid <= 15; ssid++)
+=======
+	}
+	webString += "</select></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Pass Code</label>\n";
+	webString += "<div class=\"col-sm-2 col-xs-4\"><input class=\"form-control\" id=\"myPasscode\" name=\"myPasscode\" type=\"password\" value=\"" + String(config.aprs_passcode) + "\" />From <a href=\"https://www.dprns.com/index.php?pid=5\">Here</a></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">APRS ITEM</label>\n";
+	webString += "<div class=\"col-sm-3 col-xs-4\"><input class=\"form-control\" id=\"myobject\" name=\"myobject\" type=\"text\" maxlength=\"9\" value=\"" + String(config.aprs_object) + "\" /></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">APRS Server</label>\n";
+	webString += "<div class=\"col-sm-6 col-xs-8\"><input class=\"form-control\" id=\"aprsHost\" name=\"aprsHost\" type=\"text\" value=\"" + String(config.aprs_host) + "\" /><br />Web Service: <a href=\"" + String(config.aprs_host) + ":" + String(config.aprs_port) + "\" target=\"_blank\">T2 Server</a></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">APRS Port</label>\n";
+	webString += "<div class=\"col-sm-2 col-xs-4\"><input class=\"form-control\" id=\"aprsPort\" name=\"aprsPort\" type=\"text\" value=\"" + String(config.aprs_port) + "\" /></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">APRS Filter</label>\n";
+	webString += "<div class=\"col-sm-6 col-xs-8\"><input class=\"form-control\" id=\"aprsFilter\" name=\"aprsFilter\" type=\"text\" value=\"" + String(config.aprs_filter) + "\" /></div>\n";
+	webString += "</div>\n";
+
+	String tncFlage = "";
+	if (config.tnc)
+		tncFlage = "checked";
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">TNC Enable</label>\n";
+	webString += "<div class=\"col-sm-4 col-xs-8\"><input class=\"field_checkbox\" id=\"tncEnable\" name=\"tncEnable\" type=\"checkbox\" value=\"OK\" " + tncFlage + "/></div>\n";
+	webString += "</div>\n";
+
+	String tlmFlage = "";
+	if (config.tnc_telemetry)
+		tlmFlage = "checked";
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Telemetry Enable</label>\n";
+	webString += "<div class=\"col-sm-4 col-xs-8\"><input class=\"field_checkbox\" id=\"tlmEnable\" name=\"tlmEnable\" type=\"checkbox\" value=\"OK\" " + tlmFlage + "/></div>\n";
+	webString += "</div>\n";
+	String rf2inetFlage = "";
+	if (config.rf2inet)
+		rf2inetFlage = "checked";
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">RF->Inet Enable</label>\n";
+	webString += "<div class=\"col-sm-4 col-xs-8\"><input class=\"field_checkbox\" id=\"rf2inetEnable\" name=\"rf2inetEnable\" type=\"checkbox\" value=\"OK\" " + rf2inetFlage + "/></div>\n";
+	webString += "</div>\n";
+	String inet2rfFlage = "";
+	if (config.inet2rf)
+		inet2rfFlage = "checked";
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Inet->RF Enable</label>\n";
+	webString += "<div class=\"col-sm-4 col-xs-8\"><input class=\"field_checkbox\" id=\"inet2rfEnable\" name=\"inet2rfEnable\" type=\"checkbox\" value=\"OK\" " + inet2rfFlage + "/></div>\n";
+	webString += "</div>\n";
+	String hpfFlage = "";
+	if (config.input_hpf)
+		hpfFlage = "checked";
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">AF Input BPF</label>\n";
+	webString += "<div class=\"col-sm-4 col-xs-8\"><input class=\"field_checkbox\" id=\"hpfEnable\" name=\"hpfEnable\" type=\"checkbox\" value=\"OK\" " + hpfFlage + "/></div>\n";
+	webString += "</div>\n";
+	String digiFlage = "";
+	if (config.tnc_digi)
+		digiFlage = "checked";
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Digi Repeager</label>\n";
+	webString += "<div class=\"col-sm-4 col-xs-8\"><input class=\"field_checkbox\" id=\"digiEnable\" name=\"digiEnable\" type=\"checkbox\" value=\"OK\" " + digiFlage + "/></div>\n";
+	webString += "</div>\n";
+
+	webString += "<div class=\"form-group\">\n";
+	webString += "<label class=\"col-sm-4 col-xs-12 control-label\">Digi Delay(mSec)</label>\n";
+	webString += "<div class=\"col-sm-2 col-xs-6\"><select name=\"digiDelay\" id=\"digiDelay\">\n";
+	for (uint16_t delay = 0; delay <= 5000; delay += 500)
+	{
+		if (config.digi_delay == delay)
+>>>>>>> 8ce33d110cb3c4caf006912f31c2547fa39db0ca
 		{
 			if (config.aprs_ssid == ssid)
 			{

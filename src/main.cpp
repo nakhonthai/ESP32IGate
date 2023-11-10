@@ -301,6 +301,24 @@ void defaultConfig()
     config.tx_timeslot = 2000; // ms
 
     config.wifi_mode = WIFI_AP_STA_FIX;
+<<<<<<< HEAD
+=======
+        config.wifi_ch = 1;
+    config.tnc_digi = true;
+    config.tnc_telemetry = true;
+    config.tnc_btext[0] = 0;
+    config.tnc_beacon = 0;
+    config.aprs_table = '/';
+    config.aprs_symbol = '&';
+    config.digi_delay = 2000;
+    config.tx_timeslot = 5000;
+    sprintf(config.aprs_path, "WIDE1-1");
+    sprintf(config.aprs_comment, "ESP32 Internet Gateway");
+    sprintf(config.tnc_comment, "ESP32 Build in TNC");
+    sprintf(config.aprs_filter, "g/HS*/E2*");
+    sprintf(config.tnc_path, "WIDE1-1");
+    memset(config.aprs_object,0,sizeof(config.aprs_object));
+>>>>>>> 8ce33d110cb3c4caf006912f31c2547fa39db0ca
     config.wifi_power = 44;
     config.wifi_ap_ch = 6;
     config.wifi_sta[0].enable = true;
@@ -1560,16 +1578,24 @@ float conv_coords(float in_coords)
 
 void DD_DDDDDtoDDMMSS(float DD_DDDDD, int *DD, int *MM, int *SS)
 {
+<<<<<<< HEAD
     DD_DDDDD = abs(DD_DDDDD);
     *DD = (int)DD_DDDDD;
     *MM = (int)((DD_DDDDD - *DD) * 60);
     *SS = ((DD_DDDDD - *DD) * 60 - *MM) * 100;
+=======
+    float uDD_DDDDD = abs(DD_DDDDD);
+    *DD = (int)uDD_DDDDD;                       // сделали из 37.45545 это 37 т.е. Градусы
+    *MM = (int)((uDD_DDDDD - *DD) * 60);        // получили минуты
+    *SS = ((uDD_DDDDD - *DD) * 60 - *MM) * 100; // получили секунды
+>>>>>>> 8ce33d110cb3c4caf006912f31c2547fa39db0ca
 }
 
 String igate_position(double lat, double lon, double alt, String comment)
 {
     String tnc2Raw = "";
     int lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss;
+<<<<<<< HEAD
     char strtmp[500], loc[100];
     char lon_ew = 'E';
     char lat_ns = 'N';
@@ -1598,6 +1624,25 @@ String igate_position(double lat, double lon, double alt, String comment)
     else
     {
         sprintf(loc, "!%02d%02d.%02d%c%c%03d%02d.%02d%c%c", lat_dd, lat_mm, lat_ss, lat_ns, config.igate_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.igate_symbol[1]);
+=======
+    char strtmp[300], loc[30];
+    char lon_ew, lat_ns;
+    lon_ew = 'E';
+    lat_ns = 'N';
+    memset(strtmp, 0, 300);
+    DD_DDDDDtoDDMMSS(config.gps_lat, &lat_dd, &lat_mm, &lat_ss);
+    DD_DDDDDtoDDMMSS(config.gps_lon, &lon_dd, &lon_mm, &lon_ss);
+    if(config.gps_lat < 0){
+        lat_ns = 'S';
+    }
+    if(config.gps_lon < 0){
+        lon_ew = 'W';
+    }
+    if(strlen(config.aprs_object)>=3){
+        sprintf(loc, ")%s!%02d%02d.%02d%c%c%03d%02d.%02d%c%c",config.aprs_object,lat_dd, lat_mm, lat_ss, lat_ns, config.aprs_table, lon_dd, lon_mm, lon_ss, lon_ew,config.aprs_symbol);
+    }else{
+        sprintf(loc, "!%02d%02d.%02d%c%c%03d%02d.%02d%c%c", lat_dd, lat_mm, lat_ss, lat_ns, config.aprs_table, lon_dd, lon_mm, lon_ss, lon_ew, config.aprs_symbol);
+>>>>>>> 8ce33d110cb3c4caf006912f31c2547fa39db0ca
     }
     if (config.aprs_ssid == 0)
         sprintf(strtmp, "%s>APE32I", config.aprs_mycall);
