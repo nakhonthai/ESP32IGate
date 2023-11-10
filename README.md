@@ -25,7 +25,7 @@ ESP32IGate is a Internet Gateway(IGate)/Dital Repeater(DiGi) with TNC Built in t
 
 ## Hardware screen short
 ![esp32dr_simple](image/ESP32DR_Simple_Test.png) ![esp32dr_sa868](image/ESP32DR_SA868_2.png)
-![esp32dr_simple](image/ESP32DR_SA868.png) ![esp32dr_simple](doc/ESP32DR_SA868/ESP32DR_SA868_Block.png)
+![esp32dr_sa868_pcb](doc/ESP32DR_SA868/ESP32DR_SA868_Block.png)
 
 ## ESP32DR_SA868
 
@@ -33,6 +33,8 @@ Schematic [here](doc/ESP32DR_SA868/ESP32DR_SA868_sch.pdf) \
 PCB Gerber [hare](doc/ESP32DR_SA868/ESP32DR_SA868_Gerber.zip)
 
 ## ESP32DR Simple
+
+![esp32dr_simple_3d](image/ESP32DR_Simple_Model.png)
 
 ESP32DR Simple Circut is small interface board for connecting to a transceiver.
 
