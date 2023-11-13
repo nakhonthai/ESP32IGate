@@ -326,7 +326,7 @@ void defaultConfig()
     config.bt_pin = 0;
 
     //--RF Module
-    config.rf_en = true;
+    config.rf_en = false;
     config.rf_type = RF_SA868_VHF;
     config.freq_rx = 144.3900;
     config.freq_tx = 144.3900;
@@ -445,10 +445,10 @@ void defaultConfig()
     sprintf(config.http_username, "admin");
     sprintf(config.http_password, "admin");
 
-    config.modbus_baudrate = 9600;
+    config.gnss_baudrate = 9600;
     config.gnss_enable = false;
-    config.gnss_tx_gpio = 17;
-    config.gnss_rx_gpio = 16;
+    config.gnss_tx_gpio = 19;
+    config.gnss_rx_gpio = 18;
     config.gnss_pps_gpio = -1;
 
     config.modbus_baudrate = 9600;
@@ -2114,6 +2114,7 @@ void taskGPS(void *pvParameters)
 
 long timeSlot;
 unsigned long iGatetickInterval;
+bool initInterval=true;
 void taskAPRS(void *pvParameters)
 {
     //	long start, stop;
@@ -2140,16 +2141,20 @@ void taskAPRS(void *pvParameters)
     afskSetHPF(config.audio_hpf);
     afskSetBPF(config.audio_bpf);
     timeSlot = millis();
-    DiGiInterval = iGatetickInterval = millis() + 15000;
     tx_counter = tx_interval - 10;
+    initInterval=true;
     for (;;)
     {
         long now = millis();
         // wdtSensorTimer = now;
         time_t timeStamp;
         time(&timeStamp);
+        if(initInterval){
+            DiGiInterval = iGatetickInterval = millis() + 15000;
+            initInterval=false;
+        }
         vTaskDelay(10 / portTICK_PERIOD_MS);
-        // serviceHandle();
+
         if (config.rf_en)
         { // RF Module enable
             // SEND RF in time slot
@@ -2540,7 +2545,7 @@ void taskNetwork(void *pvParameters)
             }
         }
         WiFi.setTxPower((wifi_power_t)config.wifi_power);
-        WiFi.setHostname("ESP32APRS_T-TWR");
+        WiFi.setHostname("ESP32IGate");
     }
 
     if (config.wifi_mode & WIFI_AP_FIX)
@@ -2559,7 +2564,6 @@ void taskNetwork(void *pvParameters)
         // Serial.println("");
         log_d("Wi-Fi CONNECTED!");
         log_d("IP address: %s", WiFi.localIP().toString().c_str());
-        webService();
         NTP_Timeout = millis() + 2000;
     }
 
@@ -2576,6 +2580,7 @@ void taskNetwork(void *pvParameters)
         // if (WiFi.status() == WL_CONNECTED)
         if (wifiMulti.run(connectTimeoutMs) == WL_CONNECTED)
         {
+            webService();
             serviceHandle();
 
             if (millis() > NTP_Timeout)
@@ -2744,7 +2749,9 @@ void taskNetwork(void *pvParameters)
                     }
                 }
             }
-        } // WiFi connected
+        }else if (config.wifi_mode & WIFI_AP_FIX){ // WiFi connected
+            serviceHandle();
+        }
     }     // for loop
 }
 

@@ -1666,15 +1666,6 @@ void handle_mod()
 		html += "</tr>\n";
 
 		String LowFlag = "", HighFlag = "";
-		if (config.rf_sql_active)
-			HighFlag = "checked=\"checked\"";
-		else
-			LowFlag = "checked=\"checked\"";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>SQL GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\"  name=\"sql\" type=\"number\" value=\"" + String(config.rf_sql_gpio) + "\" /> Active:<input type=\"radio\" name=\"sql_active\" value=\"0\" " + LowFlag + "/>LOW <input type=\"radio\" name=\"sql_active\" value=\"1\" " + HighFlag + "/>HIGH </td>\n";
-		html += "</tr>\n";
-
 		LowFlag = "";
 		HighFlag = "";
 		if (config.rf_pd_active)
@@ -1699,6 +1690,17 @@ void handle_mod()
 
 		LowFlag = "";
 		HighFlag = "";
+		if (config.rf_sql_active)
+			HighFlag = "checked=\"checked\"";
+		else
+			LowFlag = "checked=\"checked\"";
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>SQL GPIO:</b></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\"  name=\"sql\" type=\"number\" value=\"" + String(config.rf_sql_gpio) + "\" /> Active:<input type=\"radio\" name=\"sql_active\" value=\"0\" " + LowFlag + "/>LOW <input type=\"radio\" name=\"sql_active\" value=\"1\" " + HighFlag + "/>HIGH </td>\n";
+		html += "</tr>\n";
+
+		LowFlag = "";
+		HighFlag = "";
 		if (config.rf_ptt_active)
 			HighFlag = "checked=\"checked\"";
 		else
@@ -1706,7 +1708,7 @@ void handle_mod()
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>PTT GPIO:</b></td>\n";
 		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\"  name=\"ptt\" type=\"number\" value=\"" + String(config.rf_ptt_gpio) + "\" /> Active:<input type=\"radio\" name=\"ptt_active\" value=\"0\" " + LowFlag + "/>LOW <input type=\"radio\" name=\"ptt_active\" value=\"1\" " + HighFlag + "/>HIGH </td>\n";
-		html += "</tr>\n";
+		html += "</tr>\n";		
 
 		html += "</table><br />\n";
 		html += "<td><input class=\"btn btn-primary\" id=\"submitRF\" name=\"commitRFS\" type=\"submit\" value=\"Save Config\" maxlength=\"80\"/></td>\n";
@@ -2508,6 +2510,7 @@ void handle_igate()
 		config.igate_loc2inet = pos2INET;
 
 		saveEEPROM();
+		initInterval=true;
 		String html = "OK";
 		server.send(200, "text/html", html);
 	}
@@ -3313,6 +3316,7 @@ void handle_digi()
 		config.digi_loc2inet = pos2INET;
 
 		saveEEPROM();
+		initInterval=true;
 		String html = "OK";
 		server.send(200, "text/html", html);
 	}
@@ -3720,6 +3724,7 @@ void handle_wx()
 		config.wx_2inet = pos2INET;
 
 		saveEEPROM();
+		initInterval=true;
 		String html = "OK";
 		server.send(200, "text/html", html);
 	}
@@ -4295,7 +4300,7 @@ void handle_about()
 	webString += "<table>";
 	webString += "<th colspan=\"2\"><span><b>System Information</b></span></th>\n";
 	// webString += "<tr><th width=\"200\"><span><b>Name</b></span></th><th><span><b>Information</b></span></th></tr>";
-	webString += "<tr><td align=\"right\"><b>Hardware Version: </b></td><td align=\"left\"> ESP32 Simple,ESP32DR </td></tr>";
+	webString += "<tr><td align=\"right\"><b>Hardware Version: </b></td><td align=\"left\"> ESP32DR Simple,ESP32DR_SA868,DIY </td></tr>";
 	webString += "<tr><td align=\"right\"><b>Firmware Version: </b></td><td align=\"left\"> V" + String(VERSION) + String(VERSION_BUILD) + "</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>RF Analog Module: </b></td><td align=\"left\"> MODEL: " + String(RF_TYPE[config.rf_type]) + "</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>ESP32 Model: </b></td><td align=\"left\"> " + String(ESP.getChipModel()) + "</td></tr>";
@@ -4465,9 +4470,14 @@ void handle_default()
 	defaultConfig();
 	defaultSetting = false;
 }
-
+bool webServiceBegin=true;
 void webService()
 {
+	if(webServiceBegin){
+		webServiceBegin=false;
+	}else{
+		return;
+	}
 	server.close();
 	// web client handlers
 	server.on("/", setMainPage);

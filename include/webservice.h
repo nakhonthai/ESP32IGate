@@ -84,6 +84,7 @@ extern pkgListType *pkgList;
 extern TinyGPSPlus gps;
 extern float vbat;
 extern WiFiClient aprsClient;
+extern bool initInterval;
 
 #ifdef __cplusplus
 extern "C"
