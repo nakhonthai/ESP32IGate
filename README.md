@@ -6,7 +6,7 @@ ESP32IGate is a Internet Gateway(IGate)/Dital Repeater(DiGi) with TNC Built in t
 ## Feature
 
 * Supported hardware: ESP32DR Simple,ESP32DR,D.I.Y Other
-* Supported RF: SA868/FRS VHF/UHF/350 model
+* Supported RF Module: SA8x8/FRS VHF/UHF/350 model
 * Support APRS internet gateway (IGATE)
 * Support APRS digital repeater (DIGI)
 * Support APRS IGATE/DIGI/WX with fix position for move position from GNSS
@@ -168,11 +168,8 @@ https://www.espressif.com/en/support/download/other-tools
 
 ## Credits & Reference
 
-- Thank you for support device hardware chakphanu [E24OUW](https://github.com/chakphanu)
 - ESP32TNC project by amedes [ESP32TNC](https://github.com/amedes/ESP32TNC)
 - APRS Library by markqvist [LibAPRS](https://github.com/markqvist/LibAPRS)
-- Hardware & Software LILYGO [T-TWR](https://github.com/Xinyuan-LilyGO/T-TWR)
-- Online UUID Generator [UUID-Gen](https://www.uuidgenerator.net/)
 
 ## HITH
 This project implement by APRS text (TNC2 Raw) only,It not support null string(0x00) in the package.
