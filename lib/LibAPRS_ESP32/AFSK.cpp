@@ -57,7 +57,7 @@ cppQueue adcq(sizeof(int8_t), 19200, IMPLEMENTATION); // Instantiate queue
 #define RTC_MODULE_CHECK(a, str, ret_val)                                             \
   if (!(a))                                                                           \
   {                                                                                   \
-    ESP_LOGE(RTC_MODULE_TAG, "%s:%d (%s):%s", __FILE__, __LINE__, __FUNCTION__, str); \
+    log_d("%s:%d (%s):%s", __FILE__, __LINE__, __FUNCTION__, str); \
     return (ret_val);                                                                 \
   }
 
@@ -920,9 +920,10 @@ void AFSK_Poll(bool SA818, bool RFPower)
     // size_t writeByte;
     if (x > 0)
     {
-      // size_t writeByte;
-      if (i2s_write_bytes(I2S_NUM_0, (char *)&pcm_out, (x * sizeof(uint16_t)), portMAX_DELAY) == ESP_OK)
-      // if (i2s_write(I2S_NUM_0, (char *)&pcm_out, (x * sizeof(uint16_t)),&writeByte, portMAX_DELAY) == ESP_OK)
+     
+      //if (i2s_write_bytes(I2S_NUM_0, (char *)&pcm_out, (x * sizeof(uint16_t)), portMAX_DELAY) == ESP_OK)
+      size_t writeByte;
+      if (i2s_write(I2S_NUM_0, (char *)&pcm_out, (x * sizeof(uint16_t)),&writeByte, portMAX_DELAY) == ESP_OK)
       {
         log_d("I2S Write Error");
       }
@@ -955,10 +956,10 @@ void AFSK_Poll(bool SA818, bool RFPower)
       memset(pcm_out, 0, sizeof(pcm_out));
       // log_d("TX TAIL");
       //  Clear Delay DMA Buffer
-      // size_t writeByte;
+      size_t writeByte;
       for (int i = 0; i < 5; i++)
-        // i2s_write(I2S_NUM_0, (char *)&pcm_out, (ADC_SAMPLES_COUNT * sizeof(uint16_t)),&writeByte, portMAX_DELAY);
-        i2s_write_bytes(I2S_NUM_0, (char *)&pcm_out, (ADC_SAMPLES_COUNT * sizeof(uint16_t)), portMAX_DELAY);
+        i2s_write(I2S_NUM_0, (char *)&pcm_out, (ADC_SAMPLES_COUNT * sizeof(uint16_t)),&writeByte, portMAX_DELAY);
+        //i2s_write_bytes(I2S_NUM_0, (char *)&pcm_out, (ADC_SAMPLES_COUNT * sizeof(uint16_t)), portMAX_DELAY);
       // wait on I2S event queue until a TX_DONE is found
       while (xQueueReceive(i2s_event_queue, &i2s_evt, portMAX_DELAY) == pdPASS)
       {
@@ -976,10 +977,10 @@ void AFSK_Poll(bool SA818, bool RFPower)
       i2s_zero_dma_buffer(I2S_NUM_0);
       // i2s_adc_enable(I2S_NUM_0);
       digitalWrite(PTT_PIN, LOW);
-      if (SA818)
-      {
-        digitalWrite(12, LOW); // RF Power LOW
-      }
+      // if (SA818)
+      // {
+      //   digitalWrite(12, LOW); // RF Power LOW
+      // }
     }
 #endif
   }
@@ -1051,7 +1052,7 @@ void AFSK_Poll(bool SA818, bool RFPower)
         {
           // if (hdlc_flag_count > 5 && hdlc_flage_end == true)
           // {
-          if (mVsumCount > ADC_SAMPLES_COUNT)
+          if (mVsumCount > ADC_SAMPLES_COUNT/2)
           {
             mVrms = sqrtl(mVsum / mVsumCount);
             mVsum = 0;

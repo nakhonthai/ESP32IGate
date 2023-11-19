@@ -354,7 +354,7 @@ void defaultConfig()
     config.aprs_port = 14580;
     sprintf(config.aprs_mycall, "NOCALL");
     sprintf(config.aprs_host, "aprs.dprns.com");
-    sprintf(config.aprs_passcode, "");
+    memset(config.aprs_passcode, 0, sizeof(config.aprs_passcode));
     sprintf(config.aprs_moniCall, "%s-%d", config.aprs_mycall, config.aprs_ssid);
     sprintf(config.aprs_filter, "m/10");
     //--Position
@@ -364,8 +364,8 @@ void defaultConfig()
     config.igate_alt = 0;
     config.igate_interval = 600;
     sprintf(config.igate_symbol, "/&");
-    sprintf(config.igate_object, "");
-    sprintf(config.igate_phg, "");
+    memset(config.igate_object, 0, sizeof(config.igate_object));
+    memset(config.igate_phg, 0, sizeof(config.igate_phg));
     sprintf(config.igate_path, "WIDE1-1");
     sprintf(config.igate_comment, "IGate MODE");
 
@@ -374,6 +374,7 @@ void defaultConfig()
     config.digi_loc2rf = true;
     config.digi_loc2inet = false;
     config.digi_ssid = 3;
+    config.digi_timestamp = false;
     sprintf(config.digi_mycall, "NOCALL");
     sprintf(config.digi_path, "WIDE1-1");
     //--Position
@@ -382,14 +383,15 @@ void defaultConfig()
     config.digi_lon = 100.4930;
     config.digi_alt = 0;
     config.digi_interval = 600;
+    config.igate_timestamp = false;
     config.digi_delay = 0;
     config.digiFilter = FILTER_OBJECT | FILTER_ITEM | FILTER_MESSAGE | FILTER_MICE | FILTER_POSITION | FILTER_WX;
 
     sprintf(config.digi_symbol, "/#");
-    sprintf(config.digi_phg, "");
+    memset(config.digi_phg, 0, sizeof(config.digi_phg));
     sprintf(config.digi_comment, "DIGI MODE");
 
-    //WX
+    // WX
     config.wx_en = false;
     config.wx_2rf = true;
     config.wx_2inet = true;
@@ -397,14 +399,15 @@ void defaultConfig()
     sprintf(config.wx_mycall, "NOCALL");
     sprintf(config.wx_path, "WIDE1-1");
     sprintf(config.wx_comment, "WX MODE");
-    sprintf(config.wx_object, "");
+    memset(config.wx_object, 0, sizeof(config.wx_object));
+
     //--Position
     config.wx_gps = false;
     config.wx_lat = 13.7555;
     config.wx_lon = 100.4930;
     config.wx_alt = 0;
     config.wx_interval = 600;
-    config.wx_mode=0;
+    config.wx_mode = 0;
 
     // OLED DISPLAY
     config.oled_enable = true;
@@ -476,7 +479,7 @@ unsigned long pingTimeout;
 
 bool psramBusy = false;
 
-const char *lastTitle = "LAST HERT";
+const char *lastTitle = "LAST HEARD";
 
 int tlmList_Find(char *call)
 {
@@ -1409,16 +1412,37 @@ void setup()
     // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C, false); // initialize with the I2C addr 0x3C (for the 128x64)
     // Initialising the UI will init the display too.
+    // display.clearDisplay();
+    // display.setTextSize(1);
+    // display.setTextColor(WHITE);
+    // display.setCursor(30, 5);
+    // display.print("ESP32 IGATE");
+    // display.setCursor(1, 17);
+    // display.print("Firmware Version " + String(VERSION));
+    // display.drawLine(10, 30, 110, 30, WHITE);
+    // display.setCursor(1, 40);
+    // display.print("Push B Factory reset");
+    // display.display();
     display.clearDisplay();
     display.setTextSize(1);
     display.setTextColor(WHITE);
-    display.setCursor(30, 5);
-    display.print("ESP32 IGATE");
-    display.setCursor(1, 17);
-    display.print("Firmware Version " + String(VERSION));
-    display.drawLine(10, 30, 110, 30, WHITE);
-    display.setCursor(1, 40);
-    display.print("Push B Factory reset");
+
+    display.setTextSize(1);
+    display.setFont(&FreeSansBold9pt7b);
+    display.setCursor(0, 15);
+    display.print("APRS");
+    display.setCursor(60, 32);
+    display.print("I-GATE");
+    display.drawYBitmap(0, 16, LOGO, 48, 48, WHITE);
+    display.drawRoundRect(52, 16, 75, 22, 3, WHITE);
+
+    display.setFont();
+    display.setTextColor(WHITE);
+
+    display.setCursor(60, 40);
+    display.printf("FW Ver %s%c", VERSION, VERSION_BUILD);
+    display.setCursor(65, 5);
+    display.print("Copy@2022");
     display.display();
 #endif
 
@@ -1431,20 +1455,21 @@ void setup()
     delay(1000);
     digitalWrite(LED_TX, HIGH);
     display.fillRect(49, 49, 50, 8, 0);
-    display.setCursor(50, 50);
+    display.setCursor(70, 50);
     display.print("3 Sec");
     display.display();
     delay(1000);
     digitalWrite(LED_RX, HIGH);
     display.fillRect(49, 49, 50, 8, 0);
-    display.setCursor(50, 50);
+    display.setCursor(70, 50);
     display.print("2 Sec");
     display.display();
     delay(1000);
     display.fillRect(49, 49, 50, 8, 0);
-    display.setCursor(50, 50);
+    display.setCursor(70, 50);
     display.print("1 Sec");
     display.display();
+    delay(1000);
 #else
     delay(1000);
     digitalWrite(LED_TX, HIGH);
@@ -1511,6 +1536,8 @@ void setup()
     // enableCore0WDT();
     enableCore1WDT();
 
+    oledSleepTimeout = millis() + (config.oled_timeout * 1000);
+
     // Task 1
     xTaskCreatePinnedToCore(
         taskAPRS,        /* Function to implement the task */
@@ -1542,6 +1569,16 @@ void setup()
             &taskGpsHandle, /* Task handle. */
             0);             /* Core where the task should run */
     }
+}
+
+String getTimeStamp()
+{
+    char strtmp[50];
+    time_t now;
+    time(&now);
+    struct tm *info = gmtime(&now);
+    sprintf(strtmp, "%02d%02d%02dz", info->tm_mday, info->tm_hour, info->tm_min);
+    return String(strtmp);
 }
 
 int pkgCount = 0;
@@ -1590,19 +1627,35 @@ String igate_position(double lat, double lon, double alt, String comment)
     if (strlen(config.igate_object) >= 3)
     {
         char object[10];
-        memset(object, 0, 10);
-        strcpy(object, config.igate_object);
+        memset(object, 0x20, 10);
+        memcpy(object, config.igate_object, strlen(config.igate_object));
         object[9] = 0;
-        sprintf(loc, ")%s!%02d%02d.%02d%c%c%03d%02d.%02d%c%c", object, lat_dd, lat_mm, lat_ss, lat_ns, config.igate_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.igate_symbol[1]);
+        if (config.igate_timestamp)
+        {
+            String timeStamp = getTimeStamp();
+            sprintf(loc, ";%s*%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c", object, timeStamp, lat_dd, lat_mm, lat_ss, lat_ns, config.igate_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.igate_symbol[1]);
+        }
+        else
+        {
+            sprintf(loc, ")%s!%02d%02d.%02d%c%c%03d%02d.%02d%c%c", config.igate_object, lat_dd, lat_mm, lat_ss, lat_ns, config.igate_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.igate_symbol[1]);
+        }
     }
     else
     {
-        sprintf(loc, "!%02d%02d.%02d%c%c%03d%02d.%02d%c%c", lat_dd, lat_mm, lat_ss, lat_ns, config.igate_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.igate_symbol[1]);
+        if (config.igate_timestamp)
+        {
+            String timeStamp = getTimeStamp();
+            sprintf(loc, "/%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c", timeStamp.c_str(), lat_dd, lat_mm, lat_ss, lat_ns, config.igate_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.igate_symbol[1]);
+        }
+        else
+        {
+            sprintf(loc, "!%02d%02d.%02d%c%c%03d%02d.%02d%c%c", lat_dd, lat_mm, lat_ss, lat_ns, config.igate_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.igate_symbol[1]);
+        }
     }
     if (config.aprs_ssid == 0)
-        sprintf(strtmp, "%s>APE32I", config.aprs_mycall);
+        sprintf(strtmp, "%s>APTWR", config.aprs_mycall);
     else
-        sprintf(strtmp, "%s-%d>APE32I", config.aprs_mycall, config.aprs_ssid);
+        sprintf(strtmp, "%s-%d>APTWR", config.aprs_mycall, config.aprs_ssid);
     tnc2Raw = String(strtmp);
     if (config.igate_path[0] != 0)
     {
@@ -1637,11 +1690,19 @@ String digi_position(double lat, double lon, double alt, String comment)
     {
         sprintf(strAltitude, "/A=%06d", (int)(alt * 3.28F));
     }
-    sprintf(loc, "!%02d%02d.%02d%c%c%03d%02d.%02d%c%c", lat_dd, lat_mm, lat_ss, lat_ns, config.digi_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.digi_symbol[1]);
-    if (config.digi_ssid == 0)
-        sprintf(strtmp, "%s>APE32I", config.digi_mycall);
+    if (config.digi_timestamp)
+    {
+        String timeStamp = getTimeStamp();
+        sprintf(loc, "/%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c", timeStamp, lat_dd, lat_mm, lat_ss, lat_ns, config.digi_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.digi_symbol[1]);
+    }
     else
-        sprintf(strtmp, "%s-%d>APE32I", config.digi_mycall, config.digi_ssid);
+    {
+        sprintf(loc, "!%02d%02d.%02d%c%c%03d%02d.%02d%c%c", lat_dd, lat_mm, lat_ss, lat_ns, config.digi_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.digi_symbol[1]);
+    }
+    if (config.digi_ssid == 0)
+        sprintf(strtmp, "%s>APTWR", config.digi_mycall);
+    else
+        sprintf(strtmp, "%s-%d>APTWR", config.digi_mycall, config.digi_ssid);
     tnc2Raw = String(strtmp);
     if (config.digi_path[0] != 0)
     {
@@ -1704,39 +1765,47 @@ int GetAPRSDataAvg(char *strData)
     unsigned int i;
 
     int lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss;
-    char strtmp[300], obj[13];
+    char strtmp[300], obj[30];
 
     memset(&obj[0], 0, sizeof(obj));
-    memset(&strData[0], 0, sizeof(strData));
 
     DD_DDDDDtoDDMMSS(config.wx_lat, &lat_dd, &lat_mm, &lat_ss);
     DD_DDDDDtoDDMMSS(config.wx_lon, &lon_dd, &lon_mm, &lon_ss);
     if (strlen(config.wx_object) >= 3)
     {
-        sprintf(obj, ";%s", config.wx_object);
-        for (i = strlen(config.wx_object) + 1; i < 10; i++)
-        {
-            obj[i] = 0x20;
-        }
-        obj[i] = '*';
+        char object[10];
+        memset(object, 0x20, 10);
+        memcpy(object, config.wx_object,strlen(config.wx_object));
+        object[9] = 0;
+        String timeStamp=getTimeStamp();
+        sprintf(obj, ";%s*%s", object,timeStamp);
     }
     else
     {
-        sprintf(obj, "!");
-        obj[1] = 0;        
+        if(config.wx_timestamp){
+            String timeStamp=getTimeStamp();
+            sprintf(obj,"/%s",timeStamp.c_str());
+        }else{
+            sprintf(obj, "!");
+            obj[1] = 0;
+        }
     }
-    if (config.wx_ssid == 0)
-        sprintf(strtmp, "%s>APE32I,WIDE1-1:", config.wx_mycall);
-    else
-        sprintf(strtmp, "%s-%d>APE32I,WIDE1-1:", config.wx_mycall, config.wx_ssid);
+    if (config.wx_ssid == 0){
+        if (config.wx_path[0] != 0)
+            sprintf(strtmp, "%s>APE32I,%s:", config.wx_mycall,config.wx_path);
+        else
+            sprintf(strtmp, "%s>APE32I:", config.wx_mycall);
+    }else{
+        if (config.wx_path[0] != 0)
+            sprintf(strtmp, "%s-%d>APE32I,%s:", config.wx_mycall, config.wx_ssid,config.wx_path);
+        else
+            sprintf(strtmp, "%s-%d>APE32I:", config.wx_mycall, config.wx_ssid);
+    }
 
     strcat(strData, strtmp);
     strcat(strData, obj);
 
-    time_t now;
-    time(&now);
-    struct tm *info = gmtime(&now);
-    sprintf(strtmp, "%02d%02d%02dz%02d%02d.%02dN/%03d%02d.%02dE_", info->tm_mday, info->tm_hour, info->tm_min, lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss);
+    sprintf(strtmp, "%02d%02d.%02dN/%03d%02d.%02dE_", lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss);
     strcat(strData, strtmp);
 
     sprintf(strtmp, "%03u/%03ug%03u", weather.winddirection, (unsigned int)(weather.windspeed * 0.621), (unsigned int)(weather.windgust * 0.621));
@@ -1748,6 +1817,9 @@ int GetAPRSDataAvg(char *strData)
 
     unsigned int rain = (unsigned int)((weather.rain * 100.0F) / 25.6F);
     unsigned int rain24 = (unsigned int)((weather.rain24hr * 100.0F) / 25.6F);
+    time_t now;
+    time(&now);
+    struct tm *info = gmtime(&now);
     if (info->tm_min == 0)
     {
         rain = 0;
@@ -1866,6 +1938,7 @@ void getWeather()
 }
 #endif
 
+unsigned long timeSec;
 void loop()
 {
     vTaskDelay(5 / portTICK_PERIOD_MS);
@@ -1875,7 +1948,8 @@ void loop()
 #endif
 
 #ifdef WX
-    if(config.wx_en) getWeather();
+    if (config.wx_en)
+        getWeather();
 #endif
 
     if (digitalRead(0) == LOW)
@@ -1903,12 +1977,13 @@ void loop()
             else
             {
                 showDisp = true;
-                if (oledSleepTimeout > 0)
-                {
-                    curTab++;
-                    if (curTab > 3)
-                        curTab = 0;
-                }
+                timeSec = timeHalfSec = millis();
+                // if (oledSleepTimeout > 0)
+                //{
+                curTab++;
+                if (curTab > 3)
+                    curTab = 0;
+                //}
             }
             btn_count = 0;
         }
@@ -1926,6 +2001,7 @@ void loop()
                 dispBuffer.pop(&tnc2);
                 dispWindow(String(tnc2), 0, false);
                 timeHalfSec = millis() + (config.dispDelay * 1000);
+                oledSleepTimeout = millis() + (config.oled_timeout * 1000);
             }
         }
         else
@@ -1933,16 +2009,19 @@ void loop()
             // Sleep display
             if (millis() > timeHalfSec)
             {
-                if (timeHalfSec > 0)
+                if (millis() > timeSec && timeHalfSec > 0)
                 {
+                    timeSec = millis() + 10000;
                     showDisp = true;
-                    timeHalfSec = 0;
-                    oledSleepTimeout = millis() + (config.oled_timeout * 1000);
+                    // timeHalfSec = 0;
+                    // oledSleepTimeout = millis() + (config.oled_timeout * 1000);
                 }
                 else
                 {
                     if (millis() > oledSleepTimeout && oledSleepTimeout > 0)
                     {
+                        showDisp = false;
+                        timeHalfSec = 0;
                         oledSleepTimeout = 0;
                         display.clearDisplay();
                         display.display();
@@ -1954,18 +2033,21 @@ void loop()
         if (showDisp)
         {
             showDisp = false;
-            timeHalfSec = 0;
-            oledSleepTimeout = millis() + (config.oled_timeout * 1000);
+            timeHalfSec = millis();
+            // oledSleepTimeout = millis() + (config.oled_timeout * 1000);
             switch (curTab)
             {
             case 0:
                 statisticsDisp();
+                timeSec = millis() + 10000;
                 break;
             case 1:
                 pkgLastDisp();
+                timeSec = millis() + 10000;
                 break;
             case 2:
                 pkgCountDisp();
+                timeSec = millis() + 10000;
                 break;
             case 3:
                 systemDisp();
@@ -2025,7 +2107,7 @@ void sendIsPkg(char *raw)
     String tnc2Raw = String(str);
     if (aprsClient.connected())
         aprsClient.println(tnc2Raw); // Send packet to Inet
-    if (config.rf_en && config.digi_en)
+    if (config.digi_en)
         pkgTxPush(str, strlen(str), 0);
 }
 
@@ -2114,7 +2196,7 @@ void taskGPS(void *pvParameters)
 
 long timeSlot;
 unsigned long iGatetickInterval;
-bool initInterval=true;
+bool initInterval = true;
 void taskAPRS(void *pvParameters)
 {
     //	long start, stop;
@@ -2142,20 +2224,21 @@ void taskAPRS(void *pvParameters)
     afskSetBPF(config.audio_bpf);
     timeSlot = millis();
     tx_counter = tx_interval - 10;
-    initInterval=true;
+    initInterval = true;
     for (;;)
     {
         long now = millis();
         // wdtSensorTimer = now;
         time_t timeStamp;
         time(&timeStamp);
-        if(initInterval){
+        if (initInterval)
+        {
             DiGiInterval = iGatetickInterval = millis() + 15000;
-            initInterval=false;
+            initInterval = false;
         }
         vTaskDelay(10 / portTICK_PERIOD_MS);
 
-        if (config.rf_en)
+        // if (config.rf_en)
         { // RF Module enable
             // SEND RF in time slot
             if (now > (timeSlot + 10))
@@ -2685,7 +2768,7 @@ void taskNetwork(void *pvParameters)
                                     }
 #endif
                                     // INET2RF affter filter
-                                    if (config.rf_en && config.inet2rf)
+                                    if (config.inet2rf)
                                     {
                                         if (type & config.inet2rfFilter)
                                         {
@@ -2728,7 +2811,7 @@ void taskNetwork(void *pvParameters)
                 {
                     log_d("GW Fail!\n");
                     WiFi.disconnect();
-                    WiFi.reconnect();
+                    wifiMulti.run(5000);
                     wifiTTL = 0;
                 }
                 if (config.vpn)
@@ -2749,10 +2832,12 @@ void taskNetwork(void *pvParameters)
                     }
                 }
             }
-        }else if (config.wifi_mode & WIFI_AP_FIX){ // WiFi connected
+        }
+        else if (config.wifi_mode & WIFI_AP_FIX)
+        { // WiFi connected
             serviceHandle();
         }
-    }     // for loop
+    } // for loop
 }
 
 #ifdef OLED

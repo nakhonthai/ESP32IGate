@@ -1500,6 +1500,13 @@ void handle_mod()
 					config.rf_ptt_gpio = server.arg(i).toInt();
 				}
 			}
+			if (server.argName(i) == "sql")
+			{
+				if (server.arg(i) != "")
+				{
+					config.rf_sql_gpio = server.arg(i).toInt();
+				}
+			}
 		}
 		saveEEPROM();
 		String html = "OK";
@@ -1634,10 +1641,10 @@ void handle_mod()
 
 		html += "</td></tr></table>\n";
 
-		/**************RF Module******************/
+		/**************RF GPIO******************/
 		html += "<form accept-charset=\"UTF-8\" action=\"#\" class=\"form-horizontal\" id=\"fromRF\" method=\"post\">\n";
 		html += "<table>\n";
-		html += "<th colspan=\"2\"><span><b>RF Module Modify</b></span></th>\n";
+		html += "<th colspan=\"2\"><span><b>RF GPIO Modify</b></span></th>\n";
 		html += "<tr>";
 
 		html += "<tr>\n";
@@ -2306,6 +2313,7 @@ void handle_igate()
 	bool bcnEN = false;
 	bool pos2RF = false;
 	bool pos2INET = false;
+	bool timeStamp = false;
 
 	if (server.hasArg("commitIGATE"))
 	{
@@ -2499,6 +2507,14 @@ void handle_igate()
 						bcnEN = true;
 				}
 			}
+			if (server.argName(i) == "igateTimeStamp")
+			{
+				if (server.arg(i) != "")
+				{
+					if (String(server.arg(i)) == "OK")
+						timeStamp = true;
+				}
+			}
 		}
 
 		config.igate_en = aprsEn;
@@ -2508,6 +2524,7 @@ void handle_igate()
 		config.igate_bcn = bcnEN;
 		config.igate_loc2rf = pos2RF;
 		config.igate_loc2inet = pos2INET;
+		config.igate_timestamp = timeStamp;
 
 		saveEEPROM();
 		initInterval=true;
@@ -2851,6 +2868,13 @@ void handle_igate()
 		if (config.inet2rf)
 			inet2rfEnFlag = "checked";
 		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" id=\"inet2rfEnable\" name=\"inet2rfEnable\" onclick=\"onINET2RFCheck()\" value=\"OK\" " + inet2rfEnFlag + "><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\"><i> *Switch Internet to RF gateway</i></label></td>\n";
+		html += "</tr>\n";
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>Time Stamp:</b></td>\n";
+		String timeStampFlag = "";
+		if (config.igate_timestamp)
+			timeStampFlag = "checked";
+		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"igateTimeStamp\" value=\"OK\" " + timeStampFlag + "><span class=\"slider round\"></span></label></td>\n";
 		html += "</tr>\n<tr>";
 
 		html += "<td align=\"right\"><b>POSITION:</b></td>\n";
@@ -3080,6 +3104,7 @@ void handle_digi()
 	bool bcnEN = false;
 	bool pos2RF = false;
 	bool pos2INET = false;
+	bool timeStamp = false;
 
 	if (server.hasArg("commitDIGI"))
 	{
@@ -3308,12 +3333,21 @@ void handle_digi()
 						config.digiFilter |= FILTER_POSITION;
 				}
 			}
+			if (server.argName(i) == "digiTimeStamp")
+			{
+				if (server.arg(i) != "")
+				{
+					if (String(server.arg(i)) == "OK")
+						timeStamp = true;
+				}
+			}
 		}
 		config.digi_en = digiEn;
 		config.digi_gps = posGPS;
 		config.digi_bcn = bcnEN;
 		config.digi_loc2rf = pos2RF;
 		config.digi_loc2inet = pos2INET;
+		config.digi_timestamp = timeStamp;
 
 		saveEEPROM();
 		initInterval=true;
@@ -3440,6 +3474,14 @@ void handle_digi()
 		html += "</tr>\n";
 
 		html += "<tr><td style=\"text-align: right;\"><b>Repeat Delay:</b></td><td style=\"text-align: left;\"><input min=\"0\" max=\"10000\" step=\"100\" id=\"digiDelay\" name=\"digiDelay\" type=\"number\" value=\"" + String(config.digi_delay) + "\" /> mSec. <i>*0 is auto,Other random of delay time</i></td></tr>";
+
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>Time Stamp:</b></td>\n";
+		String timeStampFlag = "";
+		if (config.digi_timestamp)
+			timeStampFlag = "checked";
+		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"digiTimeStamp\" value=\"OK\" " + timeStampFlag + "><span class=\"slider round\"></span></label></td>\n";
+		html += "</tr>\n";
 
 		html += "<tr><td align=\"right\"><b>POSITION:</b></td>\n";
 		html += "<td align=\"center\">\n";
@@ -3593,6 +3635,7 @@ void handle_wx()
 	bool posGPS = false;
 	bool pos2RF = false;
 	bool pos2INET = false;
+	bool timeStamp = false;
 
 	if (server.hasArg("commitWX"))
 	{
@@ -3717,11 +3760,20 @@ void handle_wx()
 						pos2INET = true;
 				}
 			}
+			if (server.argName(i) == "wxTimeStamp")
+			{
+				if (server.arg(i) != "")
+				{
+					if (String(server.arg(i)) == "OK")
+						timeStamp = true;
+				}
+			}
 		}
 		config.wx_en = En;
 		config.wx_gps = posGPS;
 		config.wx_2rf = pos2RF;
 		config.wx_2inet = pos2INET;
+		config.wx_timestamp = timeStamp;
 
 		saveEEPROM();
 		initInterval=true;
@@ -3795,6 +3847,14 @@ void handle_wx()
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Text Comment:</b></td>\n";
 		html += "<td style=\"text-align: left;\"><input maxlength=\"50\" size=\"50\" name=\"Comment\" type=\"text\" value=\"" + String(config.wx_comment) + "\" /></td>\n";
+		html += "</tr>\n";
+
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>Time Stamp:</b></td>\n";
+		String timeStampFlag = "";
+		if (config.wx_timestamp)
+			timeStampFlag = "checked";
+		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"wxTimeStamp\" value=\"OK\" " + timeStampFlag + "><span class=\"slider round\"></span></label></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr><td align=\"right\"><b>POSITION:</b></td>\n";
