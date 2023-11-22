@@ -26,6 +26,8 @@ bool input_BPF = false;
 int8_t sql_pin;
 bool sql_active;
 
+uint8_t adc_atten;
+
 static const adc_unit_t unit = ADC_UNIT_1;
 
 void sample_isr();
@@ -36,6 +38,20 @@ static filter_t lpf;
 static filter_t hpf;
 
 Afsk *AFSK_modem;
+
+adc_atten_t cfg_adc_atten=ADC_ATTEN_DB_0;
+void afskSetADCAtten(uint8_t val){
+  adc_atten=val;
+  if(adc_atten==0){
+    cfg_adc_atten=ADC_ATTEN_DB_0;
+  }else if(adc_atten==1){
+    cfg_adc_atten=ADC_ATTEN_DB_2_5;
+  }else if(adc_atten==2){
+    cfg_adc_atten=ADC_ATTEN_DB_6;
+  }else if(adc_atten==3){
+    cfg_adc_atten=ADC_ATTEN_DB_11;
+  }
+}
 
 uint8_t CountOnesFromInteger(uint8_t value)
 {
@@ -167,7 +183,7 @@ void I2S_Init(i2s_mode_t MODE, i2s_bits_per_sample_t BPS)
     // sample time SAR setting
     SYSCON.saradc_ctrl.sar_clk_div = 2;
     SYSCON.saradc_fsm.sample_cycle = 2;
-    adc_set_i2s_data_pattern(ADC_UNIT_1, 0, ADC_CHANNEL_0, ADC_WIDTH_BIT_12, ADC_ATTEN_DB_0); // Input Vref 1.36V=4095,Offset 0.6324V=1744
+    adc_set_i2s_data_pattern(ADC_UNIT_1, 0, ADC_CHANNEL_0, ADC_WIDTH_BIT_12, cfg_adc_atten); // Input Vref 1.36V=4095,Offset 0.6324V=1744
     adc_set_i2s_data_len(ADC_UNIT_1, 1);
 
     i2s_set_pin(I2S_NUM_0, NULL);
@@ -218,6 +234,7 @@ void afskSetSQL(int8_t val, bool act)
   sql_active = act;
 }
 
+esp_adc_cal_characteristics_t adc_chars;
 void AFSK_hw_init(void)
 {
   // Set up ADC
@@ -229,6 +246,8 @@ void AFSK_hw_init(void)
   digitalWrite(LED_PIN, LOW);
 
   digitalWrite(PTT_PIN, LOW);
+
+  esp_adc_cal_characterize(ADC_UNIT_1, cfg_adc_atten, ADC_WIDTH_BIT_12, 1100, &adc_chars);
 
 #ifdef I2S_INTERNAL
   //  Initialize the I2S peripheral
@@ -777,7 +796,11 @@ int16_t abufPos = 0;
 extern void APRS_poll();
 uint8_t poll_timer = 0;
 // int adc_count = 0;
-int offset_new = 0, offset = 2303, offset_count = 0;
+int offset_new = 0, offset = 620, offset_count = 0;
+int dc_offset=620;
+void afskSetDCOffset(int val){
+  dc_offset=offset=val;
+}
 
 #ifndef I2S_INTERNAL
 // int x=0;
@@ -852,6 +875,29 @@ bool tx_en = false;
 extern int mVrms;
 extern float dBV;
 extern bool afskSync;
+
+// #define AN_Pot1     35
+// #define FILTER_LEN  15
+// uint32_t AN_Pot1_Buffer[FILTER_LEN] = {0};
+// int AN_Pot1_i = 0;
+// int AN_Pot1_Raw = 0;
+// int AN_Pot1_Filtered = 0;
+// uint32_t readADC_Avg(int ADC_Raw)
+// {
+//   int i = 0;
+//   uint32_t Sum = 0;
+  
+//   AN_Pot1_Buffer[AN_Pot1_i++] = ADC_Raw;
+//   if(AN_Pot1_i == FILTER_LEN)
+//   {
+//     AN_Pot1_i = 0;
+//   }
+//   for(i=0; i<FILTER_LEN; i++)
+//   {
+//     Sum += AN_Pot1_Buffer[i];
+//   }
+//   return (Sum/FILTER_LEN);
+// }
 
 long mVsum = 0;
 int mVsumCount = 0;
@@ -1008,7 +1054,8 @@ void AFSK_Poll(bool SA818, bool RFPower)
         // log_d("%i,%i,%i,%i", pcm_in[0], pcm_in[1], pcm_in[2], pcm_in[3]);
         for (int i = 0; i < (bytesRead / sizeof(uint16_t)); i += 2)
         {
-          adcVal = (int)pcm_in[i];
+          /* Converts Raw ADC Reading To Calibrated Value & Return the results in mV */         
+          adcVal = (int)esp_adc_cal_raw_to_voltage((int)pcm_in[i], &adc_chars); //Read ADC 
           offset_new += adcVal;
           offset_count++;
           if (offset_count >= ADC_SAMPLES_COUNT) // 192
@@ -1016,15 +1063,21 @@ void AFSK_Poll(bool SA818, bool RFPower)
             offset = offset_new / offset_count;
             offset_count = 0;
             offset_new = 0;
-            if (offset > 3300 || offset < 1300) // Over dc offset to default
-              offset = 2303;
+            if(adc_atten==0){
+              if(offset<100 || offset>950) offset=dc_offset;            
+            }else if(adc_atten==1){
+              if(offset<100 || offset>1250) offset=dc_offset;            
+            }else if(adc_atten==2){
+              if(offset<150 || offset>1750) offset=dc_offset;            
+            }else if(adc_atten==3){
+              if(offset<150 || offset>2450) offset=dc_offset;            
+            } 
           }
           adcVal -= offset; // Convert unsinewave to sinewave
 
           if (sync_flage == true)
           {
-            //mV = (int)((float)adcVal / 1.1862F); // ADC Raw to mV
-            mV = (int)((float)adcVal / 3.7533F); // ADC_RAW ADC_ATTEN_DB_0 to mV
+            mV = adcVal;
             mVsum += powl(mV, 2);                // VRMS = √(1/n)(V1^2 +V2^2 + … + Vn^2)
             mVsumCount++;
           }

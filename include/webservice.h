@@ -69,6 +69,7 @@ const timeZoneName tzList[40] PROGMEM= {
 	{+14.00, "(GMT +14:00) Line Islands, Tokelau"},
 };
 
+const char ADC_ATTEN[4][19] = {"0dB (100-950mV)", "2.5dB (100-1250mV)", "6dB (150-1750mV)", "11dB (150-2450mV)"};
 
 // ใช้ตัวแปรโกลบอลในไฟล์ main.cpp
 extern statusType status;

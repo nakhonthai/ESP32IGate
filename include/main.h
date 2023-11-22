@@ -18,7 +18,7 @@
 // #define DEBUG_IS
 #define WX
 
-//#define OLED
+#define OLED
 //  #define SDCARD
 //  #define BLUETOOTH
 
@@ -81,6 +81,7 @@
 #include <SPIFFS.h>
 #include "soc/rtc_wdt.h"
 #include <AX25.h>
+#include "weather.h"
 
 #include "HardwareSerial.h"
 #include "EEPROM.h"
@@ -207,6 +208,7 @@ typedef struct Config_Struct
 	char wx_object[10];
 	char wx_comment[50];
 	uint8_t wx_mode;
+	uint32_t wx_flage;
 
 	// OLED DISPLAY
 	bool oled_enable;
@@ -266,14 +268,19 @@ typedef struct Config_Struct
 	bool rf_pd_active = 1;
 	bool rf_pwr_active = 0;
 	bool rf_ptt_active = 0;
+	uint8_t adc_atten = 0;
+	uint16_t adc_dc_offset;	
 
-	int8_t i2c_sql_pin = -1;
+	bool i2c_enable;
+	int8_t i2c_sda_pin = -1;
 	int8_t i2c_sck_pin = -1;
-	bool i2c1_enable = false;
-	int8_t i2c1_sql_pin = -1;
+	uint32_t i2c_freq = 400000;
+	bool i2c1_enable;
+	int8_t i2c1_sda_pin = -1;
 	int8_t i2c1_sck_pin = -1;
+	uint32_t i2c1_freq = 100000;
 
-	bool ownwire_enable = false;
+	bool onewire_enable = false;
 	int8_t onewire_gpio = -1;
 
 	bool modbus_enable = false;
@@ -281,6 +288,14 @@ typedef struct Config_Struct
 	int8_t modbus_tx_gpio = -1;
 	int8_t modbus_rx_gpio = -1;
 	int8_t modbus_de_gpio = -1;
+
+	bool counter0_enable = false;
+	bool counter0_active = 0;
+	int8_t counter0_gpio = -1;
+
+	bool counter1_enable = false;
+	bool counter1_active = 0;
+	int8_t counter1_gpio = -1;
 
 } Configuration;
 
@@ -357,27 +372,6 @@ typedef struct txQueue_struct
 	int Delay;
 	char Info[300];
 } txQueueType;
-
-typedef struct Weather_Struct
-{
-	unsigned long int timeStamp;
-	unsigned int winddirection;
-	float windspeed;
-	float windgust;
-	float temperature;
-	float rain;
-	float rain24hr;
-	float humidity;
-	float barometric;
-	unsigned int solar;
-	float soitemp;
-	unsigned int soihum; // 0-100%
-	unsigned int water;	 // centiment
-	float vbat;
-	float vsolar;
-	float ibat;
-	float pbat;
-} WeatherData;
 
 typedef struct txDispStruct
 {
@@ -464,5 +458,7 @@ void systemDisp();
 void pkgCountDisp();
 void pkgLastDisp();
 void statisticsDisp();
+String getTimeStamp();
+void DD_DDDDDtoDDMMSS(float DD_DDDDD, int *DD, int *MM, int *SS);
 
 #endif

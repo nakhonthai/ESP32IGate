@@ -298,5 +298,7 @@ void AFSK_TimerEnable(bool sts);
 void afskSetHPF(bool val);
 void afskSetBPF(bool val);
 int read_adc_dma(uint32_t *ret_num, uint8_t *result);
+void afskSetDCOffset(int val);
+void afskSetADCAtten(uint8_t val);
 
 #endif

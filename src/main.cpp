@@ -23,6 +23,7 @@
 #include "igate.h"
 #include "wireguardif.h"
 #include "wireguard.h"
+#include "driver/pcnt.h"
 
 #include <TinyGPS++.h>
 #include <pbuf.h>
@@ -139,6 +140,9 @@ txQueueType *txQueue;
 // RTC_DATA_ATTR txQueueType txQueue[PKGTXSIZE];
 // #endif
 
+RTC_DATA_ATTR uint32_t COUNTER0_RAW;
+RTC_DATA_ATTR uint32_t COUNTER1_RAW;
+
 extern RTC_DATA_ATTR uint8_t digiCount;
 
 String RF_VERSION;
@@ -186,8 +190,6 @@ void Bluetooth()
 }
 #endif
 
-WeatherData weather;
-
 // Set your Static IP address for wifi AP
 IPAddress local_IP(192, 168, 4, 1);
 IPAddress gateway(192, 168, 4, 254);
@@ -196,6 +198,117 @@ IPAddress subnet(255, 255, 255, 0);
 IPAddress vpn_IP(192, 168, 44, 195);
 
 int pkgTNC_count = 0;
+
+xQueueHandle pcnt_evt_queue;   // A queue to handle pulse counter events
+pcnt_isr_handle_t user_isr_handle = NULL; //user's ISR service handle
+
+/* A sample structure to pass events from the PCNT
+ * interrupt handler to the main program.
+ */
+typedef struct {
+    int unit;  // the PCNT unit that originated an interrupt
+    uint32_t status; // information on the event type that caused the interrupt
+    unsigned long timeStamp; // The time the event occured
+} pcnt_evt_t;
+
+/* Decode what PCNT's unit originated an interrupt
+ * and pass this information together with the event type
+ * and timestamp to the main program using a queue.
+ */
+static void IRAM_ATTR pcnt_intr_handler(void *arg)
+{
+    unsigned long currentMillis = millis(); //Time at instant ISR was called
+    uint32_t intr_status = PCNT.int_st.val;
+    int i = 0;
+    pcnt_evt_t evt;
+    portBASE_TYPE HPTaskAwoken = pdFALSE;
+
+    
+    for (i = 0; i < PCNT_UNIT_MAX; i++) {
+        if (intr_status & (BIT(i))) {
+            evt.unit = i;
+            /* Save the PCNT event type that caused an interrupt
+               to pass it to the main program */
+            evt.status = PCNT.status_unit[i].val;
+            evt.timeStamp = currentMillis; 
+            PCNT.int_clr.val = BIT(i);
+            xQueueSendFromISR(pcnt_evt_queue, &evt, &HPTaskAwoken);
+            if (HPTaskAwoken == pdTRUE) {
+                portYIELD_FROM_ISR();
+            }
+        }
+    }
+}
+
+
+/* Initialize PCNT functions for one channel:
+ *  - configure and initialize PCNT with pos-edge counting 
+ *  - set up the input filter
+ *  - set up the counter events to watch
+ * Variables:
+ * UNIT - Pulse Counter #, INPUT_SIG - Signal Input Pin, INPUT_CTRL - Control Input Pin,
+ * Channel - Unit input channel, H_LIM - High Limit, L_LIM - Low Limit,
+ * THRESH1 - configurable limit 1, THRESH0 - configurable limit 2, 
+ */
+void pcnt_init_channel(pcnt_unit_t PCNT_UNIT,int PCNT_INPUT_SIG_IO ,bool ACTIVE = false, int PCNT_INPUT_CTRL_IO = PCNT_PIN_NOT_USED,pcnt_channel_t PCNT_CHANNEL = PCNT_CHANNEL_0, int PCNT_H_LIM_VAL = 65535, int PCNT_L_LIM_VAL = 0, int PCNT_THRESH1_VAL = 50, int PCNT_THRESH0_VAL = -50 ) {
+    /* Prepare configuration for the PCNT unit */
+    pcnt_config_t pcnt_config; 
+        // Set PCNT input signal and control GPIOs
+        pcnt_config.pulse_gpio_num = PCNT_INPUT_SIG_IO;
+        pcnt_config.ctrl_gpio_num = PCNT_INPUT_CTRL_IO;
+        pcnt_config.channel = PCNT_CHANNEL;
+        pcnt_config.unit = PCNT_UNIT;
+        // What to do on the positive / negative edge of pulse input?
+        if(ACTIVE){
+            pcnt_config.pos_mode = PCNT_COUNT_INC;   // Count up on the positive edge
+            pcnt_config.neg_mode = PCNT_COUNT_DIS;   // Keep the counter value on the negative edge
+        }else{
+            pcnt_config.neg_mode = PCNT_COUNT_INC;   // Count up on the positive edge
+            pcnt_config.pos_mode = PCNT_COUNT_DIS;   // Keep the counter value on the negative edge
+        }
+        // What to do when control input is low or high?
+        pcnt_config.lctrl_mode = PCNT_MODE_REVERSE; // Reverse counting direction if low
+        pcnt_config.hctrl_mode = PCNT_MODE_KEEP;    // Keep the primary counter mode if high
+        // Set the maximum and minimum limit values to watch
+        pcnt_config.counter_h_lim = PCNT_H_LIM_VAL;
+        pcnt_config.counter_l_lim = PCNT_L_LIM_VAL;
+    
+    /* Initialize PCNT unit */
+    pcnt_unit_config(&pcnt_config);
+    /* Configure and enable the input filter */
+    //pcnt_set_filter_value(PCNT_UNIT, 100);
+    //pcnt_filter_enable(PCNT_UNIT);
+
+    /* Set threshold 0 and 1 values and enable events to watch */
+    // pcnt_set_event_value(PCNT_UNIT, PCNT_EVT_THRES_1, PCNT_THRESH1_VAL);
+    // pcnt_event_enable(PCNT_UNIT, PCNT_EVT_THRES_1);
+    // pcnt_set_event_value(PCNT_UNIT, PCNT_EVT_THRES_0, PCNT_THRESH0_VAL);
+    // pcnt_event_enable(PCNT_UNIT, PCNT_EVT_THRES_0);
+    /* Enable events on zero, maximum and minimum limit values */
+    pcnt_event_enable(PCNT_UNIT, PCNT_EVT_ZERO);
+    pcnt_event_enable(PCNT_UNIT, PCNT_EVT_H_LIM);
+
+    /* Initialize PCNT's counter */
+    pcnt_counter_pause(PCNT_UNIT);
+    pcnt_counter_clear(PCNT_UNIT);
+    /* Register ISR handler and enable interrupts for PCNT unit */
+    //pcnt_isr_register(pcnt_intr_handler, NULL, 0, &user_isr_handle);
+    //pcnt_intr_enable(PCNT_UNIT);
+
+    /* Everything is set up, now go to counting */
+    pcnt_counter_resume(PCNT_UNIT);
+    //pcnt_counter_resume(PCNT_UNIT_1);
+}
+
+/* Count RPM Function - takes first timestamp and last timestamp,
+number of pulses, and pulses per revolution */
+int countRPM(int firstTime, int lastTime, int pulseTotal, int pulsePerRev) {
+  int timeDelta = (lastTime - firstTime); //lastTime - firstTime
+  if (timeDelta <= 0){ // This means we've gotten something wrong
+    return -1;
+  }
+  return ((60000 * (pulseTotal/pulsePerRev)) / timeDelta);
+}
 
 time_t setGpsTime()
 {
@@ -459,6 +572,9 @@ void defaultConfig()
     config.modbus_tx_gpio = 17;
     config.modbus_rx_gpio = 16;
 
+    config.onewire_enable = false;
+    config.onewire_gpio = -1;
+
     config.rf_baudrate = 9600;
     config.rf_tx_gpio = 13;
     config.rf_rx_gpio = 14;
@@ -470,6 +586,31 @@ void defaultConfig()
     config.rf_pd_active = 1;
     config.rf_pwr_active = 0;
     config.rf_ptt_active = 1;
+    config.adc_atten = 0;
+	config.adc_dc_offset = 625;
+
+    #ifdef OLED
+    config.i2c_enable = true;
+    config.i2c_sda_pin = 21;
+    config.i2c_sck_pin = 22;
+    #else
+    config.i2c_enable = false;
+    config.i2c_sda = -1;
+    config.i2c_scl = -1;
+    #endif
+    config.i2c_freq = 400000;
+    config.i2c1_enable = false;
+    config.i2c1_sda_pin = -1;
+    config.i2c1_sck_pin = -1;
+    config.i2c1_freq = 100000;
+
+    config.counter0_enable = false;
+	config.counter0_active = 0;
+	config.counter0_gpio = -1;
+
+    config.counter1_enable = false;
+	config.counter1_active = 0;
+	config.counter1_gpio = -1;
 
     saveEEPROM();
 }
@@ -1389,7 +1530,7 @@ void setup()
 
     pinMode(0, INPUT_PULLUP); // BOOT Button
     pinMode(LED_RX, OUTPUT);
-    pinMode(LED_TX, OUTPUT);
+    pinMode(LED_TX, OUTPUT);    
 
     // Set up serial port
 #ifdef CORE_DEBUG_LEVEL
@@ -1405,24 +1546,33 @@ void setup()
     Serial.println("Start ESP32IGate V" + String(VERSION));
     Serial.println("Push BOOT after 3 sec for Factory Default config.");
 
+    if (!EEPROM.begin(EEPROM_SIZE))
+    {
+        Serial.println(F("failed to initialise EEPROM")); // delay(100000);
+    }
+        // ตรวจสอบคอนฟิกซ์ผิดพลาด
+    ptr = (byte *)&config;
+    EEPROM.readBytes(1, ptr, sizeof(Configuration));
+    uint8_t chkSum = checkSum(ptr, sizeof(Configuration));
+    Serial.printf("EEPROM Check %0Xh=%0Xh(%dByte)\n", EEPROM.read(0), chkSum, sizeof(Configuration));
+    if (EEPROM.read(0) != chkSum)
+    {
+        Serial.println("CFG EEPROM Error!");
+        Serial.println("Factory Default");
+        defaultConfig();
+    }
+
+    if(config.i2c1_enable){
+        Wire1.begin(config.i2c1_sda_pin,config.i2c1_sck_pin,config.i2c1_freq);
+    }
+
 #ifdef OLED
-    Wire.begin();
-    Wire.setClock(400000L);
+    config.i2c_enable=true;
+    Wire.begin(config.i2c_sda_pin,config.i2c_sck_pin,config.i2c_freq);
 
     // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C, false); // initialize with the I2C addr 0x3C (for the 128x64)
     // Initialising the UI will init the display too.
-    // display.clearDisplay();
-    // display.setTextSize(1);
-    // display.setTextColor(WHITE);
-    // display.setCursor(30, 5);
-    // display.print("ESP32 IGATE");
-    // display.setCursor(1, 17);
-    // display.print("Firmware Version " + String(VERSION));
-    // display.drawLine(10, 30, 110, 30, WHITE);
-    // display.setCursor(1, 40);
-    // display.print("Push B Factory reset");
-    // display.display();
     display.clearDisplay();
     display.setTextSize(1);
     display.setTextColor(WHITE);
@@ -1444,14 +1594,7 @@ void setup()
     display.setCursor(65, 5);
     display.print("Copy@2022");
     display.display();
-#endif
 
-    if (!EEPROM.begin(EEPROM_SIZE))
-    {
-        Serial.println(F("failed to initialise EEPROM")); // delay(100000);
-    }
-
-#ifdef OLED
     delay(1000);
     digitalWrite(LED_TX, HIGH);
     display.fillRect(49, 49, 50, 8, 0);
@@ -1471,6 +1614,9 @@ void setup()
     display.display();
     delay(1000);
 #else
+    if(config.i2c_enable){
+        Wire1.begin(config.i2c_sda_pin,config.i2c_sck_pin,config.i2c_freq);
+    }
     delay(1000);
     digitalWrite(LED_TX, HIGH);
     delay(1000);
@@ -1500,16 +1646,11 @@ void setup()
     digitalWrite(LED_TX, LOW);
     digitalWrite(LED_RX, LOW);
 
-    // ตรวจสอบคอนฟิกซ์ผิดพลาด
-    ptr = (byte *)&config;
-    EEPROM.readBytes(1, ptr, sizeof(Configuration));
-    uint8_t chkSum = checkSum(ptr, sizeof(Configuration));
-    Serial.printf("EEPROM Check %0Xh=%0Xh(%dByte)\n", EEPROM.read(0), chkSum, sizeof(Configuration));
-    if (EEPROM.read(0) != chkSum)
-    {
-        Serial.println("CFG EEPROM Error!");
-        Serial.println("Factory Default");
-        defaultConfig();
+    if(config.counter0_enable){
+        pcnt_init_channel(PCNT_UNIT_0,config.counter0_gpio,config.counter0_active); // Initialize Unit 0 to pin 4        
+    }
+    if(config.counter1_enable){
+        pcnt_init_channel(PCNT_UNIT_1,config.counter1_gpio,config.counter1_active); // Initialize Unit 0 to pin 4        
     }
 
     RF_MODULE(true);
@@ -1756,187 +1897,6 @@ bool AFSKInitAct = false;
 int btn_count = 0;
 long timeCheck = 0;
 int timeHalfSec = 0;
-long int wxTimeout = 0;
-
-#ifdef WX
-
-int GetAPRSDataAvg(char *strData)
-{
-    unsigned int i;
-
-    int lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss;
-    char strtmp[300], obj[30];
-
-    memset(&obj[0], 0, sizeof(obj));
-
-    DD_DDDDDtoDDMMSS(config.wx_lat, &lat_dd, &lat_mm, &lat_ss);
-    DD_DDDDDtoDDMMSS(config.wx_lon, &lon_dd, &lon_mm, &lon_ss);
-    if (strlen(config.wx_object) >= 3)
-    {
-        char object[10];
-        memset(object, 0x20, 10);
-        memcpy(object, config.wx_object,strlen(config.wx_object));
-        object[9] = 0;
-        String timeStamp=getTimeStamp();
-        sprintf(obj, ";%s*%s", object,timeStamp);
-    }
-    else
-    {
-        if(config.wx_timestamp){
-            String timeStamp=getTimeStamp();
-            sprintf(obj,"/%s",timeStamp.c_str());
-        }else{
-            sprintf(obj, "!");
-            obj[1] = 0;
-        }
-    }
-    if (config.wx_ssid == 0){
-        if (config.wx_path[0] != 0)
-            sprintf(strtmp, "%s>APE32I,%s:", config.wx_mycall,config.wx_path);
-        else
-            sprintf(strtmp, "%s>APE32I:", config.wx_mycall);
-    }else{
-        if (config.wx_path[0] != 0)
-            sprintf(strtmp, "%s-%d>APE32I,%s:", config.wx_mycall, config.wx_ssid,config.wx_path);
-        else
-            sprintf(strtmp, "%s-%d>APE32I:", config.wx_mycall, config.wx_ssid);
-    }
-
-    strcat(strData, strtmp);
-    strcat(strData, obj);
-
-    sprintf(strtmp, "%02d%02d.%02dN/%03d%02d.%02dE_", lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss);
-    strcat(strData, strtmp);
-
-    sprintf(strtmp, "%03u/%03ug%03u", weather.winddirection, (unsigned int)(weather.windspeed * 0.621), (unsigned int)(weather.windgust * 0.621));
-    strcat(strData, strtmp);
-
-    unsigned int tempF = (unsigned int)((weather.temperature * 9 / 5) + 32);
-    sprintf(strtmp, "t%03u", tempF);
-    strcat(strData, strtmp);
-
-    unsigned int rain = (unsigned int)((weather.rain * 100.0F) / 25.6F);
-    unsigned int rain24 = (unsigned int)((weather.rain24hr * 100.0F) / 25.6F);
-    time_t now;
-    time(&now);
-    struct tm *info = gmtime(&now);
-    if (info->tm_min == 0)
-    {
-        rain = 0;
-        weather.rain = 0;
-    }
-    if (info->tm_hour == 0 && info->tm_min == 0)
-    {
-        rain24 = 0;
-        weather.rain24hr = 0;
-    }
-    sprintf(strtmp, "r%03up%03uP...", rain, rain24);
-    strcat(strData, strtmp);
-
-    if (weather.solar < 1000)
-        sprintf(strtmp, "L%03u", (unsigned int)weather.solar);
-    else
-        sprintf(strtmp, "l%03u", (unsigned int)weather.solar - 1000);
-    strcat(strData, strtmp);
-
-    sprintf(strtmp, "h%02u", (unsigned int)weather.humidity);
-    strcat(strData, strtmp);
-
-    sprintf(strtmp, "b%05u", (unsigned int)(weather.barometric * 10));
-    strcat(strData, strtmp);
-
-    // sprintf(strtmp,"m%03u",(int)((weather.soitemp*9/5)+32));
-    // strcat(strData,strtmp);
-
-    // sprintf(strtmp,"M%03u",(unsigned int)(weather.soihum/10));
-    // strcat(strData,strtmp);
-
-    // sprintf(strtmp,"W%04u",(unsigned int)(weather.water));
-    // strcat(strData,strtmp);
-
-    sprintf(strtmp, " BAT:%0.2fV/%dmA", weather.vbat, (int)(weather.ibat * 1000));
-    strcat(strData, strtmp);
-    // sprintf(strtmp,"/%0.1fmA",weather.ibat*1000);
-    // strcat(strData,strtmp);
-
-    i = strlen(strData);
-    return i;
-}
-
-bool weatherUpdate = false;
-void getWeather()
-{
-    String stream, weatherRaw;
-    int st = 0;
-    if (Serial.available() > 30)
-    {
-        stream = Serial.readString();
-        // Serial.println(stream);
-        delay(100);
-        st = stream.indexOf("DATA:");
-        // Serial.printf("Find ModBus > %d",st);
-        // Serial.println(stream);
-        if (st >= 0)
-        {
-            // String data = stream.substring(st+5);
-            weatherRaw = stream.substring(st + 5);
-            weatherUpdate = true;
-            // Serial.println("Weather DATA: " + weatherRaw);
-        }
-        else
-        {
-            st = stream.indexOf("CLK?");
-            if (st >= 0)
-            {
-                struct tm br_time;
-                getLocalTime(&br_time, 5000);
-                char strtmp[30];
-                Serial.printf(strtmp, "#CLK=%02d/%02d/%02d,%02d:%02d:%02d\r\n", br_time.tm_year - 2000, br_time.tm_mon, br_time.tm_mday, br_time.tm_hour, br_time.tm_min, br_time.tm_sec);
-            }
-        }
-
-        if (weatherUpdate)
-        {
-            // String value;
-            float rainSample = getValue(weatherRaw, ',', 2).toFloat();
-            weather.rain += rainSample;
-            weather.rain24hr += rainSample;
-            weather.windspeed = getValue(weatherRaw, ',', 3).toFloat();
-            weather.winddirection = getValue(weatherRaw, ',', 4).toInt();
-            weather.solar = getValue(weatherRaw, ',', 5).toInt();
-            weather.barometric = getValue(weatherRaw, ',', 6).toFloat() * 10.0F;
-            weather.temperature = getValue(weatherRaw, ',', 7).toFloat();
-            weather.humidity = getValue(weatherRaw, ',', 8).toFloat();
-            weather.windgust = getValue(weatherRaw, ',', 13).toFloat();
-            weather.vbat = getValue(weatherRaw, ',', 9).toFloat();
-            weather.vsolar = getValue(weatherRaw, ',', 10).toFloat();
-            weather.ibat = getValue(weatherRaw, ',', 11).toFloat();
-            weather.pbat = getValue(weatherRaw, ',', 12).toFloat();
-
-            weatherUpdate = false;
-            wxTimeout = millis();
-            char strData[300];
-            size_t lng = GetAPRSDataAvg(strData);
-
-            if (config.wx_2rf)
-            { // WX SEND POSITION TO RF
-                pkgTxPush(strData, lng, 0);
-            }
-            if (config.wx_2inet)
-            { // WX SEND TO APRS-IS
-                if (aprsClient.connected())
-                {
-                    status.txCount++;
-                    aprsClient.println(strData); // Send packet to Inet
-                }
-            }
-            // Serial.printf("APRS: %s\r\n",strData);
-        }
-        Serial.flush();
-    }
-    // ModbusSerial.flush();
-}
-#endif
 
 unsigned long timeSec;
 void loop()
@@ -1949,7 +1909,7 @@ void loop()
 
 #ifdef WX
     if (config.wx_en)
-        getWeather();
+        getCSV2Wx();
 #endif
 
     if (digitalRead(0) == LOW)
@@ -2210,6 +2170,8 @@ void taskAPRS(void *pvParameters)
     PacketBuffer.clean();
 
     afskSetSQL(config.rf_sql_gpio, config.rf_sql_active);
+    afskSetDCOffset(config.adc_dc_offset);
+    afskSetADCAtten(config.adc_atten);
     APRS_init();
     APRS_setCallsign(config.aprs_mycall, config.aprs_ssid);
     APRS_setPath1(config.igate_path, 1);
