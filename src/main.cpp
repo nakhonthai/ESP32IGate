@@ -41,7 +41,7 @@
 
 // #include <PPPoS.h>
 
-#define EEPROM_SIZE 2048
+#define EEPROM_SIZE 4096
 
 #ifdef BLUETOOTH
 #include "BluetoothSerial.h"
@@ -133,6 +133,7 @@ void pushTxDisp(uint8_t ch, const char *name, char *info)
 
 statusType status;
 RTC_DATA_ATTR igateTLMType igateTLM;
+RTC_DATA_ATTR dataTLMType systemTLM;
 txQueueType *txQueue;
 // #ifdef BOARD_HAS_PSRAM
 // txQueueType *txQueue;
@@ -199,15 +200,16 @@ IPAddress vpn_IP(192, 168, 44, 195);
 
 int pkgTNC_count = 0;
 
-xQueueHandle pcnt_evt_queue;   // A queue to handle pulse counter events
-pcnt_isr_handle_t user_isr_handle = NULL; //user's ISR service handle
+xQueueHandle pcnt_evt_queue;              // A queue to handle pulse counter events
+pcnt_isr_handle_t user_isr_handle = NULL; // user's ISR service handle
 
 /* A sample structure to pass events from the PCNT
  * interrupt handler to the main program.
  */
-typedef struct {
-    int unit;  // the PCNT unit that originated an interrupt
-    uint32_t status; // information on the event type that caused the interrupt
+typedef struct
+{
+    int unit;                // the PCNT unit that originated an interrupt
+    uint32_t status;         // information on the event type that caused the interrupt
     unsigned long timeStamp; // The time the event occured
 } pcnt_evt_t;
 
@@ -217,67 +219,72 @@ typedef struct {
  */
 static void IRAM_ATTR pcnt_intr_handler(void *arg)
 {
-    unsigned long currentMillis = millis(); //Time at instant ISR was called
+    unsigned long currentMillis = millis(); // Time at instant ISR was called
     uint32_t intr_status = PCNT.int_st.val;
     int i = 0;
     pcnt_evt_t evt;
     portBASE_TYPE HPTaskAwoken = pdFALSE;
 
-    
-    for (i = 0; i < PCNT_UNIT_MAX; i++) {
-        if (intr_status & (BIT(i))) {
+    for (i = 0; i < PCNT_UNIT_MAX; i++)
+    {
+        if (intr_status & (BIT(i)))
+        {
             evt.unit = i;
             /* Save the PCNT event type that caused an interrupt
                to pass it to the main program */
             evt.status = PCNT.status_unit[i].val;
-            evt.timeStamp = currentMillis; 
+            evt.timeStamp = currentMillis;
             PCNT.int_clr.val = BIT(i);
             xQueueSendFromISR(pcnt_evt_queue, &evt, &HPTaskAwoken);
-            if (HPTaskAwoken == pdTRUE) {
+            if (HPTaskAwoken == pdTRUE)
+            {
                 portYIELD_FROM_ISR();
             }
         }
     }
 }
 
-
 /* Initialize PCNT functions for one channel:
- *  - configure and initialize PCNT with pos-edge counting 
+ *  - configure and initialize PCNT with pos-edge counting
  *  - set up the input filter
  *  - set up the counter events to watch
  * Variables:
  * UNIT - Pulse Counter #, INPUT_SIG - Signal Input Pin, INPUT_CTRL - Control Input Pin,
  * Channel - Unit input channel, H_LIM - High Limit, L_LIM - Low Limit,
- * THRESH1 - configurable limit 1, THRESH0 - configurable limit 2, 
+ * THRESH1 - configurable limit 1, THRESH0 - configurable limit 2,
  */
-void pcnt_init_channel(pcnt_unit_t PCNT_UNIT,int PCNT_INPUT_SIG_IO ,bool ACTIVE = false, int PCNT_INPUT_CTRL_IO = PCNT_PIN_NOT_USED,pcnt_channel_t PCNT_CHANNEL = PCNT_CHANNEL_0, int PCNT_H_LIM_VAL = 65535, int PCNT_L_LIM_VAL = 0, int PCNT_THRESH1_VAL = 50, int PCNT_THRESH0_VAL = -50 ) {
+void pcnt_init_channel(pcnt_unit_t PCNT_UNIT, int PCNT_INPUT_SIG_IO, bool ACTIVE = false, int PCNT_INPUT_CTRL_IO = PCNT_PIN_NOT_USED, pcnt_channel_t PCNT_CHANNEL = PCNT_CHANNEL_0, int PCNT_H_LIM_VAL = 65535, int PCNT_L_LIM_VAL = 0, int PCNT_THRESH1_VAL = 50, int PCNT_THRESH0_VAL = -50)
+{
     /* Prepare configuration for the PCNT unit */
-    pcnt_config_t pcnt_config; 
-        // Set PCNT input signal and control GPIOs
-        pcnt_config.pulse_gpio_num = PCNT_INPUT_SIG_IO;
-        pcnt_config.ctrl_gpio_num = PCNT_INPUT_CTRL_IO;
-        pcnt_config.channel = PCNT_CHANNEL;
-        pcnt_config.unit = PCNT_UNIT;
-        // What to do on the positive / negative edge of pulse input?
-        if(ACTIVE){
-            pcnt_config.pos_mode = PCNT_COUNT_INC;   // Count up on the positive edge
-            pcnt_config.neg_mode = PCNT_COUNT_DIS;   // Keep the counter value on the negative edge
-        }else{
-            pcnt_config.neg_mode = PCNT_COUNT_INC;   // Count up on the positive edge
-            pcnt_config.pos_mode = PCNT_COUNT_DIS;   // Keep the counter value on the negative edge
-        }
-        // What to do when control input is low or high?
-        pcnt_config.lctrl_mode = PCNT_MODE_REVERSE; // Reverse counting direction if low
-        pcnt_config.hctrl_mode = PCNT_MODE_KEEP;    // Keep the primary counter mode if high
-        // Set the maximum and minimum limit values to watch
-        pcnt_config.counter_h_lim = PCNT_H_LIM_VAL;
-        pcnt_config.counter_l_lim = PCNT_L_LIM_VAL;
-    
+    pcnt_config_t pcnt_config;
+    // Set PCNT input signal and control GPIOs
+    pcnt_config.pulse_gpio_num = PCNT_INPUT_SIG_IO;
+    pcnt_config.ctrl_gpio_num = PCNT_INPUT_CTRL_IO;
+    pcnt_config.channel = PCNT_CHANNEL;
+    pcnt_config.unit = PCNT_UNIT;
+    // What to do on the positive / negative edge of pulse input?
+    if (ACTIVE)
+    {
+        pcnt_config.pos_mode = PCNT_COUNT_INC; // Count up on the positive edge
+        pcnt_config.neg_mode = PCNT_COUNT_DIS; // Keep the counter value on the negative edge
+    }
+    else
+    {
+        pcnt_config.neg_mode = PCNT_COUNT_INC; // Count up on the positive edge
+        pcnt_config.pos_mode = PCNT_COUNT_DIS; // Keep the counter value on the negative edge
+    }
+    // What to do when control input is low or high?
+    pcnt_config.lctrl_mode = PCNT_MODE_REVERSE; // Reverse counting direction if low
+    pcnt_config.hctrl_mode = PCNT_MODE_KEEP;    // Keep the primary counter mode if high
+    // Set the maximum and minimum limit values to watch
+    pcnt_config.counter_h_lim = PCNT_H_LIM_VAL;
+    pcnt_config.counter_l_lim = PCNT_L_LIM_VAL;
+
     /* Initialize PCNT unit */
     pcnt_unit_config(&pcnt_config);
     /* Configure and enable the input filter */
-    //pcnt_set_filter_value(PCNT_UNIT, 100);
-    //pcnt_filter_enable(PCNT_UNIT);
+    // pcnt_set_filter_value(PCNT_UNIT, 100);
+    // pcnt_filter_enable(PCNT_UNIT);
 
     /* Set threshold 0 and 1 values and enable events to watch */
     // pcnt_set_event_value(PCNT_UNIT, PCNT_EVT_THRES_1, PCNT_THRESH1_VAL);
@@ -292,22 +299,24 @@ void pcnt_init_channel(pcnt_unit_t PCNT_UNIT,int PCNT_INPUT_SIG_IO ,bool ACTIVE 
     pcnt_counter_pause(PCNT_UNIT);
     pcnt_counter_clear(PCNT_UNIT);
     /* Register ISR handler and enable interrupts for PCNT unit */
-    //pcnt_isr_register(pcnt_intr_handler, NULL, 0, &user_isr_handle);
-    //pcnt_intr_enable(PCNT_UNIT);
+    // pcnt_isr_register(pcnt_intr_handler, NULL, 0, &user_isr_handle);
+    // pcnt_intr_enable(PCNT_UNIT);
 
     /* Everything is set up, now go to counting */
     pcnt_counter_resume(PCNT_UNIT);
-    //pcnt_counter_resume(PCNT_UNIT_1);
+    // pcnt_counter_resume(PCNT_UNIT_1);
 }
 
 /* Count RPM Function - takes first timestamp and last timestamp,
 number of pulses, and pulses per revolution */
-int countRPM(int firstTime, int lastTime, int pulseTotal, int pulsePerRev) {
-  int timeDelta = (lastTime - firstTime); //lastTime - firstTime
-  if (timeDelta <= 0){ // This means we've gotten something wrong
-    return -1;
-  }
-  return ((60000 * (pulseTotal/pulsePerRev)) / timeDelta);
+int countRPM(int firstTime, int lastTime, int pulseTotal, int pulsePerRev)
+{
+    int timeDelta = (lastTime - firstTime); // lastTime - firstTime
+    if (timeDelta <= 0)
+    { // This means we've gotten something wrong
+        return -1;
+    }
+    return ((60000 * (pulseTotal / pulsePerRev)) / timeDelta);
 }
 
 time_t setGpsTime()
@@ -514,6 +523,60 @@ void defaultConfig()
     sprintf(config.wx_comment, "WX MODE");
     memset(config.wx_object, 0, sizeof(config.wx_object));
 
+    // Telemetry_0
+    config.tlm0_en = false;
+    config.tlm0_2rf = true;
+    config.tlm0_2inet = true;
+    config.tlm0_ssid = 0;
+    sprintf(config.tlm0_mycall, "NOCALL");
+    sprintf(config.tlm0_path, "WIDE1-1");
+    config.tlm0_data_interval = 600;
+    config.tlm0_info_interval = 1800;
+    sprintf(config.tlm0_PARM[0], "RF->INET");
+    sprintf(config.tlm0_PARM[1], "INET->RF");
+    sprintf(config.tlm0_PARM[2], "Repeater");
+    sprintf(config.tlm0_PARM[3], "AllCount");
+    sprintf(config.tlm0_PARM[4], "AllDrop");
+    sprintf(config.tlm0_PARM[5], "IGATE");
+    sprintf(config.tlm0_PARM[6], "DIGI");
+    sprintf(config.tlm0_PARM[7], "WX");
+    sprintf(config.tlm0_PARM[8], "SAT");
+    sprintf(config.tlm0_PARM[9], "INET");
+    sprintf(config.tlm0_PARM[10], "VPN");
+    sprintf(config.tlm0_PARM[11], "4G");
+    sprintf(config.tlm0_PARM[12], "MQTT");
+
+    for (int i = 0; i < 5; i++)
+    {
+        sprintf(config.tlm0_UNIT[i], "Pkts");
+        config.tlm0_EQNS[i][0] = 0; // a av2 + bv + c
+        config.tlm0_EQNS[i][1] = 1; // b
+        config.tlm0_EQNS[i][2] = 0; // c
+    }
+    sprintf(config.tlm0_UNIT[5], "En");
+    sprintf(config.tlm0_UNIT[6], "En");
+    sprintf(config.tlm0_UNIT[7], "En");
+    sprintf(config.tlm0_UNIT[8], "En");
+    sprintf(config.tlm0_UNIT[9], "ON");
+    sprintf(config.tlm0_UNIT[10], "ON");
+    sprintf(config.tlm0_UNIT[11], "ON");
+    sprintf(config.tlm0_UNIT[12], "ON");
+    config.tlm0_BITS_Active = 0x00;
+    config.tml0_data_channel[0]=2;
+    config.tml0_data_channel[1]=3;
+    config.tml0_data_channel[2]=4;
+    config.tml0_data_channel[3]=1;
+    config.tml0_data_channel[4]=5;
+    config.tml0_data_channel[5]=1;
+    config.tml0_data_channel[6]=2;
+    config.tml0_data_channel[7]=3;
+    config.tml0_data_channel[8]=4;
+    config.tml0_data_channel[9]=5;
+    config.tml0_data_channel[10]=6;
+    config.tml0_data_channel[11]=7;
+    config.tml0_data_channel[12]=8;
+    sprintf(config.tlm0_comment, "SYSTEM STATUS");
+
     //--Position
     config.wx_gps = false;
     config.wx_lat = 13.7555;
@@ -587,17 +650,17 @@ void defaultConfig()
     config.rf_pwr_active = 0;
     config.rf_ptt_active = 1;
     config.adc_atten = 0;
-	config.adc_dc_offset = 625;
+    config.adc_dc_offset = 625;
 
-    #ifdef OLED
+#ifdef OLED
     config.i2c_enable = true;
     config.i2c_sda_pin = 21;
     config.i2c_sck_pin = 22;
-    #else
+#else
     config.i2c_enable = false;
     config.i2c_sda = -1;
     config.i2c_scl = -1;
-    #endif
+#endif
     config.i2c_freq = 400000;
     config.i2c1_enable = false;
     config.i2c1_sda_pin = -1;
@@ -605,12 +668,12 @@ void defaultConfig()
     config.i2c1_freq = 100000;
 
     config.counter0_enable = false;
-	config.counter0_active = 0;
-	config.counter0_gpio = -1;
+    config.counter0_active = 0;
+    config.counter0_gpio = -1;
 
     config.counter1_enable = false;
-	config.counter1_active = 0;
-	config.counter1_gpio = -1;
+    config.counter1_active = 0;
+    config.counter1_gpio = -1;
 
     saveEEPROM();
 }
@@ -1530,7 +1593,7 @@ void setup()
 
     pinMode(0, INPUT_PULLUP); // BOOT Button
     pinMode(LED_RX, OUTPUT);
-    pinMode(LED_TX, OUTPUT);    
+    pinMode(LED_TX, OUTPUT);
 
     // Set up serial port
 #ifdef CORE_DEBUG_LEVEL
@@ -1550,7 +1613,7 @@ void setup()
     {
         Serial.println(F("failed to initialise EEPROM")); // delay(100000);
     }
-        // ตรวจสอบคอนฟิกซ์ผิดพลาด
+    // ตรวจสอบคอนฟิกซ์ผิดพลาด
     ptr = (byte *)&config;
     EEPROM.readBytes(1, ptr, sizeof(Configuration));
     uint8_t chkSum = checkSum(ptr, sizeof(Configuration));
@@ -1562,13 +1625,14 @@ void setup()
         defaultConfig();
     }
 
-    if(config.i2c1_enable){
-        Wire1.begin(config.i2c1_sda_pin,config.i2c1_sck_pin,config.i2c1_freq);
+    if (config.i2c1_enable)
+    {
+        Wire1.begin(config.i2c1_sda_pin, config.i2c1_sck_pin, config.i2c1_freq);
     }
 
 #ifdef OLED
-    config.i2c_enable=true;
-    Wire.begin(config.i2c_sda_pin,config.i2c_sck_pin,config.i2c_freq);
+    config.i2c_enable = true;
+    Wire.begin(config.i2c_sda_pin, config.i2c_sck_pin, config.i2c_freq);
 
     // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C, false); // initialize with the I2C addr 0x3C (for the 128x64)
@@ -1614,8 +1678,9 @@ void setup()
     display.display();
     delay(1000);
 #else
-    if(config.i2c_enable){
-        Wire1.begin(config.i2c_sda_pin,config.i2c_sck_pin,config.i2c_freq);
+    if (config.i2c_enable)
+    {
+        Wire1.begin(config.i2c_sda_pin, config.i2c_sck_pin, config.i2c_freq);
     }
     delay(1000);
     digitalWrite(LED_TX, HIGH);
@@ -1646,11 +1711,13 @@ void setup()
     digitalWrite(LED_TX, LOW);
     digitalWrite(LED_RX, LOW);
 
-    if(config.counter0_enable){
-        pcnt_init_channel(PCNT_UNIT_0,config.counter0_gpio,config.counter0_active); // Initialize Unit 0 to pin 4        
+    if (config.counter0_enable)
+    {
+        pcnt_init_channel(PCNT_UNIT_0, config.counter0_gpio, config.counter0_active); // Initialize Unit 0 to pin 4
     }
-    if(config.counter1_enable){
-        pcnt_init_channel(PCNT_UNIT_1,config.counter1_gpio,config.counter1_active); // Initialize Unit 0 to pin 4        
+    if (config.counter1_enable)
+    {
+        pcnt_init_channel(PCNT_UNIT_1, config.counter1_gpio, config.counter1_active); // Initialize Unit 0 to pin 4
     }
 
     RF_MODULE(true);
@@ -1794,9 +1861,9 @@ String igate_position(double lat, double lon, double alt, String comment)
         }
     }
     if (config.aprs_ssid == 0)
-        sprintf(strtmp, "%s>APTWR", config.aprs_mycall);
+        sprintf(strtmp, "%s>APE32I", config.aprs_mycall);
     else
-        sprintf(strtmp, "%s-%d>APTWR", config.aprs_mycall, config.aprs_ssid);
+        sprintf(strtmp, "%s-%d>APE32I", config.aprs_mycall, config.aprs_ssid);
     tnc2Raw = String(strtmp);
     if (config.igate_path[0] != 0)
     {
@@ -1841,9 +1908,9 @@ String digi_position(double lat, double lon, double alt, String comment)
         sprintf(loc, "!%02d%02d.%02d%c%c%03d%02d.%02d%c%c", lat_dd, lat_mm, lat_ss, lat_ns, config.digi_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.digi_symbol[1]);
     }
     if (config.digi_ssid == 0)
-        sprintf(strtmp, "%s>APTWR", config.digi_mycall);
+        sprintf(strtmp, "%s>APE32I", config.digi_mycall);
     else
-        sprintf(strtmp, "%s-%d>APTWR", config.digi_mycall, config.digi_ssid);
+        sprintf(strtmp, "%s-%d>APE32I", config.digi_mycall, config.digi_ssid);
     tnc2Raw = String(strtmp);
     if (config.digi_path[0] != 0)
     {
@@ -2098,6 +2165,144 @@ void sendIsPkgMsg(char *raw)
     // APRS_sendTNC2Pkt(tnc2Raw); // Send packet to RF
 }
 
+void sendTelemetry_0(char *raw,bool header)
+{
+    char str[300];
+    char call[11];
+    int i;
+    memset(&call[0], 0, 11);
+    if (config.tlm0_ssid == 0)
+        sprintf(call, "%s", config.tlm0_mycall);
+    else
+        sprintf(call, "%s-%d", config.tlm0_mycall, config.tlm0_ssid);
+    i = strlen(call);
+    for (; i < 9; i++)
+        call[i] = 0x20;
+
+    if(header){
+        if (config.tlm0_ssid == 0)
+            sprintf(str, "%s>APE32I::%s:%s", config.tlm0_mycall, call, raw);
+        else
+            sprintf(str, "%s-%d>APE32I::%s:%s", config.tlm0_mycall, config.tlm0_ssid, call, raw);
+    }else{
+        if (config.tlm0_ssid == 0)
+            sprintf(str, "%s>APE32I:%s", config.tlm0_mycall, raw);
+        else
+            sprintf(str, "%s-%d>APE32I:%s", config.tlm0_mycall, config.tlm0_ssid, raw);
+    }
+
+    if (config.tlm0_2rf)
+    { // TLM SEND TO RF
+        // char *rawP = (char *)malloc(rawData.length());
+        //  rawData.toCharArray(rawP, rawData.length());
+        // memcpy(rawP, rawData.c_str(), rawData.length());
+        pkgTxPush(str, strlen(str), 0);
+        // pushTxDisp(TXCH_RF, "TX DIGI POS", sts);
+        // free(rawP);
+    }
+    if (config.tlm0_2inet)
+    { // TLM SEND TO APRS-IS
+        if (aprsClient.connected())
+        {
+            status.txCount++;
+            aprsClient.printf("%s\r\n", str); // Send packet to Inet
+            // pushTxDisp(TXCH_TCP, "TX DIGI POS", sts);
+        }
+    }
+}
+
+RTC_IRAM_ATTR statusType statOld;
+uint8_t getSensor(int ch)
+{
+    int val=0;
+    switch(ch){
+        case 0: //Internal Temp
+            val=0;
+        break;
+        case 1: //allCount
+            val=status.allCount-statOld.allCount;
+            statOld.allCount=status.allCount;
+        break;
+        case 2: //rf2inet
+            val=status.rf2inet-statOld.rf2inet;
+            statOld.rf2inet=status.rf2inet;
+        break;
+        case 3: //inet2rf
+            val=status.inet2rf-statOld.inet2rf;
+            statOld.inet2rf=status.inet2rf;
+        break;
+        case 4: //digi
+            val=status.digiCount-statOld.digiCount;
+            statOld.digiCount=status.digiCount;
+        break;
+        case 5: //Drop
+            val=status.dropCount-statOld.dropCount;
+            statOld.dropCount=status.dropCount;
+        break;
+    }
+    if(val<0) val=0;
+    return val;
+}
+
+bool getBits(int ch)
+{
+    bool val=false;
+    switch(ch){
+        case 0: //Internal Temp
+            val=0;
+        break;
+        case 1: //IGATE Enable
+            val=config.igate_en;
+        break;
+        case 2: //DIGI Enable
+            val=config.digi_en;
+        break;
+        case 3: //WX Enable
+            val=config.wx_en;
+        break;
+        case 4: //Sat Enable
+            val=0;
+        break;
+        case 5: //APRS-IS Status
+            if(aprsClient.connected()) val=1;
+        break;
+        case 6: //VPN Status
+            val=wireguard_active();
+        break;
+        case 7: //4G LTE
+            val=0;
+        break;
+        case 8: //MQTT
+            val=0;
+        break;
+    }
+    return val;
+}
+
+void getTelemetry_0()
+{
+    //A1
+    // systemTLM.A1=getSensor(2);
+    // systemTLM.A2=getSensor(3);
+    // systemTLM.A3=getSensor(4);
+    // systemTLM.A4=getSensor(1);
+    // systemTLM.A5=getSensor(5);
+    systemTLM.A1=getSensor(config.tml0_data_channel[0]);
+    systemTLM.A2=getSensor(config.tml0_data_channel[1]);
+    systemTLM.A3=getSensor(config.tml0_data_channel[2]);
+    systemTLM.A4=getSensor(config.tml0_data_channel[3]);
+    systemTLM.A5=getSensor(config.tml0_data_channel[4]);
+    systemTLM.BITS=0;
+    if(getBits(config.tml0_data_channel[5])) systemTLM.BITS|=0x01;
+    if(getBits(config.tml0_data_channel[6])) systemTLM.BITS|=0x02;
+    if(getBits(config.tml0_data_channel[7])) systemTLM.BITS|=0x04;
+    if(getBits(config.tml0_data_channel[8])) systemTLM.BITS|=0x08;
+    if(getBits(config.tml0_data_channel[9])) systemTLM.BITS|=0x10;
+    if(getBits(config.tml0_data_channel[10])) systemTLM.BITS|=0x20;
+    if(getBits(config.tml0_data_channel[11])) systemTLM.BITS|=0x40;
+    if(getBits(config.tml0_data_channel[12])) systemTLM.BITS|=0x80;
+}
+
 char EVENT_TX_POSITION = 0;
 unsigned char SB_SPEED = 0, SB_SPEED_OLD = 0;
 int16_t SB_HEADING = 0;
@@ -2195,7 +2400,9 @@ void taskAPRS(void *pvParameters)
         time(&timeStamp);
         if (initInterval)
         {
-            DiGiInterval = iGatetickInterval = millis() + 15000;
+            DiGiInterval = iGatetickInterval = millis() + 10000;
+            systemTLM.ParmTimeout = millis() + 20000;
+            systemTLM.TeleTimeout = millis() + 30000;
             initInterval = false;
         }
         vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -2511,39 +2718,112 @@ void taskAPRS(void *pvParameters)
             }
         }
 
-        // if (config.tnc_telemetry)
-        // {
-        //     if (igateTLM.TeleTimeout < millis())
-        //     {
-        //         igateTLM.TeleTimeout = millis() + 600000; // 10Min
-        //         if ((igateTLM.Sequence % 6) == 0)
-        //         {
-        //             sendIsPkgMsg((char *)&PARM[0]);
-        //             sendIsPkgMsg((char *)&UNIT[0]);
-        //             sendIsPkgMsg((char *)&EQNS[0]);
-        //         }
-        //         char rawTlm[100];
-        //         if (config.aprs_ssid == 0)
-        //             sprintf(rawTlm, "%s>APE32I:T#%03d,%d,%d,%d,%d,%d,00000000", config.aprs_mycall, igateTLM.Sequence, igateTLM.RF2INET, igateTLM.INET2RF, igateTLM.RX, igateTLM.TX, igateTLM.DROP);
-        //         else
-        //             sprintf(rawTlm, "%s-%d>APE32I:T#%03d,%d,%d,%d,%d,%d,00000000", config.aprs_mycall, config.aprs_ssid, igateTLM.Sequence, igateTLM.RF2INET, igateTLM.INET2RF, igateTLM.RX, igateTLM.TX, igateTLM.DROP);
+        if (config.tlm0_en)
+        {
+            if (systemTLM.ParmTimeout < millis())
+            {
+                systemTLM.ParmTimeout = millis() + (config.tlm0_info_interval * 1000);
+                char rawInfo[100];
+                char name[10];
+                sprintf(rawInfo,"PARM.");
+                for(int i=0;i<13;i++){
+                    if(i>0) strcat(rawInfo,",");
+                    sprintf(name,"%s",config.tlm0_PARM[i]);
+                    strcat(rawInfo,name);
+                }
+                sendTelemetry_0(rawInfo,true);
+                memset(rawInfo,0,sizeof(rawInfo));
+                sprintf(rawInfo,"UNIT.");
+                for(int i=0;i<13;i++){
+                    if(i>0) strcat(rawInfo,",");
+                    sprintf(name,"%s",config.tlm0_UNIT[i]);
+                    strcat(rawInfo,name);
+                }
+                sendTelemetry_0(rawInfo,true);
+                memset(rawInfo,0,sizeof(rawInfo));
+                sprintf(rawInfo,"EQNS.");
+                for(int i=0;i<5;i++){
+                    if(i>0) strcat(rawInfo,",");
+                    if(fmod(config.tlm0_EQNS[i][0],1)==0)
+                        sprintf(name,"%0.f",config.tlm0_EQNS[i][0]);
+                    else
+                        sprintf(name,"%.3f",config.tlm0_EQNS[i][0]);
+                    strcat(rawInfo,name);
+                    if(fmod(config.tlm0_EQNS[i][1],1)==0)
+                        sprintf(name,",%0.f",config.tlm0_EQNS[i][1]);
+                    else
+                        sprintf(name,",%.3f",config.tlm0_EQNS[i][1]);
+                    strcat(rawInfo,name);
+                    if(fmod(config.tlm0_EQNS[i][2],1)==0)
+                        sprintf(name,",%0.f",config.tlm0_EQNS[i][2]);
+                    else
+                        sprintf(name,",%.3f",config.tlm0_EQNS[i][2]);
+                    strcat(rawInfo,name);
+                }
+                sendTelemetry_0(rawInfo,true);
+                memset(rawInfo,0,sizeof(rawInfo));
+                sprintf(rawInfo,"BITS.");
+                uint8_t b=1;
+                for(int i=0;i<8;i++){
+                    if(config.tlm0_BITS_Active&b){
+                        strcat(rawInfo,"1");
+                    }else{
+                        strcat(rawInfo,"0");
+                    }
+                    b<<=1;
+                }                
+                sendTelemetry_0(rawInfo,true);
+            }
 
-        //         if (aprsClient.connected())
-        //             aprsClient.println(String(rawTlm)); // Send packet to Inet
-        //         if (config.tnc && config.tnc_digi)
-        //             pkgTxUpdate(rawTlm, 0);
-        //         // APRS_sendTNC2Pkt(String(rawTlm)); // Send packet to RF
-        //         igateTLM.Sequence++;
-        //         if (igateTLM.Sequence > 999)
-        //             igateTLM.Sequence = 0;
-        //         igateTLM.DROP = 0;
-        //         igateTLM.INET2RF = 0;
-        //         igateTLM.RF2INET = 0;
-        //         igateTLM.RX = 0;
-        //         igateTLM.TX = 0;
-        //         // client.println(raw);
-        //     }
-        // }
+            if (systemTLM.TeleTimeout < millis())
+            {
+                systemTLM.TeleTimeout = millis() + (config.tlm0_data_interval * 1000);
+                char rawTlm[100];
+                if(systemTLM.Sequence>999)
+                    systemTLM.Sequence=0;
+                else
+                    systemTLM.Sequence++;
+                getTelemetry_0();
+                sprintf(rawTlm, "T#%03d,%03d,%03d,%03d,%03d,%03d,", systemTLM.Sequence, systemTLM.A1, systemTLM.A2, systemTLM.A3, systemTLM.A4, systemTLM.A5);
+                uint8_t b=1;
+                for(int i=0;i<8;i++){
+                    if(systemTLM.BITS&b){
+                        strcat(rawTlm,"1");
+                    }else{
+                        strcat(rawTlm,"0");
+                    }
+                    b<<=1;
+                }
+                strcat(rawTlm,config.tlm0_comment);
+                sendTelemetry_0(rawTlm,false);
+                // if ((igateTLM.Sequence % 6) == 0)
+                // {
+                //     sendIsPkgMsg((char *)&PARM[0]);
+                //     sendIsPkgMsg((char *)&UNIT[0]);
+                //     sendIsPkgMsg((char *)&EQNS[0]);
+                // }
+                // char rawTlm[100];
+                // if (config.aprs_ssid == 0)
+                //     sprintf(rawTlm, "%s>APE32I:T#%03d,%d,%d,%d,%d,%d,00000000", config.aprs_mycall, igateTLM.Sequence, igateTLM.RF2INET, igateTLM.INET2RF, igateTLM.RX, igateTLM.TX, igateTLM.DROP);
+                // else
+                //     sprintf(rawTlm, "%s-%d>APE32I:T#%03d,%d,%d,%d,%d,%d,00000000", config.aprs_mycall, config.aprs_ssid, igateTLM.Sequence, igateTLM.RF2INET, igateTLM.INET2RF, igateTLM.RX, igateTLM.TX, igateTLM.DROP);
+
+                // if (aprsClient.connected())
+                //     aprsClient.println(String(rawTlm)); // Send packet to Inet
+                // if (config.tnc && config.tnc_digi)
+                //     pkgTxUpdate(rawTlm, 0);
+                // // APRS_sendTNC2Pkt(String(rawTlm)); // Send packet to RF
+                // igateTLM.Sequence++;
+                // if (igateTLM.Sequence > 999)
+                //     igateTLM.Sequence = 0;
+                // igateTLM.DROP = 0;
+                // igateTLM.INET2RF = 0;
+                // igateTLM.RF2INET = 0;
+                // igateTLM.RX = 0;
+                // igateTLM.TX = 0;
+                // client.println(raw);
+            }
+        }
     }
 }
 

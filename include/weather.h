@@ -31,9 +31,10 @@
 #define WX_WATER_TEMP (1 << 13)    // w Water (Fahenheit)
 #define WX_WATER_TDS (1 << 14)     // W Water TDS(Total Dissolved Solids) 0-1000ppm
 #define WX_WATER_LEVEL (1 << 15)   // v Water Level (in hundredths of an inch)
-#define WX_PM25 (1 << 16)          // o Ordure PM 2.5
-#define WX_PM100 (1 << 17)         // O Ordure PM 10
+#define WX_PM25 (1 << 16)          // o Ordure PM 2.5 0~1000μg/m³
+#define WX_PM100 (1 << 17)         // O Ordure PM 10 ,0~1000μg/m³
 #define WX_CO2 (1 << 18)           // X,x Co2 (PPM) x=0-9999,X=010000-999999
+#define WX_CH2O (1<<19)             //F,f Formaldehyde(CH2O) F=0-9999,f,1000-2000 μg/m³
 
 typedef struct Weather_Struct
 {
@@ -54,9 +55,10 @@ typedef struct Weather_Struct
     float water_temp;       // Water Temperature (Celsius)
     uint16_t water_tds;     // Water TDS(Total Dissolved Solids) 0-1000ppm
     uint16_t water_level;   // Water Level (in mm.)
-    uint16_t pm25;          // Ordure PM 2.5 (ppm)
-    uint16_t pm100;         // Ordure PM 10 (ppm)
+    uint16_t pm25;          // Ordure PM 2.5 (0~1000μg/m³)
+    uint16_t pm100;         // Ordure PM 10 (0~1000μg/m³)
     uint32_t co2;           // Co2 (ppm)
+    uint16_t ch2o;           // F,f Formaldehyde(CH2O) F=0-9999,f,1000-2000 μg/m³
     float vbat;             // Battery Voltage (V)
     float vsolar;           // Solar cell Voltage (V)
     float ibat;             // Battery Current (A)

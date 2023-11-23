@@ -210,6 +210,22 @@ typedef struct Config_Struct
 	uint8_t wx_mode;
 	uint32_t wx_flage;
 
+	// Telemetry
+	bool tlm0_en;
+	bool tlm0_2rf;
+	bool tlm0_2inet;
+	uint8_t tlm0_ssid;
+	char tlm0_mycall[10];
+	char tlm0_path[72];
+	uint16_t tlm0_data_interval;
+	uint16_t tlm0_info_interval;
+	char tlm0_PARM[13][10];
+	char tlm0_UNIT[13][8];
+	float tlm0_EQNS[5][3];
+	uint8_t tlm0_BITS_Active;	
+	char tlm0_comment[50];
+	uint8_t tml0_data_channel[13];
+
 	// OLED DISPLAY
 	bool oled_enable;
 	int oled_timeout;
@@ -350,6 +366,19 @@ typedef struct digiTLM_struct
 	unsigned char DropRx;
 	unsigned char ErPkts;
 } digiTLMType;
+
+typedef struct dataTLM_struct
+{
+	unsigned int Sequence;
+	unsigned long ParmTimeout;
+	unsigned long TeleTimeout;
+	uint8_t A1;
+	uint8_t A2;
+	uint8_t A3;
+	uint8_t A4;
+	uint8_t A5;
+	uint8_t BITS;
+} dataTLMType;
 
 typedef struct Telemetry_struct
 {
