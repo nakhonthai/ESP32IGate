@@ -27,6 +27,10 @@ ESP32IGate is a Internet Gateway(IGate)/Dital Repeater(DiGi) with TNC Built in t
 ![esp32dr_simple](image/ESP32DR_Simple_Test.png) ![esp32dr_sa868](image/ESP32DR_SA868_2.png)
 ![esp32dr_sa868_pcb](doc/ESP32DR_SA868/ESP32DR_SA868_Block.png)
 
+## Web service screen short
+![screen_dashboard](image/ESP32IGate_Screen_dashboard.png) ![screen_igate](image/ESP32IGate_Screen_igate.png) \
+![screen_radio](image/ESP32IGate_Screen_radio.png) ![screen_mod](image/ESP32IGate_Screen_mod.png)
+
 ## ESP32DR_SA868
 
 Schematic [here](doc/ESP32DR_SA868/ESP32DR_SA868_sch.pdf) \
