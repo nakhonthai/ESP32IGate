@@ -71,6 +71,14 @@ const timeZoneName tzList[40] PROGMEM= {
 
 const char ADC_ATTEN[4][19] = {"0dB (100-950mV)", "2.5dB (100-1250mV)", "6dB (150-1750mV)", "11dB (150-2450mV)"};
 
+#define SYSTEM_LEN 6
+#define SYSTEM_BIT_LEN 9
+#define PATH_LEN 17
+const char SYSTEM_NAME[SYSTEM_LEN][20] = {"NONE", "All Count", "RF2INET", "INET2RF","DIGI","All Drop"};
+const char SYSTEM_BITS_NAME[9][20] = {"NONE", "IGATE Mode", "DIGI Mode", "WEATHER Mode","SAT Status","INET Status","VPN Status","GSM Status","MQTT Status"};
+const char PATH_NAME[PATH_LEN][15] = {"OFF", "DST-TRACTE 1", "DST-TRACTE 2", "DST-TRACTE 3", "DST-TRACTE 4", "TRACE1-1", "TRACE2-2", "TRACE3-3", "WIDE1-1","RFONLY","RELAY","GATE","ECHO","UserDefine 1","UserDefine 2","UserDefine 3","UserDefine 4"};
+
+
 // ใช้ตัวแปรโกลบอลในไฟล์ main.cpp
 extern statusType status;
 extern digiTLMType digiTLM;

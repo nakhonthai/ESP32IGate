@@ -121,15 +121,29 @@ int getRawWx(char *strData)
         }
     }
     if (config.wx_ssid == 0){
-        if (config.wx_path[0] != 0)
-            sprintf(strtmp, "%s>APE32I,%s:", config.wx_mycall,config.wx_path);
+        if (config.wx_path < 5)
+        {
+            if (config.wx_path > 0)
+                sprintf(strtmp, "%s>APE32I-%d:", config.wx_mycall,config.wx_path);
+            else
+                sprintf(strtmp, "%s>APE32I:", config.wx_mycall);
+        }
         else
-            sprintf(strtmp, "%s>APE32I:", config.wx_mycall);
+        {
+            sprintf(strtmp, "%s>APE32I,%s:", config.wx_mycall,getPath(config.igate_path).c_str());
+        }
     }else{
-        if (config.wx_path[0] != 0)
-            sprintf(strtmp, "%s-%d>APE32I,%s:", config.wx_mycall, config.wx_ssid,config.wx_path);
+        if (config.wx_path < 5)
+        {
+            if (config.wx_path > 0)
+                sprintf(strtmp, "%s-%d>APE32I-%d:", config.wx_mycall, config.wx_ssid,config.wx_path);
+            else
+                sprintf(strtmp, "%s-%d>APE32I:", config.wx_mycall, config.wx_ssid);
+        }
         else
-            sprintf(strtmp, "%s-%d>APE32I:", config.wx_mycall, config.wx_ssid);
+        {
+            sprintf(strtmp, "%s-%d>APE32I,%s:", config.wx_mycall, config.wx_ssid,getPath(config.igate_path).c_str());
+        }
     }
 
     strcat(strData, strtmp);

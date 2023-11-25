@@ -152,16 +152,16 @@ void setMainPage()
 
 void handle_css()
 {
-	const char* css = ".container{width:800px;text-align:left;margin:auto;border-radius:10px 10px 10px 10px;-moz-border-radius:10px 10px 10px 10px;-webkit-border-radius:10px 10px 10px 10px;-khtml-border-radius:10px 10px 10px 10px;-ms-border-radius:10px 10px 10px 10px;box-shadow:3px 3px 3px #707070;background:#fff;border-color: #2194ec;padding: 0px;border-width: 5px;border-style:solid;}body,font{font:12px verdana,arial,sans-serif;color:#fff}.header{background:#2194ec;text-decoration:none;color:#fff;font-family:verdana,arial,sans-serif;text-align:left;padding:5px 0;border-radius:10px 10px 0 0;-moz-border-radius:10px 10px 0 0;-webkit-border-radius:10px 10px 0 0;-khtml-border-radius:10px 10px 0 0;-ms-border-radius:10px 10px 0 0}.content{margin:0 0 0 166px;padding:1px 5px 5px;color:#000;background:#fff;text-align:center;font-size: 8pt;}.contentwide{padding:50px 5px 5px;color:#000;background:#fff;text-align:center}.contentwide h2{color:#000;font:1em verdana,arial,sans-serif;text-align:center;font-weight:700;padding:0;margin:0;font-size: 12pt;}.footer{background:#2194ec;text-decoration:none;color:#fff;font-family:verdana,arial,sans-serif;font-size:9px;text-align:center;padding:10px 0;border-radius:0 0 10px 10px;-moz-border-radius:0 0 10px 10px;-webkit-border-radius:0 0 10px 10px;-khtml-border-radius:0 0 10px 10px;-ms-border-radius:0 0 10px 10px;clear:both}#tail{height:450px;width:805px;overflow-y:scroll;overflow-x:scroll;color:#0f0;background:#000}table{vertical-align:middle;text-align:center;empty-cells:show;padding-left:3;padding-right:3;padding-top:3;padding-bottom:3;border-collapse:collapse;border-color:#0f07f2;border-style:solid;border-spacing:0px;border-width:3px;text-decoration:none;color:#fff;background:#000;font-family:verdana,arial,sans-serif;font-size : 12px;width:100%;white-space:nowrap}table th{font-size: 10pt;font-family:lucidia console,Monaco,monospace;text-shadow:1px 1px #0e038c;text-decoration:none;background:#0525f7;border:1px solid silver}table tr:nth-child(even){background:#f7f7f7}table tr:nth-child(odd){background:#eeeeee}table td{color:#000;font-family:lucidia console,Monaco,monospace;text-decoration:none;border:1px solid #010369}body{background:#edf0f5;color:#000}a{text-decoration:none}a:link,a:visited{text-decoration:none;color:#0000e0;font-weight:400}th:last-child a.tooltip:hover span{left:auto;right:0}ul{padding:5px;margin:10px 0;list-style:none;float:left}ul li{float:left;display:inline;margin:0 10px}ul li a{text-decoration:none;float:left;color:#999;cursor:pointer;font:900 14px/22px arial,Helvetica,sans-serif}ul li a span{margin:0 10px 0 -10px;padding:1px 8px 5px 18px;position:relative;float:left}h1{text-shadow:2px 2px #303030;text-align:center}.toggle{position:absolute;margin-left:-9999px;visibility:hidden}.toggle+label{display:block;position:relative;cursor:pointer;outline:none}input.toggle-round-flat+label{padding:1px;width:33px;height:18px;background-color:#ddd;border-radius:10px;transition:background .4s}input.toggle-round-flat+label:before,input.toggle-round-flat+label:after{display:block;position:absolute;}input.toggle-round-flat+label:before{top:1px;left:1px;bottom:1px;right:1px;background-color:#fff;border-radius:10px;transition:background .4s}input.toggle-round-flat+label:after{top:2px;left:2px;bottom:2px;width:16px;background-color:#ddd;border-radius:12px;transition:margin .4s,background .4s}input.toggle-round-flat:checked+label{background-color:#dd4b39}input.toggle-round-flat:checked+label:after{margin-left:14px;background-color:#dd4b39}@-moz-document url-prefix(){select,input{margin:0;padding:0;border-width:1px;font:12px verdana,arial,sans-serif}input[type=button],button,input[type=submit]{padding:0 3px;border-radius:3px 3px 3px 3px;-moz-border-radius:3px 3px 3px 3px}}.nice-select.small,.nice-select-dropdown li.option{height:24px!important;min-height:24px!important;line-height:24px!important}.nice-select.small ul li:nth-of-type(2){clear:both}.nav{margin-bottom:0;padding-left:10;list-style:none}.nav>li{position:relative;display:block}.nav>li>a{position:relative;display:block;padding:5px 10px}.nav>li>a:hover,.nav>li>a:focus{text-decoration:none;background-color:#eee}.nav>li.disabled>a{color:#999}.nav>li.disabled>a:hover,.nav>li.disabled>a:focus{color:#999;text-decoration:none;background-color:initial;cursor:not-allowed}.nav .open>a,.nav .open>a:hover,.nav .open>a:focus{background-color:#eee;border-color:#428bca}.nav .nav-divider{height:1px;margin:9px 0;overflow:hidden;background-color:#e5e5e5}.nav>li>a>img{max-width:none}.nav-tabs{border-bottom:1px solid #ddd}.nav-tabs>li{float:left;margin-bottom:-1px}.nav-tabs>li>a{margin-right:0;line-height:1.42857143;border:1px solid #ddd;border-radius:10px 10px 0 0}.nav-tabs>li>a:hover{border-color:#eee #eee #ddd}.nav-tabs>button{margin-right:0;line-height:1.42857143;border:2px solid #ddd;border-radius:10px 10px 0 0}.nav-tabs>button:hover{background-color:#25bbfc;border-color:#428bca;color:#eaf2f9;border-bottom-color:transparent;}.nav-tabs>button.active,.nav-tabs>button.active:hover,.nav-tabs>button.active:focus{color:#f7fdfd;background-color:#1aae0d;border:1px solid #ddd;border-bottom-color:transparent;cursor:default}.nav-tabs>li.active>a,.nav-tabs>li.active>a:hover,.nav-tabs>li.active>a:focus{color:#428bca;background-color:#e5e5e5;border:1px solid #ddd;border-bottom-color:transparent;cursor:default}.nav-tabs.nav-justified{width:100%;border-bottom:0}.nav-tabs.nav-justified>li{float:none}.nav-tabs.nav-justified>li>a{text-align:center;margin-bottom:5px}.nav-tabs.nav-justified>.dropdown .dropdown-menu{top:auto;left:auto}.nav-status{float:left;margin:0;padding:3px;width:160px;font-weight:400;min-height:600}#bar,#prgbar {background-color: #f1f1f1;border-radius: 14px}#bar {background-color: #3498db;width: 0%;height: 14px}.switch{position:relative;display:inline-block;width:34px;height:16px}.switch input{opacity:0;width:0;height:0}.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#f55959;-webkit-transition:.4s;transition:.4s}.slider:before{position:absolute;content:\"\";height:12px;width:12px;left:2px;bottom:2px;background-color:#fff;-webkit-transition:.4s;transition:.4s}input:checked+.slider{background-color:#5ca30a}input:focus+.slider{box-shadow:0 0 1px #5ca30a}input:checked+.slider:before{-webkit-transform:translateX(16px);-ms-transform:translateX(16px);transform:translateX(16px)}.slider.round{border-radius:34px}.slider.round:before{border-radius:50%}\n";
-	server.send_P(200,"text/css",css);
+	const char *css = ".container{width:800px;text-align:left;margin:auto;border-radius:10px 10px 10px 10px;-moz-border-radius:10px 10px 10px 10px;-webkit-border-radius:10px 10px 10px 10px;-khtml-border-radius:10px 10px 10px 10px;-ms-border-radius:10px 10px 10px 10px;box-shadow:3px 3px 3px #707070;background:#fff;border-color: #2194ec;padding: 0px;border-width: 5px;border-style:solid;}body,font{font:12px verdana,arial,sans-serif;color:#fff}.header{background:#2194ec;text-decoration:none;color:#fff;font-family:verdana,arial,sans-serif;text-align:left;padding:5px 0;border-radius:10px 10px 0 0;-moz-border-radius:10px 10px 0 0;-webkit-border-radius:10px 10px 0 0;-khtml-border-radius:10px 10px 0 0;-ms-border-radius:10px 10px 0 0}.content{margin:0 0 0 166px;padding:1px 5px 5px;color:#000;background:#fff;text-align:center;font-size: 8pt;}.contentwide{padding:50px 5px 5px;color:#000;background:#fff;text-align:center}.contentwide h2{color:#000;font:1em verdana,arial,sans-serif;text-align:center;font-weight:700;padding:0;margin:0;font-size: 12pt;}.footer{background:#2194ec;text-decoration:none;color:#fff;font-family:verdana,arial,sans-serif;font-size:9px;text-align:center;padding:10px 0;border-radius:0 0 10px 10px;-moz-border-radius:0 0 10px 10px;-webkit-border-radius:0 0 10px 10px;-khtml-border-radius:0 0 10px 10px;-ms-border-radius:0 0 10px 10px;clear:both}#tail{height:450px;width:805px;overflow-y:scroll;overflow-x:scroll;color:#0f0;background:#000}table{vertical-align:middle;text-align:center;empty-cells:show;padding-left:3;padding-right:3;padding-top:3;padding-bottom:3;border-collapse:collapse;border-color:#0f07f2;border-style:solid;border-spacing:0px;border-width:3px;text-decoration:none;color:#fff;background:#000;font-family:verdana,arial,sans-serif;font-size : 12px;width:100%;white-space:nowrap}table th{font-size: 10pt;font-family:lucidia console,Monaco,monospace;text-shadow:1px 1px #0e038c;text-decoration:none;background:#0525f7;border:1px solid silver}table tr:nth-child(even){background:#f7f7f7}table tr:nth-child(odd){background:#eeeeee}table td{color:#000;font-family:lucidia console,Monaco,monospace;text-decoration:none;border:1px solid #010369}body{background:#edf0f5;color:#000}a{text-decoration:none}a:link,a:visited{text-decoration:none;color:#0000e0;font-weight:400}th:last-child a.tooltip:hover span{left:auto;right:0}ul{padding:5px;margin:10px 0;list-style:none;float:left}ul li{float:left;display:inline;margin:0 10px}ul li a{text-decoration:none;float:left;color:#999;cursor:pointer;font:900 14px/22px arial,Helvetica,sans-serif}ul li a span{margin:0 10px 0 -10px;padding:1px 8px 5px 18px;position:relative;float:left}h1{text-shadow:2px 2px #303030;text-align:center}.toggle{position:absolute;margin-left:-9999px;visibility:hidden}.toggle+label{display:block;position:relative;cursor:pointer;outline:none}input.toggle-round-flat+label{padding:1px;width:33px;height:18px;background-color:#ddd;border-radius:10px;transition:background .4s}input.toggle-round-flat+label:before,input.toggle-round-flat+label:after{display:block;position:absolute;}input.toggle-round-flat+label:before{top:1px;left:1px;bottom:1px;right:1px;background-color:#fff;border-radius:10px;transition:background .4s}input.toggle-round-flat+label:after{top:2px;left:2px;bottom:2px;width:16px;background-color:#ddd;border-radius:12px;transition:margin .4s,background .4s}input.toggle-round-flat:checked+label{background-color:#dd4b39}input.toggle-round-flat:checked+label:after{margin-left:14px;background-color:#dd4b39}@-moz-document url-prefix(){select,input{margin:0;padding:0;border-width:1px;font:12px verdana,arial,sans-serif}input[type=button],button,input[type=submit]{padding:0 3px;border-radius:3px 3px 3px 3px;-moz-border-radius:3px 3px 3px 3px}}.nice-select.small,.nice-select-dropdown li.option{height:24px!important;min-height:24px!important;line-height:24px!important}.nice-select.small ul li:nth-of-type(2){clear:both}.nav{margin-bottom:0;padding-left:10;list-style:none}.nav>li{position:relative;display:block}.nav>li>a{position:relative;display:block;padding:5px 10px}.nav>li>a:hover,.nav>li>a:focus{text-decoration:none;background-color:#eee}.nav>li.disabled>a{color:#999}.nav>li.disabled>a:hover,.nav>li.disabled>a:focus{color:#999;text-decoration:none;background-color:initial;cursor:not-allowed}.nav .open>a,.nav .open>a:hover,.nav .open>a:focus{background-color:#eee;border-color:#428bca}.nav .nav-divider{height:1px;margin:9px 0;overflow:hidden;background-color:#e5e5e5}.nav>li>a>img{max-width:none}.nav-tabs{border-bottom:1px solid #ddd}.nav-tabs>li{float:left;margin-bottom:-1px}.nav-tabs>li>a{margin-right:0;line-height:1.42857143;border:1px solid #ddd;border-radius:10px 10px 0 0}.nav-tabs>li>a:hover{border-color:#eee #eee #ddd}.nav-tabs>button{margin-right:0;line-height:1.42857143;border:2px solid #ddd;border-radius:10px 10px 0 0}.nav-tabs>button:hover{background-color:#25bbfc;border-color:#428bca;color:#eaf2f9;border-bottom-color:transparent;}.nav-tabs>button.active,.nav-tabs>button.active:hover,.nav-tabs>button.active:focus{color:#f7fdfd;background-color:#1aae0d;border:1px solid #ddd;border-bottom-color:transparent;cursor:default}.nav-tabs>li.active>a,.nav-tabs>li.active>a:hover,.nav-tabs>li.active>a:focus{color:#428bca;background-color:#e5e5e5;border:1px solid #ddd;border-bottom-color:transparent;cursor:default}.nav-tabs.nav-justified{width:100%;border-bottom:0}.nav-tabs.nav-justified>li{float:none}.nav-tabs.nav-justified>li>a{text-align:center;margin-bottom:5px}.nav-tabs.nav-justified>.dropdown .dropdown-menu{top:auto;left:auto}.nav-status{float:left;margin:0;padding:3px;width:160px;font-weight:400;min-height:600}#bar,#prgbar {background-color: #f1f1f1;border-radius: 14px}#bar {background-color: #3498db;width: 0%;height: 14px}.switch{position:relative;display:inline-block;width:34px;height:16px}.switch input{opacity:0;width:0;height:0}.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#f55959;-webkit-transition:.4s;transition:.4s}.slider:before{position:absolute;content:\"\";height:12px;width:12px;left:2px;bottom:2px;background-color:#fff;-webkit-transition:.4s;transition:.4s}input:checked+.slider{background-color:#5ca30a}input:focus+.slider{box-shadow:0 0 1px #5ca30a}input:checked+.slider:before{-webkit-transform:translateX(16px);-ms-transform:translateX(16px);transform:translateX(16px)}.slider.round{border-radius:34px}.slider.round:before{border-radius:50%}\n";
+	server.send_P(200, "text/css", css);
 }
 
 void handle_jquery()
 {
 	server.setContentLength(jquery_3_7_1_min_js_gz_len);
-	server.sendHeader(String(F("Content-Encoding")),String(F("gzip")));
-	server.send(200,String(F("application/javascript")),"");
-	server.sendContent_P(jquery_3_7_1_min_js_gz,jquery_3_7_1_min_js_gz_len);
+	server.sendHeader(String(F("Content-Encoding")), String(F("gzip")));
+	server.send(200, String(F("application/javascript")), "");
+	server.sendContent_P(jquery_3_7_1_min_js_gz, jquery_3_7_1_min_js_gz_len);
 }
 
 void handle_dashboard()
@@ -338,7 +338,7 @@ void handle_sidebar()
 		html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\">DIGI</th>\n";
 	html += "</tr>\n";
 	html += "<tr>\n";
-	if	(config.wx_en)
+	if (config.wx_en)
 		html += "<th style=\"background:#0b0; color:#030; width:50%;border-radius: 10px;border: 2px solid white;\">WX</th>\n";
 	else
 		html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\">WX</th>\n";
@@ -1427,7 +1427,8 @@ void handle_mod()
 		saveEEPROM();
 		String html = "OK";
 		server.send(200, "text/html", html);
-	}else if (server.hasArg("commitONEWIRE"))
+	}
+	else if (server.hasArg("commitONEWIRE"))
 	{
 		bool En = false;
 		for (uint8_t i = 0; i < server.args(); i++)
@@ -1570,7 +1571,8 @@ void handle_mod()
 		saveEEPROM();
 		String html = "OK";
 		server.send(200, "text/html", html);
-	}else if (server.hasArg("commitI2C0"))
+	}
+	else if (server.hasArg("commitI2C0"))
 	{
 		bool En = false;
 		for (uint8_t i = 0; i < server.args(); i++)
@@ -1616,7 +1618,8 @@ void handle_mod()
 		saveEEPROM();
 		String html = "OK";
 		server.send(200, "text/html", html);
-	}else if (server.hasArg("commitI2C1"))
+	}
+	else if (server.hasArg("commitI2C1"))
 	{
 		bool En = false;
 		for (uint8_t i = 0; i < server.args(); i++)
@@ -1662,7 +1665,8 @@ void handle_mod()
 		saveEEPROM();
 		String html = "OK";
 		server.send(200, "text/html", html);
-	}else if (server.hasArg("commitCOUNTER0"))
+	}
+	else if (server.hasArg("commitCOUNTER0"))
 	{
 		bool En = false;
 		for (uint8_t i = 0; i < server.args(); i++)
@@ -1701,7 +1705,8 @@ void handle_mod()
 		saveEEPROM();
 		String html = "OK";
 		server.send(200, "text/html", html);
-	}else if (server.hasArg("commitCOUNTER1"))
+	}
+	else if (server.hasArg("commitCOUNTER1"))
 	{
 		bool En = false;
 		for (uint8_t i = 0; i < server.args(); i++)
@@ -1822,7 +1827,7 @@ void handle_mod()
 
 		html += "</form><br />\n";
 
-		//html += "</td><td width=\"2%\" style=\"border:unset;\"></td>";
+		// html += "</td><td width=\"2%\" style=\"border:unset;\"></td>";
 		html += "</td><td width=\"32%\" style=\"border:unset;\">";
 
 		/**************RS485/Modbus Modify******************/
@@ -1892,7 +1897,7 @@ void handle_mod()
 		html += "<td align=\"right\"><b>GPIO:</b></td>\n";
 		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\" name=\"data\" type=\"number\" value=\"" + String(config.onewire_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
-		
+
 		html += "<tr><td colspan=\"2\" align=\"right\">\n";
 		html += "<input class=\"btn btn-primary\" id=\"submitONEWIRE\" name=\"commitONEWIRE\" type=\"submit\" value=\"Apply\" maxlength=\"80\"/>\n";
 		html += "<input type=\"hidden\" name=\"commitONEWIRE\"/>\n";
@@ -1996,7 +2001,7 @@ void handle_mod()
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>PTT GPIO:</b></td>\n";
 		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\"  name=\"ptt\" type=\"number\" value=\"" + String(config.rf_ptt_gpio) + "\" /> Active:<input type=\"radio\" name=\"ptt_active\" value=\"0\" " + LowFlag + "/>LOW <input type=\"radio\" name=\"ptt_active\" value=\"1\" " + HighFlag + "/>HIGH </td>\n";
-		html += "</tr>\n";		
+		html += "</tr>\n";
 
 		html += "<tr><td colspan=\"2\" align=\"right\">\n";
 		html += "<input class=\"btn btn-primary\" id=\"submitRF\" name=\"commitRF\" type=\"submit\" value=\"Apply\" maxlength=\"80\"/>\n";
@@ -2033,7 +2038,7 @@ void handle_mod()
 		html += "<td align=\"right\"><b>Frequency:</b></td>\n";
 		html += "<td style=\"text-align: left;\"><input min=\"1000\" max=\"800000\" name=\"freq\" type=\"number\" value=\"" + String(config.i2c_freq) + "\" /></td>\n";
 		html += "</tr>\n";
-		
+
 		html += "<tr><td colspan=\"2\" align=\"right\">\n";
 		html += "<input class=\"btn btn-primary\" id=\"submitI2C0\" name=\"commitI2C0\" type=\"submit\" value=\"Apply\" maxlength=\"80\"/>\n";
 		html += "<input type=\"hidden\" name=\"commitI2C0\"/>\n";
@@ -2057,7 +2062,7 @@ void handle_mod()
 		html += "<td align=\"right\"><b>INPUT GPIO:</b></td>\n";
 		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\" name=\"gpio\" type=\"number\" value=\"" + String(config.counter0_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
-		
+
 		LowFlag = "";
 		HighFlag = "";
 		if (config.counter0_active)
@@ -2068,7 +2073,7 @@ void handle_mod()
 		html += "<td align=\"right\">Active</td>\n";
 		html += "<td style=\"text-align: left;\"><input type=\"radio\" name=\"active\" value=\"0\" " + LowFlag + "/>LOW <input type=\"radio\" name=\"active\" value=\"1\" " + HighFlag + "/>HIGH </td>\n";
 		html += "</tr>\n";
-		
+
 		html += "<tr><td colspan=\"2\" align=\"right\">\n";
 		html += "<input class=\"btn btn-primary\" id=\"submitCOUNTER0\" name=\"commitCOUNTER0\" type=\"submit\" value=\"Apply\" maxlength=\"80\"/>\n";
 		html += "<input type=\"hidden\" name=\"commitCOUNTER0\"/>\n";
@@ -2103,7 +2108,7 @@ void handle_mod()
 		html += "<td align=\"right\"><b>Frequency:</b></td>\n";
 		html += "<td style=\"text-align: left;\"><input min=\"1000\" max=\"800000\" name=\"freq\" type=\"number\" value=\"" + String(config.i2c1_freq) + "\" /></td>\n";
 		html += "</tr>\n";
-		
+
 		html += "<tr><td colspan=\"2\" align=\"right\">\n";
 		html += "<input class=\"btn btn-primary\" id=\"submitI2C1\" name=\"commitI2C1\" type=\"submit\" value=\"Apply\" maxlength=\"80\"/>\n";
 		html += "<input type=\"hidden\" name=\"commitI2C1\"/>\n";
@@ -2127,7 +2132,7 @@ void handle_mod()
 		html += "<td align=\"right\"><b>INPUT GPIO:</b></td>\n";
 		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\" name=\"gpio\" type=\"number\" value=\"" + String(config.counter0_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
-		
+
 		LowFlag = "";
 		HighFlag = "";
 		if (config.counter1_active)
@@ -2138,7 +2143,7 @@ void handle_mod()
 		html += "<td align=\"right\">Active</td>\n";
 		html += "<td style=\"text-align: left;\"><input type=\"radio\" name=\"active\" value=\"0\" " + LowFlag + "/>LOW <input type=\"radio\" name=\"active\" value=\"1\" " + HighFlag + "/>HIGH </td>\n";
 		html += "</tr>\n";
-		
+
 		html += "<tr><td colspan=\"2\" align=\"right\">\n";
 		html += "<input class=\"btn btn-primary\" id=\"submitCOUNTER1\" name=\"commitCOUNTER1\" type=\"submit\" value=\"Apply\" maxlength=\"80\"/>\n";
 		html += "<input type=\"hidden\" name=\"commitCOUNTER1\"/>\n";
@@ -2867,7 +2872,8 @@ void handle_igate()
 			{
 				if (server.arg(i) != "")
 				{
-					strcpy(config.igate_path, server.arg(i).c_str());
+					if (isValidNumber(server.arg(i)))
+						config.igate_path = server.arg(i).toInt();
 				}
 			}
 			if (server.argName(i) == "igateComment")
@@ -2952,7 +2958,7 @@ void handle_igate()
 		config.igate_timestamp = timeStamp;
 
 		saveEEPROM();
-		initInterval=true;
+		initInterval = true;
 		String html = "OK";
 		server.send(200, "text/html", html);
 	}
@@ -3262,7 +3268,21 @@ void handle_igate()
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>PATH:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input maxlength=\"72\" size=\"72\" id=\"igatePath\" name=\"igatePath\" type=\"text\" value=\"" + String(config.igate_path) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\">\n";
+		html += "<select name=\"igatePath\" id=\"igatePath\">\n";
+		for (uint8_t pthIdx = 0; pthIdx < PATH_LEN; pthIdx++)
+		{
+			if (config.igate_path == pthIdx)
+			{
+				html += "<option value=\"" + String(pthIdx) + "\" selected>" + String(PATH_NAME[pthIdx]) + "</option>\n";
+			}
+			else
+			{
+				html += "<option value=\"" + String(pthIdx) + "\">" + String(PATH_NAME[pthIdx]) + "</option>\n";
+			}
+		}
+		html += "</select></td>\n";
+		//html += "<td style=\"text-align: left;\"><input maxlength=\"72\" size=\"72\" id=\"igatePath\" name=\"igatePath\" type=\"text\" value=\"" + String(config.igate_path) + "\" /></td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Server Host:</b></td>\n";
@@ -3631,7 +3651,8 @@ void handle_digi()
 			{
 				if (server.arg(i) != "")
 				{
-					strcpy(config.digi_path, server.arg(i).c_str());
+					if (isValidNumber(server.arg(i)))
+						config.digi_path = server.arg(i).toInt();
 				}
 			}
 			if (server.argName(i) == "digiComment")
@@ -3775,7 +3796,7 @@ void handle_digi()
 		config.digi_timestamp = timeStamp;
 
 		saveEEPROM();
-		initInterval=true;
+		initInterval = true;
 		String html = "OK";
 		server.send(200, "text/html", html);
 	}
@@ -3891,7 +3912,21 @@ void handle_digi()
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>PATH:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input maxlength=\"72\" size=\"72\" id=\"digiPath\" name=\"digiPath\" type=\"text\" value=\"" + String(config.digi_path) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\">\n";
+		html += "<select name=\"digiPath\" id=\"digiPath\">\n";
+		for (uint8_t pthIdx = 0; pthIdx < PATH_LEN; pthIdx++)
+		{
+			if (config.digi_path == pthIdx)
+			{
+				html += "<option value=\"" + String(pthIdx) + "\" selected>" + String(PATH_NAME[pthIdx]) + "</option>\n";
+			}
+			else
+			{
+				html += "<option value=\"" + String(pthIdx) + "\">" + String(PATH_NAME[pthIdx]) + "</option>\n";
+			}
+		}
+		html += "</select></td>\n";
+		//html += "<td style=\"text-align: left;\"><input maxlength=\"72\" size=\"72\" id=\"digiPath\" name=\"digiPath\" type=\"text\" value=\"" + String(config.digi_path) + "\" /></td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Text Comment:</b></td>\n";
@@ -4152,7 +4187,8 @@ void handle_wx()
 			{
 				if (server.arg(i) != "")
 				{
-					strcpy(config.wx_path, server.arg(i).c_str());
+					if (isValidNumber(server.arg(i)))
+						config.wx_path = server.arg(i).toInt();
 				}
 			}
 			if (server.argName(i) == "Comment")
@@ -4194,7 +4230,7 @@ void handle_wx()
 		config.wx_timestamp = timeStamp;
 
 		saveEEPROM();
-		initInterval=true;
+		initInterval = true;
 		String html = "OK";
 		server.send(200, "text/html", html);
 	}
@@ -4260,7 +4296,21 @@ void handle_wx()
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>PATH:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input maxlength=\"72\" size=\"72\" name=\"Path\" type=\"text\" value=\"" + String(config.wx_path) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\">\n";
+		html += "<select name=\"Path\" id=\"Path\">\n";
+		for (uint8_t pthIdx = 0; pthIdx < PATH_LEN; pthIdx++)
+		{
+			if (config.wx_path == pthIdx)
+			{
+				html += "<option value=\"" + String(pthIdx) + "\" selected>" + String(PATH_NAME[pthIdx]) + "</option>\n";
+			}
+			else
+			{
+				html += "<option value=\"" + String(pthIdx) + "\">" + String(PATH_NAME[pthIdx]) + "</option>\n";
+			}
+		}
+		html += "</select></td>\n";
+		//html += "<td style=\"text-align: left;\"><input maxlength=\"72\" size=\"72\" name=\"Path\" type=\"text\" value=\"" + String(config.wx_path) + "\" /></td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Text Comment:</b></td>\n";
@@ -4317,6 +4367,7 @@ void handle_tlm()
 	bool En = false;
 	bool pos2RF = false;
 	bool pos2INET = false;
+	String arg="";
 
 	if (server.hasArg("commitTLM"))
 	{
@@ -4370,7 +4421,8 @@ void handle_tlm()
 			{
 				if (server.arg(i) != "")
 				{
-					strcpy(config.tlm0_path, server.arg(i).c_str());
+					if (isValidNumber(server.arg(i)))
+						config.tlm0_path = server.arg(i).toInt();
 				}
 			}
 			if (server.argName(i) == "Comment")
@@ -4396,13 +4448,47 @@ void handle_tlm()
 						pos2INET = true;
 				}
 			}
+			for(int x=0;x<13;x++){
+				arg="sensorCH"+String(x);
+				if (server.argName(i) == arg)
+				{
+					if (isValidNumber(server.arg(i)))
+						config.tml0_data_channel[x]=server.arg(i).toInt();
+				}
+				arg="param"+String(x);
+				if (server.argName(i) == arg)
+				{
+					if (server.arg(i) != "")
+					{
+						strcpy(config.tlm0_PARM[x],server.arg(i).c_str());
+					}
+				}
+				arg="unit"+String(x);
+				if (server.argName(i) == arg)
+				{
+					if (server.arg(i) != "")
+					{
+						strcpy(config.tlm0_UNIT[x],server.arg(i).c_str());
+					}
+				}
+				if(x<5){
+					for(int y=0;y<3;y++){
+						arg="eqns"+String(x)+String((char)(y+'a'));
+						if (server.argName(i) == arg)
+						{
+							if (isValidNumber(server.arg(i)))
+								config.tlm0_EQNS[x][y]=server.arg(i).toFloat();
+						}
+					}
+				}
+			}
 		}
 		config.tlm0_en = En;
 		config.tlm0_2rf = pos2RF;
 		config.tlm0_2inet = pos2INET;
 
 		saveEEPROM();
-		initInterval=true;
+		initInterval = true;
 		String html = "OK";
 		server.send(200, "text/html", html);
 	}
@@ -4465,7 +4551,21 @@ void handle_tlm()
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>PATH:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input maxlength=\"72\" size=\"72\" name=\"Path\" type=\"text\" value=\"" + String(config.tlm0_path) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\">\n";
+		html += "<select name=\"Path\" id=\"Path\">\n";
+		for (uint8_t pthIdx = 0; pthIdx < PATH_LEN; pthIdx++)
+		{
+			if (config.tlm0_path == pthIdx)
+			{
+				html += "<option value=\"" + String(pthIdx) + "\" selected>" + String(PATH_NAME[pthIdx]) + "</option>\n";
+			}
+			else
+			{
+				html += "<option value=\"" + String(pthIdx) + "\">" + String(PATH_NAME[pthIdx]) + "</option>\n";
+			}
+		}
+		html += "</select></td>\n";
+		//html += "<td style=\"text-align: left;\"><input maxlength=\"72\" size=\"72\" name=\"Path\" type=\"text\" value=\"" + String(config.tlm0_path) + "\" /></td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Text Comment:</b></td>\n";
@@ -4474,7 +4574,7 @@ void handle_tlm()
 
 		html += "<tr><td style=\"text-align: right;\">Info Interval:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"3600\" step=\"1\" name=\"infoInv\" type=\"number\" value=\"" + String(config.tlm0_info_interval) + "\" />Sec.</td></tr>";
 		html += "<tr><td style=\"text-align: right;\">Data Interval:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"3600\" step=\"1\" name=\"dataInv\" type=\"number\" value=\"" + String(config.tlm0_data_interval) + "\" />Sec.</td></tr>";
-		
+
 		String Pos2RFFlag = "";
 		String Pos2INETFlag = "";
 		if (config.tlm0_2rf)
@@ -4490,16 +4590,84 @@ void handle_tlm()
 		// 	timeStampFlag = "checked";
 		// html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"wxTimeStamp\" value=\"OK\" " + timeStampFlag + "><span class=\"slider round\"></span></label></td>\n";
 		// html += "</tr>\n";
+		for (int ax = 0; ax < 5; ax++)
+		{
+			html += "<tr><td align=\"right\"><b>Channel A" + String(ax + 1) + ":</b></td>\n";
+			html += "<td align=\"center\">\n";
+			html += "<table>";
 
-		html += "<tr><td align=\"right\"><b>Parameter Name:</b></td>\n";
-		html += "<td align=\"center\">\n";
-		html += "<table>";
+			//html += "<tr><td style=\"text-align: right;\">Name:</td><td style=\"text-align: center;\"><i>Sensor Type</i></td><td style=\"text-align: center;\"><i>Parameter</i></td><td style=\"text-align: center;\"><i>Unit</i></td></tr>\n";
+
+			html += "<tr><td style=\"text-align: right;\">Type/Name:</td>\n";
+			html += "<td style=\"text-align: left;\">Sensor Type: ";
+			html += "<select name=\"sensorCH" + String(ax) + "\" id=\"sensorCH" + String(ax) + "\">\n";
+			for (uint8_t idx = 0; idx < SYSTEM_LEN; idx++)
+			{
+				if (config.tml0_data_channel[ax] == idx)
+				{
+					html += "<option value=\"" + String(idx) + "\" selected>" + String(SYSTEM_NAME[idx]) + "</option>\n";
+				}
+				else
+				{
+					html += "<option value=\"" + String(idx) + "\">" + String(SYSTEM_NAME[idx]) + "</option>\n";
+				}
+			}
+			html += "</select></td>\n";
+
+			html += "<td style=\"text-align: left;\">Parameter: <input maxlength=\"10\" size=\"8\" name=\"param" + String(ax) + "\" type=\"text\" value=\"" + String(config.tlm0_PARM[ax]) + "\" /></td>\n";
+			html += "<td style=\"text-align: left;\">Unit: <input maxlength=\"8\" size=\"5\" name=\"unit" + String(ax) + "\" type=\"text\" value=\"" + String(config.tlm0_UNIT[ax]) + "\" /></td></tr>\n";
+			html += "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax) + "a\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][0], 3) + "\" />  b:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax) + "b\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][1], 3) + "\" /> c:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax) + "c\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][2], 3) + "\" /> (av^2+bv+c)</td></tr>\n";
+			html += "</table></td>";
+			html += "</tr>\n";
+		}
 		
-		//html += "<tr><td style=\"text-align: right;\">Latitude:</td><td style=\"text-align: left;\"><input min=\"-90\" max=\"90\" step=\"0.0001\" name=\"PosLat\" type=\"number\" value=\"" + String(config.wx_lat, 5) + "\" />degrees (positive for North, negative for South)</td></tr>\n";
-		//html += "<tr><td style=\"text-align: right;\">Longitude:</td><td style=\"text-align: left;\"><input min=\"-180\" max=\"180\" step=\"0.0001\" name=\"PosLon\" type=\"number\" value=\"" + String(config.wx_lon, 5) + "\" />degrees (positive for East, negative for West)</td></tr>\n";
-		//html += "<tr><td style=\"text-align: right;\">Altitude:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"10000\" step=\"0.1\" name=\"PosAlt\" type=\"number\" value=\"" + String(config.wx_alt, 2) + "\" /> meter. *Value 0 is not send height</td></tr>\n";
-		html += "</table></td>";
-		html += "</tr>\n";
+		uint8_t b=1;
+		for (int ax = 0; ax < 8; ax++)
+		{
+			html += "<tr><td align=\"right\"><b>Channel B" + String(ax + 1) + ":</b></td>\n";
+			html += "<td align=\"center\">\n";
+			html += "<table>";
+
+			//html += "<tr><td style=\"text-align: right;\">Type/Name:</td>\n";
+			html += "<td style=\"text-align: left;\">Type: ";
+			html += "<select name=\"sensorCH" + String(ax + 5) + "\" id=\"sensorCH" + String(ax) + "\">\n";
+			for (uint8_t idx = 0; idx < SYSTEM_BIT_LEN; idx++)
+			{
+				if (config.tml0_data_channel[ax+5] == idx)
+				{
+					html += "<option value=\"" + String(idx) + "\" selected>" + String(SYSTEM_BITS_NAME[idx]) + "</option>\n";
+				}
+				else
+				{
+					html += "<option value=\"" + String(idx) + "\">" + String(SYSTEM_BITS_NAME[idx]) + "</option>\n";
+				}
+			}
+			html += "</select></td>\n";
+
+			html += "<td style=\"text-align: left;\">Parameter: <input maxlength=\"10\" size=\"8\" name=\"param" + String(ax + 5) + "\" type=\"text\" value=\"" + String(config.tlm0_PARM[ax+5]) + "\" /></td>\n";
+			html += "<td style=\"text-align: left;\">Unit: <input maxlength=\"8\" size=\"5\" name=\"unit" + String(ax + 5) + "\" type=\"text\" value=\"" + String(config.tlm0_UNIT[ax+5]) + "\" /></td>\n";
+			String LowFlag = "", HighFlag = "";
+			if (config.tlm0_BITS_Active&b)
+				HighFlag = "checked=\"checked\"";
+			else
+				LowFlag = "checked=\"checked\"";
+			html += "<td style=\"text-align: left;\"> Active:<input type=\"radio\" name=\"bitact" + String(ax) + "\" value=\"0\" " + LowFlag + "/>LOW <input type=\"radio\" name=\"bitact" + String(ax) + "\" value=\"1\" " + HighFlag + "/>HIGH </td>\n";
+			html += "</tr>\n";
+			//html += "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax + 1) + "a\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][0], 3) + "\" />  b:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax + 1) + "b\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][1], 3) + "\" /> c:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax + 1) + "c\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][2], 3) + "\" /> (av^2+bv+c)</td></tr>\n";
+			html += "</table></td>";
+			html += "</tr>\n";
+			b<<=1;
+		}
+
+		// html += "<tr><td align=\"right\"><b>Parameter Name:</b></td>\n";
+		// html += "<td align=\"center\">\n";
+		// html += "<table>";
+
+		// // html += "<tr><td style=\"text-align: right;\">Latitude:</td><td style=\"text-align: left;\"><input min=\"-90\" max=\"90\" step=\"0.0001\" name=\"PosLat\" type=\"number\" value=\"" + String(config.wx_lat, 5) + "\" />degrees (positive for North, negative for South)</td></tr>\n";
+		// // html += "<tr><td style=\"text-align: right;\">Longitude:</td><td style=\"text-align: left;\"><input min=\"-180\" max=\"180\" step=\"0.0001\" name=\"PosLon\" type=\"number\" value=\"" + String(config.wx_lon, 5) + "\" />degrees (positive for East, negative for West)</td></tr>\n";
+		// // html += "<tr><td style=\"text-align: right;\">Altitude:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"10000\" step=\"0.1\" name=\"PosAlt\" type=\"number\" value=\"" + String(config.wx_alt, 2) + "\" /> meter. *Value 0 is not send height</td></tr>\n";
+		// html += "</table></td>";
+		// html += "</tr>\n";
 
 		html += "</table><br />\n";
 		html += "<div><button type='submit' id='submitTLM'  name=\"commitTLM\"> Apply Change </button></div>\n";
@@ -5149,12 +5317,15 @@ void handle_default()
 	defaultConfig();
 	defaultSetting = false;
 }
-bool webServiceBegin=true;
+bool webServiceBegin = true;
 void webService()
 {
-	if(webServiceBegin){
-		webServiceBegin=false;
-	}else{
+	if (webServiceBegin)
+	{
+		webServiceBegin = false;
+	}
+	else
+	{
 		return;
 	}
 	server.close();

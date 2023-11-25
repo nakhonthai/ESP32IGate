@@ -15,6 +15,7 @@
 #include <WiFi.h>
 
 // c...s...g...t...r...p...P...h..b.....L...S..m...M...w...W....v...o...O...x....
+#define WX_NONE 0
 #define WX_WIND_DIR (1 << 0)       // c Wind Direction (in degrees)
 #define WX_WIND_SPD (1 << 1)       // s Wind Speed (mhp)
 #define WX_WIND_GUST (1 << 2)      // g Wind Gust	(peak wind speed in mph in the last 5 minutes)

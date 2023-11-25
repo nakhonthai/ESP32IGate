@@ -47,8 +47,8 @@
 #include "BluetoothSerial.h"
 #endif
 
-#ifdef OLED
 #include <Wire.h>
+#ifdef OLED
 #include "Adafruit_SSD1306.h"
 #include <Adafruit_GFX.h>
 #include <Adafruit_I2CDevice.h>
@@ -488,7 +488,7 @@ void defaultConfig()
     sprintf(config.igate_symbol, "/&");
     memset(config.igate_object, 0, sizeof(config.igate_object));
     memset(config.igate_phg, 0, sizeof(config.igate_phg));
-    sprintf(config.igate_path, "WIDE1-1");
+    config.igate_path = 8;
     sprintf(config.igate_comment, "IGate MODE");
 
     // DIGI REPEATER
@@ -498,7 +498,7 @@ void defaultConfig()
     config.digi_ssid = 3;
     config.digi_timestamp = false;
     sprintf(config.digi_mycall, "NOCALL");
-    sprintf(config.digi_path, "WIDE1-1");
+    config.digi_path=8;
     //--Position
     config.digi_gps = false;
     config.digi_lat = 13.7555;
@@ -519,7 +519,7 @@ void defaultConfig()
     config.wx_2inet = true;
     config.wx_ssid = 13;
     sprintf(config.wx_mycall, "NOCALL");
-    sprintf(config.wx_path, "WIDE1-1");
+    config.wx_path = 8;
     sprintf(config.wx_comment, "WX MODE");
     memset(config.wx_object, 0, sizeof(config.wx_object));
 
@@ -529,7 +529,7 @@ void defaultConfig()
     config.tlm0_2inet = true;
     config.tlm0_ssid = 0;
     sprintf(config.tlm0_mycall, "NOCALL");
-    sprintf(config.tlm0_path, "WIDE1-1");
+    config.tlm0_path=0;
     config.tlm0_data_interval = 600;
     config.tlm0_info_interval = 1800;
     sprintf(config.tlm0_PARM[0], "RF->INET");
@@ -562,19 +562,19 @@ void defaultConfig()
     sprintf(config.tlm0_UNIT[11], "ON");
     sprintf(config.tlm0_UNIT[12], "ON");
     config.tlm0_BITS_Active = 0x00;
-    config.tml0_data_channel[0]=2;
-    config.tml0_data_channel[1]=3;
-    config.tml0_data_channel[2]=4;
-    config.tml0_data_channel[3]=1;
-    config.tml0_data_channel[4]=5;
-    config.tml0_data_channel[5]=1;
-    config.tml0_data_channel[6]=2;
-    config.tml0_data_channel[7]=3;
-    config.tml0_data_channel[8]=4;
-    config.tml0_data_channel[9]=5;
-    config.tml0_data_channel[10]=6;
-    config.tml0_data_channel[11]=7;
-    config.tml0_data_channel[12]=8;
+    config.tml0_data_channel[0] = 2;
+    config.tml0_data_channel[1] = 3;
+    config.tml0_data_channel[2] = 4;
+    config.tml0_data_channel[3] = 1;
+    config.tml0_data_channel[4] = 5;
+    config.tml0_data_channel[5] = 1;
+    config.tml0_data_channel[6] = 2;
+    config.tml0_data_channel[7] = 3;
+    config.tml0_data_channel[8] = 4;
+    config.tml0_data_channel[9] = 5;
+    config.tml0_data_channel[10] = 6;
+    config.tml0_data_channel[11] = 7;
+    config.tml0_data_channel[12] = 8;
     sprintf(config.tlm0_comment, "SYSTEM STATUS");
 
     //--Position
@@ -583,7 +583,8 @@ void defaultConfig()
     config.wx_lon = 100.4930;
     config.wx_alt = 0;
     config.wx_interval = 600;
-    config.wx_mode = 0;
+    config.wx_flage = 0;
+    memset(config.wx_type,0,sizeof(config.wx_type));
 
     // OLED DISPLAY
     config.oled_enable = true;
@@ -658,8 +659,8 @@ void defaultConfig()
     config.i2c_sck_pin = 22;
 #else
     config.i2c_enable = false;
-    config.i2c_sda = -1;
-    config.i2c_scl = -1;
+    config.i2c_sda_pin = -1;
+    config.i2c_sck_pin = -1;
 #endif
     config.i2c_freq = 400000;
     config.i2c1_enable = false;
@@ -674,6 +675,11 @@ void defaultConfig()
     config.counter1_enable = false;
     config.counter1_active = 0;
     config.counter1_gpio = -1;
+
+    sprintf(config.path[0], "TRACE2-2");
+    sprintf(config.path[1], "WIDE1-1");
+    sprintf(config.path[2], "WIDE1-1,WIDE2-1");
+    sprintf(config.path[3], "RFONLY");
 
     saveEEPROM();
 }
@@ -1680,7 +1686,7 @@ void setup()
 #else
     if (config.i2c_enable)
     {
-        Wire1.begin(config.i2c_sda_pin, config.i2c_sck_pin, config.i2c_freq);
+        Wire.begin(config.i2c_sda_pin, config.i2c_sck_pin, config.i2c_freq);
     }
     delay(1000);
     digitalWrite(LED_TX, HIGH);
@@ -1865,10 +1871,15 @@ String igate_position(double lat, double lon, double alt, String comment)
     else
         sprintf(strtmp, "%s-%d>APE32I", config.aprs_mycall, config.aprs_ssid);
     tnc2Raw = String(strtmp);
-    if (config.igate_path[0] != 0)
+    if (config.igate_path < 5)
+    {
+        if (config.igate_path > 0)
+            tnc2Raw += "-" + String(config.igate_path);
+    }
+    else
     {
         tnc2Raw += ",";
-        tnc2Raw += String(config.igate_path);
+        tnc2Raw += getPath(config.igate_path);
     }
     tnc2Raw += ":";
     tnc2Raw += String(loc);
@@ -1912,10 +1923,15 @@ String digi_position(double lat, double lon, double alt, String comment)
     else
         sprintf(strtmp, "%s-%d>APE32I", config.digi_mycall, config.digi_ssid);
     tnc2Raw = String(strtmp);
-    if (config.digi_path[0] != 0)
+if (config.digi_path < 5)
+    {
+        if (config.digi_path > 0)
+            tnc2Raw += "-" + String(config.digi_path);
+    }
+    else
     {
         tnc2Raw += ",";
-        tnc2Raw += String(config.digi_path);
+        tnc2Raw += getPath(config.digi_path);
     }
     tnc2Raw += ":";
     tnc2Raw += String(loc);
@@ -2165,7 +2181,7 @@ void sendIsPkgMsg(char *raw)
     // APRS_sendTNC2Pkt(tnc2Raw); // Send packet to RF
 }
 
-void sendTelemetry_0(char *raw,bool header)
+void sendTelemetry_0(char *raw, bool header)
 {
     char str[300];
     char call[11];
@@ -2179,16 +2195,61 @@ void sendTelemetry_0(char *raw,bool header)
     for (; i < 9; i++)
         call[i] = 0x20;
 
-    if(header){
-        if (config.tlm0_ssid == 0)
-            sprintf(str, "%s>APE32I::%s:%s", config.tlm0_mycall, call, raw);
-        else
-            sprintf(str, "%s-%d>APE32I::%s:%s", config.tlm0_mycall, config.tlm0_ssid, call, raw);
-    }else{
-        if (config.tlm0_ssid == 0)
-            sprintf(str, "%s>APE32I:%s", config.tlm0_mycall, raw);
-        else
-            sprintf(str, "%s-%d>APE32I:%s", config.tlm0_mycall, config.tlm0_ssid, raw);
+    if (header)
+    {
+        if (config.tlm0_ssid == 0){
+            if (config.tlm0_path < 5)
+            {
+                if (config.tlm0_path > 0)
+                    sprintf(str, "%s>APE32I-%d::%s:%s", config.tlm0_mycall,config.tlm0_path, call, raw);
+                else
+                    sprintf(str, "%s>APE32I::%s:%s", config.tlm0_mycall, call, raw);
+            }
+            else
+            {
+                sprintf(str, "%s>APE32I,%s::%s:%s", config.tlm0_mycall,getPath(config.tlm0_path).c_str(), call, raw);
+            }
+        }else{
+            if (config.tlm0_path < 5)
+            {
+                if (config.tlm0_path > 0)
+                    sprintf(str, "%s-%d>APE32I-%d::%s:%s", config.tlm0_mycall, config.tlm0_ssid,config.tlm0_path, call, raw);
+                else
+                    sprintf(str, "%s-%d>APE32I::%s:%s", config.tlm0_mycall, config.tlm0_ssid, call, raw);
+            }
+            else
+            {
+                sprintf(str, "%s-%d>APE32I,%s::%s:%s", config.tlm0_mycall, config.tlm0_ssid,getPath(config.tlm0_path).c_str(),config.tlm0_path, call, raw);
+            }
+        }
+    }
+    else
+    {
+        if (config.tlm0_ssid == 0){
+            if (config.tlm0_path < 5)
+            {
+                if (config.tlm0_path > 0)
+                    sprintf(str, "%s>APE32I-%d:%s", config.tlm0_mycall,config.tlm0_path, raw);
+                else
+                    sprintf(str, "%s>APE32I:%s", config.tlm0_mycall, raw);
+            }
+            else
+            {
+                sprintf(str, "%s>APE32I,%s:%s", config.tlm0_mycall,getPath(config.tlm0_path).c_str(), raw);
+            }
+        }else{
+            if (config.tlm0_path < 5)
+            {
+                if (config.tlm0_path > 0)
+                    sprintf(str, "%s-%d>APE32I-%d:%s", config.tlm0_mycall, config.tlm0_ssid,config.tlm0_path, raw);
+                else
+                    sprintf(str, "%s-%d>APE32I:%s", config.tlm0_mycall, config.tlm0_ssid, raw);
+            }
+            else
+            {
+                sprintf(str, "%s-%d>APE32I,%s:%s", config.tlm0_mycall, config.tlm0_ssid,getPath(config.tlm0_path).c_str(),config.tlm0_path, raw);
+            }
+        }
     }
 
     if (config.tlm0_2rf)
@@ -2214,66 +2275,70 @@ void sendTelemetry_0(char *raw,bool header)
 RTC_IRAM_ATTR statusType statOld;
 uint8_t getSensor(int ch)
 {
-    int val=0;
-    switch(ch){
-        case 0: //Internal Temp
-            val=0;
+    int val = 0;
+    switch (ch)
+    {
+    case 0: // none
+        val = 0;
         break;
-        case 1: //allCount
-            val=status.allCount-statOld.allCount;
-            statOld.allCount=status.allCount;
+    case 1: // allCount
+        val = status.allCount - statOld.allCount;
+        statOld.allCount = status.allCount;
         break;
-        case 2: //rf2inet
-            val=status.rf2inet-statOld.rf2inet;
-            statOld.rf2inet=status.rf2inet;
+    case 2: // rf2inet
+        val = status.rf2inet - statOld.rf2inet;
+        statOld.rf2inet = status.rf2inet;
         break;
-        case 3: //inet2rf
-            val=status.inet2rf-statOld.inet2rf;
-            statOld.inet2rf=status.inet2rf;
+    case 3: // inet2rf
+        val = status.inet2rf - statOld.inet2rf;
+        statOld.inet2rf = status.inet2rf;
         break;
-        case 4: //digi
-            val=status.digiCount-statOld.digiCount;
-            statOld.digiCount=status.digiCount;
+    case 4: // digi
+        val = status.digiCount - statOld.digiCount;
+        statOld.digiCount = status.digiCount;
         break;
-        case 5: //Drop
-            val=status.dropCount-statOld.dropCount;
-            statOld.dropCount=status.dropCount;
+    case 5: // Drop
+        val = status.dropCount - statOld.dropCount;
+        statOld.dropCount = status.dropCount;
         break;
     }
-    if(val<0) val=0;
+    if (val < 0)
+        val = 0;
     return val;
 }
 
 bool getBits(int ch)
 {
-    bool val=false;
-    switch(ch){
-        case 0: //Internal Temp
-            val=0;
+    bool val = false;
+    switch (ch)
+    {
+    case 0: // none
+        val = 0;
         break;
-        case 1: //IGATE Enable
-            val=config.igate_en;
+    case 1: // IGATE Enable
+        val = config.igate_en;
         break;
-        case 2: //DIGI Enable
-            val=config.digi_en;
+    case 2: // DIGI Enable
+        val = config.digi_en;
         break;
-        case 3: //WX Enable
-            val=config.wx_en;
+    case 3: // WX Enable
+        val = config.wx_en;
         break;
-        case 4: //Sat Enable
-            val=0;
+    case 4: // Sat Enable
+        val = 0;
         break;
-        case 5: //APRS-IS Status
-            if(aprsClient.connected()) val=1;
+    case 5: // APRS-IS Status
+        if (aprsClient.connected())
+            val = 1;
         break;
-        case 6: //VPN Status
-            val=wireguard_active();
+    case 6: // VPN Status
+        val = wireguard_active();
         break;
-        case 7: //4G LTE
-            val=0;
+    case 7: // 4G LTE
+        val = 0;
         break;
-        case 8: //MQTT
-            val=0;
+    case 8: // MQTT
+        val = 0;
         break;
     }
     return val;
@@ -2281,26 +2346,85 @@ bool getBits(int ch)
 
 void getTelemetry_0()
 {
-    //A1
-    // systemTLM.A1=getSensor(2);
-    // systemTLM.A2=getSensor(3);
-    // systemTLM.A3=getSensor(4);
-    // systemTLM.A4=getSensor(1);
-    // systemTLM.A5=getSensor(5);
-    systemTLM.A1=getSensor(config.tml0_data_channel[0]);
-    systemTLM.A2=getSensor(config.tml0_data_channel[1]);
-    systemTLM.A3=getSensor(config.tml0_data_channel[2]);
-    systemTLM.A4=getSensor(config.tml0_data_channel[3]);
-    systemTLM.A5=getSensor(config.tml0_data_channel[4]);
-    systemTLM.BITS=0;
-    if(getBits(config.tml0_data_channel[5])) systemTLM.BITS|=0x01;
-    if(getBits(config.tml0_data_channel[6])) systemTLM.BITS|=0x02;
-    if(getBits(config.tml0_data_channel[7])) systemTLM.BITS|=0x04;
-    if(getBits(config.tml0_data_channel[8])) systemTLM.BITS|=0x08;
-    if(getBits(config.tml0_data_channel[9])) systemTLM.BITS|=0x10;
-    if(getBits(config.tml0_data_channel[10])) systemTLM.BITS|=0x20;
-    if(getBits(config.tml0_data_channel[11])) systemTLM.BITS|=0x40;
-    if(getBits(config.tml0_data_channel[12])) systemTLM.BITS|=0x80;
+    systemTLM.A1 = getSensor(config.tml0_data_channel[0]);
+    systemTLM.A2 = getSensor(config.tml0_data_channel[1]);
+    systemTLM.A3 = getSensor(config.tml0_data_channel[2]);
+    systemTLM.A4 = getSensor(config.tml0_data_channel[3]);
+    systemTLM.A5 = getSensor(config.tml0_data_channel[4]);
+    systemTLM.BITS = 0;
+    if (getBits(config.tml0_data_channel[5]))
+        systemTLM.BITS |= 0x01;
+    if (getBits(config.tml0_data_channel[6]))
+        systemTLM.BITS |= 0x02;
+    if (getBits(config.tml0_data_channel[7]))
+        systemTLM.BITS |= 0x04;
+    if (getBits(config.tml0_data_channel[8]))
+        systemTLM.BITS |= 0x08;
+    if (getBits(config.tml0_data_channel[9]))
+        systemTLM.BITS |= 0x10;
+    if (getBits(config.tml0_data_channel[10]))
+        systemTLM.BITS |= 0x20;
+    if (getBits(config.tml0_data_channel[11]))
+        systemTLM.BITS |= 0x40;
+    if (getBits(config.tml0_data_channel[12]))
+        systemTLM.BITS |= 0x80;
+}
+
+String getPath(int idx)
+{
+    String ret = "";
+    switch (idx)
+    {
+    case 0: // OFF
+        ret = "";
+        break;
+    case 1: // DST-TRACE1
+    case 2: // DST-TRACE2
+    case 3: // DST-TRACE3
+    case 4: // DST-TRACE4
+        ret = "DST" + String(idx);
+        break;
+    case 5: // TRACE1-1
+        ret = "TRACE1-1";
+        break;
+    case 6:
+        ret = "TRACE2-2";
+        break;
+    case 7:
+        ret = "TRACE3-3";
+        break;
+    case 8:
+        ret = "WIDE1-1";
+        break;
+    case 9:
+        ret = "RFONLY";
+        break;
+    case 10:
+        ret = "RELAY";
+        break;
+    case 11:
+        ret = "GATE";
+        break;
+    case 12:
+        ret = "ECHO";
+        break;
+    case 13: // UserDefine1
+        ret = String(config.path[0]);
+        break;
+    case 14: // UserDefine2
+        ret = String(config.path[1]);
+        break;
+    case 15: // UserDefine3
+        ret = String(config.path[2]);
+        break;
+    case 16: // UserDefine4
+        ret = String(config.path[3]);
+        break;
+    default:
+        ret = "WIDE1-1";
+        break;
+    }
+    return ret;
 }
 
 char EVENT_TX_POSITION = 0;
@@ -2379,7 +2503,7 @@ void taskAPRS(void *pvParameters)
     afskSetADCAtten(config.adc_atten);
     APRS_init();
     APRS_setCallsign(config.aprs_mycall, config.aprs_ssid);
-    APRS_setPath1(config.igate_path, 1);
+    //APRS_setPath1("WIDE1-1", 1);
     APRS_setPreamble(300);
     APRS_setTail(0);
     sendTimer = millis() - (config.igate_interval * 1000) + 30000;
@@ -2725,103 +2849,91 @@ void taskAPRS(void *pvParameters)
                 systemTLM.ParmTimeout = millis() + (config.tlm0_info_interval * 1000);
                 char rawInfo[100];
                 char name[10];
-                sprintf(rawInfo,"PARM.");
-                for(int i=0;i<13;i++){
-                    if(i>0) strcat(rawInfo,",");
-                    sprintf(name,"%s",config.tlm0_PARM[i]);
-                    strcat(rawInfo,name);
+                sprintf(rawInfo, "PARM.");
+                for (int i = 0; i < 13; i++)
+                {
+                    if (i > 0)
+                        strcat(rawInfo, ",");
+                    sprintf(name, "%s", config.tlm0_PARM[i]);
+                    strcat(rawInfo, name);
                 }
-                sendTelemetry_0(rawInfo,true);
-                memset(rawInfo,0,sizeof(rawInfo));
-                sprintf(rawInfo,"UNIT.");
-                for(int i=0;i<13;i++){
-                    if(i>0) strcat(rawInfo,",");
-                    sprintf(name,"%s",config.tlm0_UNIT[i]);
-                    strcat(rawInfo,name);
+                sendTelemetry_0(rawInfo, true);
+                memset(rawInfo, 0, sizeof(rawInfo));
+                sprintf(rawInfo, "UNIT.");
+                for (int i = 0; i < 13; i++)
+                {
+                    if (i > 0)
+                        strcat(rawInfo, ",");
+                    sprintf(name, "%s", config.tlm0_UNIT[i]);
+                    strcat(rawInfo, name);
                 }
-                sendTelemetry_0(rawInfo,true);
-                memset(rawInfo,0,sizeof(rawInfo));
-                sprintf(rawInfo,"EQNS.");
-                for(int i=0;i<5;i++){
-                    if(i>0) strcat(rawInfo,",");
-                    if(fmod(config.tlm0_EQNS[i][0],1)==0)
-                        sprintf(name,"%0.f",config.tlm0_EQNS[i][0]);
+                sendTelemetry_0(rawInfo, true);
+                memset(rawInfo, 0, sizeof(rawInfo));
+                sprintf(rawInfo, "EQNS.");
+                for (int i = 0; i < 5; i++)
+                {
+                    if (i > 0)
+                        strcat(rawInfo, ",");
+                    if (fmod(config.tlm0_EQNS[i][0], 1) == 0)
+                        sprintf(name, "%0.f", config.tlm0_EQNS[i][0]);
                     else
-                        sprintf(name,"%.3f",config.tlm0_EQNS[i][0]);
-                    strcat(rawInfo,name);
-                    if(fmod(config.tlm0_EQNS[i][1],1)==0)
-                        sprintf(name,",%0.f",config.tlm0_EQNS[i][1]);
+                        sprintf(name, "%.3f", config.tlm0_EQNS[i][0]);
+                    strcat(rawInfo, name);
+                    if (fmod(config.tlm0_EQNS[i][1], 1) == 0)
+                        sprintf(name, ",%0.f", config.tlm0_EQNS[i][1]);
                     else
-                        sprintf(name,",%.3f",config.tlm0_EQNS[i][1]);
-                    strcat(rawInfo,name);
-                    if(fmod(config.tlm0_EQNS[i][2],1)==0)
-                        sprintf(name,",%0.f",config.tlm0_EQNS[i][2]);
+                        sprintf(name, ",%.3f", config.tlm0_EQNS[i][1]);
+                    strcat(rawInfo, name);
+                    if (fmod(config.tlm0_EQNS[i][2], 1) == 0)
+                        sprintf(name, ",%0.f", config.tlm0_EQNS[i][2]);
                     else
-                        sprintf(name,",%.3f",config.tlm0_EQNS[i][2]);
-                    strcat(rawInfo,name);
+                        sprintf(name, ",%.3f", config.tlm0_EQNS[i][2]);
+                    strcat(rawInfo, name);
                 }
-                sendTelemetry_0(rawInfo,true);
-                memset(rawInfo,0,sizeof(rawInfo));
-                sprintf(rawInfo,"BITS.");
-                uint8_t b=1;
-                for(int i=0;i<8;i++){
-                    if(config.tlm0_BITS_Active&b){
-                        strcat(rawInfo,"1");
-                    }else{
-                        strcat(rawInfo,"0");
+                sendTelemetry_0(rawInfo, true);
+                memset(rawInfo, 0, sizeof(rawInfo));
+                sprintf(rawInfo, "BITS.");
+                uint8_t b = 1;
+                for (int i = 0; i < 8; i++)
+                {
+                    if (config.tlm0_BITS_Active & b)
+                    {
+                        strcat(rawInfo, "1");
                     }
-                    b<<=1;
-                }                
-                sendTelemetry_0(rawInfo,true);
+                    else
+                    {
+                        strcat(rawInfo, "0");
+                    }
+                    b <<= 1;
+                }
+                sendTelemetry_0(rawInfo, true);
             }
 
             if (systemTLM.TeleTimeout < millis())
             {
                 systemTLM.TeleTimeout = millis() + (config.tlm0_data_interval * 1000);
                 char rawTlm[100];
-                if(systemTLM.Sequence>999)
-                    systemTLM.Sequence=0;
+                if (systemTLM.Sequence > 999)
+                    systemTLM.Sequence = 0;
                 else
                     systemTLM.Sequence++;
                 getTelemetry_0();
                 sprintf(rawTlm, "T#%03d,%03d,%03d,%03d,%03d,%03d,", systemTLM.Sequence, systemTLM.A1, systemTLM.A2, systemTLM.A3, systemTLM.A4, systemTLM.A5);
-                uint8_t b=1;
-                for(int i=0;i<8;i++){
-                    if(systemTLM.BITS&b){
-                        strcat(rawTlm,"1");
-                    }else{
-                        strcat(rawTlm,"0");
+                uint8_t b = 1;
+                for (int i = 0; i < 8; i++)
+                {
+                    if ((systemTLM.BITS & b) ^ (config.tlm0_BITS_Active & b))
+                    {
+                        strcat(rawTlm, "1");
                     }
-                    b<<=1;
+                    else
+                    {
+                        strcat(rawTlm, "0");
+                    }
+                    b <<= 1;
                 }
-                strcat(rawTlm,config.tlm0_comment);
-                sendTelemetry_0(rawTlm,false);
-                // if ((igateTLM.Sequence % 6) == 0)
-                // {
-                //     sendIsPkgMsg((char *)&PARM[0]);
-                //     sendIsPkgMsg((char *)&UNIT[0]);
-                //     sendIsPkgMsg((char *)&EQNS[0]);
-                // }
-                // char rawTlm[100];
-                // if (config.aprs_ssid == 0)
-                //     sprintf(rawTlm, "%s>APE32I:T#%03d,%d,%d,%d,%d,%d,00000000", config.aprs_mycall, igateTLM.Sequence, igateTLM.RF2INET, igateTLM.INET2RF, igateTLM.RX, igateTLM.TX, igateTLM.DROP);
-                // else
-                //     sprintf(rawTlm, "%s-%d>APE32I:T#%03d,%d,%d,%d,%d,%d,00000000", config.aprs_mycall, config.aprs_ssid, igateTLM.Sequence, igateTLM.RF2INET, igateTLM.INET2RF, igateTLM.RX, igateTLM.TX, igateTLM.DROP);
-
-                // if (aprsClient.connected())
-                //     aprsClient.println(String(rawTlm)); // Send packet to Inet
-                // if (config.tnc && config.tnc_digi)
-                //     pkgTxUpdate(rawTlm, 0);
-                // // APRS_sendTNC2Pkt(String(rawTlm)); // Send packet to RF
-                // igateTLM.Sequence++;
-                // if (igateTLM.Sequence > 999)
-                //     igateTLM.Sequence = 0;
-                // igateTLM.DROP = 0;
-                // igateTLM.INET2RF = 0;
-                // igateTLM.RF2INET = 0;
-                // igateTLM.RX = 0;
-                // igateTLM.TX = 0;
-                // client.println(raw);
+                strcat(rawTlm, config.tlm0_comment);
+                sendTelemetry_0(rawTlm, false);
             }
         }
     }

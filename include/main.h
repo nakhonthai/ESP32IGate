@@ -165,7 +165,7 @@ typedef struct Config_Struct
 	char igate_symbol[3] = "N&";
 	char igate_object[10];
 	char igate_phg[8];
-	char igate_path[72];
+	uint8_t igate_path;
 	char igate_comment[50];
 	//--Filter
 
@@ -176,7 +176,7 @@ typedef struct Config_Struct
 	bool digi_timestamp;
 	uint8_t digi_ssid;
 	char digi_mycall[10];
-	char digi_path[72];
+	uint8_t digi_path;
 	uint16_t digi_delay; // ms
 	uint16_t digiFilter;
 	//--Position
@@ -199,24 +199,24 @@ typedef struct Config_Struct
 	bool wx_timestamp;
 	uint8_t wx_ssid;
 	char wx_mycall[10];
-	char wx_path[72];
+	uint8_t wx_path;
 	bool wx_gps;
 	float wx_lat;
 	float wx_lon;
 	float wx_alt;
 	uint16_t wx_interval;
+	uint8_t wx_type[32]; //Sensor number 32
+	uint32_t wx_flage;
 	char wx_object[10];
 	char wx_comment[50];
-	uint8_t wx_mode;
-	uint32_t wx_flage;
 
-	// Telemetry
+	// Telemetry 0
 	bool tlm0_en;
 	bool tlm0_2rf;
 	bool tlm0_2inet;
 	uint8_t tlm0_ssid;
 	char tlm0_mycall[10];
-	char tlm0_path[72];
+	uint8_t tlm0_path;
 	uint16_t tlm0_data_interval;
 	uint16_t tlm0_info_interval;
 	char tlm0_PARM[13][10];
@@ -225,6 +225,22 @@ typedef struct Config_Struct
 	uint8_t tlm0_BITS_Active;	
 	char tlm0_comment[50];
 	uint8_t tml0_data_channel[13];
+
+	// Telemetry 1
+	bool tlm1_en;
+	bool tlm1_2rf;
+	bool tlm1_2inet;
+	uint8_t tlm1_ssid;
+	char tlm1_mycall[10];
+	uint8_t tlm1_path;
+	uint16_t tlm1_data_interval;
+	uint16_t tlm1_info_interval;
+	char tlm1_PARM[13][10];
+	char tlm1_UNIT[13][8];
+	float tlm1_EQNS[5][3];
+	uint8_t tlm1_BITS_Active;	
+	char tlm1_comment[50];
+	uint8_t tml1_data_channel[13];
 
 	// OLED DISPLAY
 	bool oled_enable;
@@ -264,7 +280,7 @@ typedef struct Config_Struct
 	char http_username[32];
 	char http_password[64];
 
-	char path[4][15];
+	char path[4][72];
 
 	// GNSS
 	bool gnss_enable;
@@ -489,5 +505,6 @@ void pkgLastDisp();
 void statisticsDisp();
 String getTimeStamp();
 void DD_DDDDDtoDDMMSS(float DD_DDDDD, int *DD, int *MM, int *SS);
+String getPath(int idx);
 
 #endif
