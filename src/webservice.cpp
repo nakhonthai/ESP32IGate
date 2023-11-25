@@ -4552,6 +4552,22 @@ void handle_tlm()
 					}
 				}
 			}
+			uint8_t b=1;
+			for(int x=0;x<8;x++){
+				arg="bitact"+String(x);
+				if (server.argName(i) == arg)
+				{
+					if (isValidNumber(server.arg(i)))
+					{
+						if(server.arg(i).toInt()==1){
+							config.tlm0_BITS_Active|=b;
+						}else{
+							config.tlm0_BITS_Active &= ~b;
+						}
+					}
+				}
+				b<<=1;
+			}
 		}
 		config.tlm0_en = En;
 		config.tlm0_2rf = pos2RF;

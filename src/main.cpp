@@ -561,7 +561,7 @@ void defaultConfig()
     sprintf(config.tlm0_UNIT[10], "ON");
     sprintf(config.tlm0_UNIT[11], "ON");
     sprintf(config.tlm0_UNIT[12], "ON");
-    config.tlm0_BITS_Active = 0x00;
+    config.tlm0_BITS_Active = 0xFF;
     config.tml0_data_channel[0] = 2;
     config.tml0_data_channel[1] = 3;
     config.tml0_data_channel[2] = 4;
@@ -1923,7 +1923,7 @@ String digi_position(double lat, double lon, double alt, String comment)
     else
         sprintf(strtmp, "%s-%d>APE32I", config.digi_mycall, config.digi_ssid);
     tnc2Raw = String(strtmp);
-if (config.digi_path < 5)
+    if (config.digi_path < 5)
     {
         if (config.digi_path > 0)
             tnc2Raw += "-" + String(config.digi_path);
@@ -2906,6 +2906,8 @@ void taskAPRS(void *pvParameters)
                     }
                     b <<= 1;
                 }
+                strcat(rawInfo,",");
+                strcat(rawInfo, config.tlm0_comment);
                 sendTelemetry_0(rawInfo, true);
             }
 
@@ -2931,8 +2933,7 @@ void taskAPRS(void *pvParameters)
                         strcat(rawTlm, "0");
                     }
                     b <<= 1;
-                }
-                strcat(rawTlm, config.tlm0_comment);
+                }                
                 sendTelemetry_0(rawTlm, false);
             }
         }
