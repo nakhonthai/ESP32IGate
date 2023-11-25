@@ -2924,7 +2924,7 @@ void taskAPRS(void *pvParameters)
                 uint8_t b = 1;
                 for (int i = 0; i < 8; i++)
                 {
-                    if ((systemTLM.BITS & b) ^ (config.tlm0_BITS_Active & b))
+                    if (!((systemTLM.BITS & b) ^ (config.tlm0_BITS_Active & b)))
                     {
                         strcat(rawTlm, "1");
                     }
