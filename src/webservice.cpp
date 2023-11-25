@@ -2298,6 +2298,50 @@ void handle_system()
 		saveEEPROM();
 		String html = "OK";
 		server.send(200, "text/html", html);
+	}else if (server.hasArg("commitPath"))
+	{
+		for (uint8_t i = 0; i < server.args(); i++)
+		{
+			// Serial.print("SERVER ARGS ");
+			// Serial.print(server.argName(i));
+			// Serial.print("=");
+			// Serial.println(server.arg(i));
+			if (server.argName(i) == "path1")
+			{
+				if (server.arg(i) != "")
+				{
+					strcpy(config.path[0], server.arg(i).c_str());
+				}
+				break;
+			}
+			if (server.argName(i) == "path2")
+			{
+				if (server.arg(i) != "")
+				{
+					strcpy(config.path[1], server.arg(i).c_str());
+				}
+				break;
+			}
+			if (server.argName(i) == "path3")
+			{
+				if (server.arg(i) != "")
+				{
+					strcpy(config.path[1], server.arg(i).c_str());
+				}
+				break;
+			}
+			if (server.argName(i) == "path4")
+			{
+				if (server.arg(i) != "")
+				{
+					strcpy(config.path[3], server.arg(i).c_str());
+				}
+				break;
+			}
+		}
+		saveEEPROM();
+		String html = "OK";
+		server.send(200, "text/html", html);
 	}
 	else if (server.hasArg("commitDISP"))
 	{
@@ -2510,6 +2554,7 @@ void handle_system()
 		html += "if(e.currentTarget.id===\"formReboot\") document.getElementById(\"REBOOT\").disabled=true;\n";
 		html += "if(e.currentTarget.id===\"formDisp\") document.getElementById(\"submitDISP\").disabled=true;\n";
 		html += "if(e.currentTarget.id===\"formWebAuth\") document.getElementById(\"submitWebAuth\").disabled=true;\n";
+		html += "if(e.currentTarget.id===\"formPath\") document.getElementById(\"submitPath\").disabled=true;\n";
 		html += "$.ajax({\n";
 		html += "url: '/system',\n";
 		html += "type: 'POST',\n";
@@ -2587,6 +2632,31 @@ void handle_system()
 		html += "</table><br />\n";
 		html += "<div><button type='submit' id='submitWebAuth'  name=\"commit\"> Apply Change </button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitWebAuth\"/>\n";
+		html += "</form><br /><br />";
+
+		/************************ PATH USER define **************************/
+		html += "<form id='formPath' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
+		html += "<table>\n";
+		html += "<th colspan=\"2\"><span><b>PATH USER Define</b></span></th>\n";
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>PATH_1:</b></td>\n";
+		html += "<td style=\"text-align: left;\"><input size=\"72\" maxlength=\"72\" class=\"form-control\" name=\"path1\" type=\"text\" value=\"" + String(config.path[0]) + "\" /></td>\n";
+		html += "</tr>\n";
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>PATH_2:</b></td>\n";
+		html += "<td style=\"text-align: left;\"><input size=\"72\" maxlength=\"72\" class=\"form-control\" name=\"path2\" type=\"text\" value=\"" + String(config.path[1]) + "\" /></td>\n";
+		html += "</tr>\n";
+				html += "<tr>\n";
+		html += "<td align=\"right\"><b>PATH_3:</b></td>\n";
+		html += "<td style=\"text-align: left;\"><input size=\"72\" maxlength=\"72\" class=\"form-control\" name=\"path3\" type=\"text\" value=\"" + String(config.path[2]) + "\" /></td>\n";
+		html += "</tr>\n";
+				html += "<tr>\n";
+		html += "<td align=\"right\"><b>PATH_4:</b></td>\n";
+		html += "<td style=\"text-align: left;\"><input size=\"72\" maxlength=\"72\" class=\"form-control\" name=\"path4\" type=\"text\" value=\"" + String(config.path[3]) + "\" /></td>\n";
+		html += "</tr>\n";
+		html += "</table><br />\n";
+		html += "<div><button type='submit' id='submitPath'  name=\"commitPath\"> Apply Change </button></div>\n";
+		html += "<input type=\"hidden\" name=\"commitPath\"/>\n";
 		html += "</form><br /><br />";
 #ifdef OLED
 		html += "<form id='formDisp' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
