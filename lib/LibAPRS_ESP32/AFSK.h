@@ -180,8 +180,8 @@ inline static uint8_t sinSample(uint16_t i)
 
 #define SPK_PIN ADC1_CHANNEL_0 // Read ADC1_0 From PIN 36(VP)
 #define MIC_PIN 26             // Out wave to PIN 26
-#define RSSI_PIN 33
-#define PTT_PIN 32
+// #define RSSI_PIN 33
+// #define PTT_PIN 32
 #define LED_PIN 2
 #define LED_TX_PIN 4
 
@@ -285,6 +285,7 @@ typedef struct Afsk
 
 extern bool input_HPF;
 extern bool input_BPF;
+extern int offset;
 
 void AFSK_init(Afsk *afsk);
 void AFSK_transmit(char *buffer, size_t size);
@@ -292,7 +293,6 @@ void AFSK_poll(Afsk *afsk);
 
 void afsk_putchar(char c);
 int afsk_getchar(void);
-void afskSetSQL(int8_t val,bool act);
 void AFSK_Poll(bool SA818,bool RFPower);
 void AFSK_TimerEnable(bool sts);
 void afskSetHPF(bool val);
@@ -300,5 +300,10 @@ void afskSetBPF(bool val);
 int read_adc_dma(uint32_t *ret_num, uint8_t *result);
 void afskSetDCOffset(int val);
 void afskSetADCAtten(uint8_t val);
+void afskSetPTT(int8_t val, bool act);
+void afskSetPWR(int8_t val, bool act);
+void afskSetSQL(int8_t val, bool act);
+bool getTransmit();
+bool getReceive();
 
 #endif

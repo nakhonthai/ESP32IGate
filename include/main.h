@@ -11,7 +11,7 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define VERSION "1.0"
+#define VERSION "1.1"
 #define VERSION_BUILD ' '
 
 // #define DEBUG
@@ -100,7 +100,7 @@ typedef struct Config_Struct
 
 	// WiFi/BT/RF
 	char wifi_mode; // WIFI_AP,WIFI_STA,WIFI_AP_STA,WIFI_OFF
-	char wifi_power;
+	int8_t wifi_power;
 	//--WiFi Client
 	wifiSTA wifi_sta[5];
 	// bool wifi_client;
@@ -192,6 +192,40 @@ typedef struct Config_Struct
 	char digi_phg[8];
 	char digi_comment[50];
 
+// TRACKER
+	bool trk_en;
+	bool trk_loc2rf;
+	bool trk_loc2inet;
+	bool trk_timestamp;
+	uint8_t trk_ssid;
+	char trk_mycall[10];
+	uint8_t trk_path;
+	//--Position
+	bool trk_gps;
+	float trk_lat;
+	float trk_lon;
+	float trk_alt;
+	uint16_t trk_interval = 60;
+	bool trk_smartbeacon = false;
+	bool trk_compress = false;
+	bool trk_altitude = false;
+	bool trk_cst = false;
+	bool trk_bat = false;
+	bool trk_sat = false;
+	bool trk_dx = false;
+	uint16_t trk_hspeed = 120;
+	uint8_t trk_lspeed = 2;
+	uint8_t trk_maxinterval = 15;
+	uint8_t trk_mininterval = 5;
+	uint8_t trk_minangle = 25;
+	uint16_t trk_slowinterval = 600;
+	char trk_symbol[3] = "\\>";
+	char trk_symmove[3] = "/>";
+	char trk_symstop[3] = "\\>";
+	// char trk_btext[17] = "";
+	char trk_comment[50];
+	char trk_item[10] = "";
+
 	// WX
 	bool wx_en;
 	bool wx_2rf;
@@ -205,6 +239,7 @@ typedef struct Config_Struct
 	float wx_lon;
 	float wx_alt;
 	uint16_t wx_interval;
+	int8_t wx_channel = 0;
 	uint8_t wx_type[32]; //Sensor number 32
 	uint32_t wx_flage;
 	char wx_object[10];
@@ -284,10 +319,11 @@ typedef struct Config_Struct
 
 	// GNSS
 	bool gnss_enable;
-	unsigned long gnss_baudrate;
-	int8_t gnss_rx_gpio;
-	int8_t gnss_tx_gpio;
-	int8_t gnss_pps_gpio;
+	int8_t gnss_pps_gpio = -1;
+	int8_t gnss_channel = 0;	
+	uint16_t gnss_tcp_port;
+	char gnss_tcp_host[20];
+	char gnss_at_command[30];
 
 	unsigned long rf_baudrate;
 	int8_t rf_tx_gpio = 13;
@@ -315,10 +351,27 @@ typedef struct Config_Struct
 	bool onewire_enable = false;
 	int8_t onewire_gpio = -1;
 
+	bool uart0_enable = false;
+	unsigned long uart0_baudrate;
+	int8_t uart0_tx_gpio = -1;
+	int8_t uart0_rx_gpio = -1;
+	int8_t uart0_rts_gpio = -1;
+
+	bool uart1_enable = false;
+	unsigned long uart1_baudrate;
+	int8_t uart1_tx_gpio = -1;
+	int8_t uart1_rx_gpio = -1;
+	int8_t uart1_rts_gpio = -1;
+
+	bool uart2_enable = false;
+	unsigned long uart2_baudrate;
+	int8_t uart2_tx_gpio = -1;
+	int8_t uart2_rx_gpio = -1;
+	int8_t uart2_rts_gpio = -1;
+
 	bool modbus_enable = false;
-	unsigned long modbus_baudrate;
-	int8_t modbus_tx_gpio = -1;
-	int8_t modbus_rx_gpio = -1;
+	uint8_t modbus_address = 0;
+	int8_t modbus_channel = -1;
 	int8_t modbus_de_gpio = -1;
 
 	bool counter0_enable = false;
@@ -328,6 +381,10 @@ typedef struct Config_Struct
 	bool counter1_enable = false;
 	bool counter1_active = 0;
 	int8_t counter1_gpio = -1;
+
+	bool ext_tnc_enable = false;
+	int8_t ext_tnc_channel = 0;
+	int8_t ext_tnc_mode = 0;
 
 } Configuration;
 
@@ -467,13 +524,17 @@ const float ctcss[] = {0, 67, 71.9, 74.4, 77, 79.7, 82.5, 85.4, 88.5, 91.5, 94.8
 const float wifiPwr[12][2] = {{-4, -1}, {8, 2}, {20, 5}, {28, 7}, {34, 8.5}, {44, 11}, {52, 13}, {60, 15}, {68, 17}, {74, 18.5}, {76, 19}, {78, 19.5}};
 const char RF_TYPE[9][11] = {"NONE", "SA868_VHF", "SA868_UHF", "SA868_350", "SR110V_VHF", "SR110U_UHF", "SR350P", "SR120V_VHF", "SR120U_UHF"};
 const unsigned long baudrate[] = {2400, 4800, 9600, 19200, 2880, 38400, 57600, 76800, 115200, 230400, 460800, 576000, 921600};
+const char GNSS_PORT[5][6] = {"NONE", "UART0", "UART1", "UART2", "TCP"};
+const char TNC_PORT[4][6] = {"NONE", "UART0", "UART1", "UART2"};
+const char TNC_MODE[4][6] = {"NONE", "KISS", "TNC2", "YAESU"};
+const char WX_PORT[7][11] = {"NONE", "UART0_CSV", "UART1_CSV", "UART2_CSV", "MODBUS","SENSOR","TCP/UDP"};
 
 uint8_t checkSum(uint8_t *ptr, size_t count);
 void saveEEPROM();
 void defaultConfig();
 String getValue(String data, char separator, int index);
 boolean isValidNumber(String str);
-void taskGPS(void *pvParameters);
+void taskSerial(void *pvParameters);
 void taskAPRS(void *pvParameters);
 void taskNetwork(void *pvParameters);
 void taskTNC(void *pvParameters);
@@ -499,6 +560,7 @@ String sendIsAckMsg(String toCallSign, char *msgId);
 bool pkgTxPush(const char *info, size_t len, int dly);
 bool pkgTxUpdate(const char *info, int delay);
 void dispWindow(String line, uint8_t mode, bool filter);
+void dispTxWindow(txDisp txs);
 void systemDisp();
 void pkgCountDisp();
 void pkgLastDisp();
@@ -506,5 +568,6 @@ void statisticsDisp();
 String getTimeStamp();
 void DD_DDDDDtoDDMMSS(float DD_DDDDD, int *DD, int *MM, int *SS);
 String getPath(int idx);
+void GPS_INIT();
 
 #endif

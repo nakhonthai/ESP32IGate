@@ -23,8 +23,8 @@ int adcVal;
 bool input_HPF = false;
 bool input_BPF = false;
 
-int8_t sql_pin;
-bool sql_active;
+int8_t _sql_pin,_ptt_pin,_pwr_pin,_dac_pin,_adc_pin;
+bool _sql_active,_ptt_active,_pwr_active;
 
 uint8_t adc_atten;
 
@@ -210,11 +210,27 @@ void AFSK_TimerEnable(bool sts)
 
 #endif
 
+bool getTransmit()
+{
+  bool ret=false;
+  if ((digitalRead(_ptt_pin) ^ _ptt_active) == 0) // signal active with ptt_active
+      ret = true;
+    else
+      ret = false;
+  if(hw_afsk_dac_isr) ret=true;
+  return ret;
+}
+
+void setTransmit(bool val)
+{
+  hw_afsk_dac_isr=val;
+}
+
 bool getReceive()
 {
   bool ret = false;
-  if (digitalRead(PTT_PIN) == 0)
-    return true; // PTT Protection receive
+  if ((digitalRead(_ptt_pin) ^ _ptt_active) == 0) // signal active with ptt_active
+      return false; // PTT Protection receive
   if (AFSK_modem->hdlc.receiving == true)
     ret = true;
   return ret;
@@ -230,22 +246,34 @@ void afskSetBPF(bool val)
 }
 void afskSetSQL(int8_t val, bool act)
 {
-  sql_pin = val;
-  sql_active = act;
+  _sql_pin = val;
+  _sql_active = act;
+}
+void afskSetPTT(int8_t val, bool act)
+{
+  _ptt_pin = val;
+  _ptt_active = act;
+}
+void afskSetPWR(int8_t val, bool act)
+{
+  _pwr_pin = val;
+  _pwr_active = act;
 }
 
 esp_adc_cal_characteristics_t adc_chars;
 void AFSK_hw_init(void)
 {
   // Set up ADC
-  pinMode(RSSI_PIN, INPUT_PULLUP);
-  pinMode(PTT_PIN, OUTPUT);
+  pinMode(_sql_pin, INPUT_PULLUP);
+  pinMode(_ptt_pin, OUTPUT);
+  pinMode(_pwr_pin, OUTPUT);
   pinMode(4, OUTPUT);
 
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
 
-  digitalWrite(PTT_PIN, LOW);
+  digitalWrite(_ptt_pin, !_ptt_active);
+  digitalWrite(_pwr_pin, LOW);
 
   esp_adc_cal_characterize(ADC_UNIT_1, cfg_adc_atten, ADC_WIDTH_BIT_12, 1100, &adc_chars);
 
@@ -325,7 +353,7 @@ static void AFSK_txStart(Afsk *afsk)
     afsk->bitstuffCount = 0;
     // LED_TX_ON();
     digitalWrite(LED_TX_PIN, HIGH);
-    digitalWrite(PTT_PIN, HIGH);
+    digitalWrite(_ptt_pin, _ptt_active);
     afsk->preambleLength = DIV_ROUND(custom_preamble * BITRATE, 9600);
     AFSK_DAC_IRQ_START();
 #ifdef I2S_INTERNAL
@@ -918,9 +946,9 @@ void AFSK_Poll(bool SA818, bool RFPower)
   int8_t adc;
 #endif
 
-  if (sql_pin > 0)
+  if (_sql_pin > 0)
   {                                               // Set SQL pin active
-    if ((digitalRead(sql_pin) ^ sql_active) == 0) // signal active with sql_active
+    if ((digitalRead(_sql_pin) ^ _sql_active) == 0) // signal active with sql_active
       sqlActive = true;
     else
       sqlActive = false;
@@ -969,7 +997,7 @@ void AFSK_Poll(bool SA818, bool RFPower)
      
       //if (i2s_write_bytes(I2S_NUM_0, (char *)&pcm_out, (x * sizeof(uint16_t)), portMAX_DELAY) == ESP_OK)
       size_t writeByte;
-      if (i2s_write(I2S_NUM_0, (char *)&pcm_out, (x * sizeof(uint16_t)),&writeByte, portMAX_DELAY) == ESP_OK)
+      if (i2s_write(I2S_NUM_0, (char *)&pcm_out, (x * sizeof(uint16_t)),&writeByte, portMAX_DELAY) != ESP_OK)
       {
         log_d("I2S Write Error");
       }
@@ -1022,7 +1050,7 @@ void AFSK_Poll(bool SA818, bool RFPower)
       dac_i2s_disable();
       i2s_zero_dma_buffer(I2S_NUM_0);
       // i2s_adc_enable(I2S_NUM_0);
-      digitalWrite(PTT_PIN, LOW);
+      digitalWrite(_ptt_pin, !_ptt_active);
       // if (SA818)
       // {
       //   digitalWrite(12, LOW); // RF Power LOW

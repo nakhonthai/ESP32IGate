@@ -69,6 +69,6 @@ typedef struct Weather_Struct
 extern WeatherData weather;
 
 int getRawWx(char *strData);
-bool getCSV2Wx();
+bool getCSV2Wx(String stream);
 
 #endif

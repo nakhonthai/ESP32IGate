@@ -15,6 +15,7 @@
 #include <Update.h>
 #include <WiFi.h>
 #include <WebServer.h>
+#include <ESPAsyncWebServer.h>
 #include <HTTPClient.h>
 #include <time.h>
 #include <TimeLib.h>
@@ -94,6 +95,7 @@ extern TinyGPSPlus gps;
 extern float vbat;
 extern WiFiClient aprsClient;
 extern bool initInterval;
+extern bool webServiceBegin;
 
 #ifdef __cplusplus
 extern "C"
@@ -116,5 +118,7 @@ void handle_default();
 void webService();
 void handle_radio();
 extern void RF_MODULE(bool boot);
+void handle_ws();
+void handle_ws_gnss(char *nmea);
 
 #endif
