@@ -3322,35 +3322,37 @@ void taskSerial(void *pvParameters)
             }
         }
 
-        if (config.gnss_enable && SerialGNSS != NULL)
+        if (config.gnss_enable)
         {
             if ((config.gnss_channel > 0) && (config.gnss_channel < 4))
             {
-                while (SerialGNSS->available())
-                {
-                    c = (char)SerialGNSS->read();
-                    // Serial.print(c);
-                    gps.encode(c);
-                    if (nmea_idx > 195)
+                if(SerialGNSS != NULL){
+                    while (SerialGNSS->available())
                     {
-                        nmea_idx = 0;
-                        memset(nmea, 0, sizeof(nmea));
-                    }
-                    else
-                    {
-                        nmea[nmea_idx++] = c;
-                        if (c == '\r' || c == '\n')
+                        c = (char)SerialGNSS->read();
+                        // Serial.print(c);
+                        gps.encode(c);
+                        if (nmea_idx > 195)
                         {
-                            nmea[nmea_idx++] = 0;
-                            if (nmea_idx > 5)
-                            {
-                                if (webServiceBegin == false)
-                                {
-                                    handle_ws_gnss(nmea);
-                                }
-                                // log_d("%s",nmea);
-                            }
                             nmea_idx = 0;
+                            memset(nmea, 0, sizeof(nmea));
+                        }
+                        else
+                        {
+                            nmea[nmea_idx++] = c;
+                            if (c == '\r' || c == '\n')
+                            {
+                                nmea[nmea_idx++] = 0;
+                                if (nmea_idx > 5)
+                                {
+                                    if (webServiceBegin == false)
+                                    {
+                                        handle_ws_gnss(nmea);
+                                    }
+                                    // log_d("%s",nmea);
+                                }
+                                nmea_idx = 0;
+                            }
                         }
                     }
                 }
