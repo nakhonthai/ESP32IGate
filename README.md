@@ -1,6 +1,6 @@
 # ESP32IGate Simple Project
 
-ESP32IGate is a Internet Gateway(IGate)/Dital Repeater(DiGi) with TNC Built in that is implemented for Espressif ESP32 processor.
+ESP32IGate is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weather(WX)/Telemetry(TLM) with TNC Built in that is implemented for Espressif ESP32 processor.
  
 
 ## Feature
@@ -9,6 +9,9 @@ ESP32IGate is a Internet Gateway(IGate)/Dital Repeater(DiGi) with TNC Built in t
 * Supported RF Module: SA8x8/FRS VHF/UHF/350 model
 * Support APRS internet gateway (IGATE)
 * Support APRS digital repeater (DIGI)
+* Support APRS tracker (TRACKER)
+* Support GNSS External mod select UART0-2 and TCP Client
+* Support TNC External mod select UART0-2 and Yaesu packet
 * Support APRS IGATE/DIGI/WX with fix position for move position from GNSS
 * Using ESP-Arduino development on Visual studio code + Platform IO
 * Support Bell202 1200bps AFSK (It has a very good sine wave signal.)
