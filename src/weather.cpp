@@ -64,6 +64,16 @@ bool getCSV2Wx(String stream)
         weather.ibat = getValue(weatherRaw, ',', 11).toFloat();
         weather.pbat = getValue(weatherRaw, ',', 12).toInt();
 
+        weather.visable|=WX_RAIN;
+        weather.visable|=WX_RAIN24HR;
+        weather.visable|=WX_WIND_SPD;
+        weather.visable|=WX_WIND_DIR;
+        weather.visable|=WX_LUMINOSITY;
+        weather.visable|=WX_BARO;
+        weather.visable|=WX_WIND_GUST;
+        weather.visable|=WX_TEMP;
+        weather.visable|=WX_HUMIDITY;
+
         weatherUpdate = false;
         // wxTimeout = millis();
         char strData[300];
@@ -86,6 +96,35 @@ bool getCSV2Wx(String stream)
     }
     return false;
     // ModbusSerial.flush();
+}
+
+bool state = true;
+bool getM702Modbus(ModbusMaster &node)
+{
+uint8_t result;
+  
+  // Toggle the coil at address 0x0002 (Manual Load Control)
+  result = node.writeSingleCoil(0x0002, state);
+  state = !state;
+
+  // Read 16 registers starting at 0x3100)
+  result = node.readInputRegisters(0x0002, 7);
+  if (result == node.ku8MBSuccess)
+  {
+    weather.co2 = node.getResponseBuffer(0x00); //Co2 PPM
+    weather.ch2o = node.getResponseBuffer(0x02); //ug
+    weather.pm25 = node.getResponseBuffer(0x06); //PM2.5ug
+    weather.pm100 = node.getResponseBuffer(0x08); //PM10 ug
+    weather.temperature = (float)node.getResponseBuffer(10)/10.0f; //C
+    weather.humidity = (float)node.getResponseBuffer(12)/10.0f; //%RH
+    weather.visable|=WX_CO2;
+    weather.visable|=WX_PM25;
+    weather.visable|=WX_PM100;
+    weather.visable|=WX_TEMP;
+    weather.visable|=WX_HUMIDITY;
+    return true;
+  }
+  return false;
 }
 
 int getRawWx(char *strData)
@@ -158,7 +197,10 @@ int getRawWx(char *strData)
 
     if (config.wx_flage & WX_WIND_DIR)
     {
-        sprintf(strtmp, "%03u/", weather.winddirection);
+        if(weather.visable & WX_WIND_DIR)
+            sprintf(strtmp, "%03u/", weather.winddirection);
+        else
+            sprintf(strtmp, ".../");
     }
     else
     {
@@ -167,13 +209,18 @@ int getRawWx(char *strData)
     strcat(strData, strtmp);
     if (config.wx_flage & WX_WIND_SPD)
     {
-        sprintf(strtmp, "%03u", (unsigned int)(weather.windspeed * 0.621));
+        if(weather.visable & WX_WIND_SPD)
+            sprintf(strtmp, "%03u", (unsigned int)(weather.windspeed * 0.621));
+        else
+            sprintf(strtmp, "...");
+        
     }
     else
     {
         sprintf(strtmp, "...");
     }
     strcat(strData, strtmp);
+
     if (config.wx_flage & WX_WIND_GUST)
     {
         sprintf(strtmp, "g%03u", (unsigned int)(weather.windgust * 0.621));
@@ -186,8 +233,12 @@ int getRawWx(char *strData)
 
     if (config.wx_flage & WX_TEMP)
     {
-        unsigned int tempF = (unsigned int)((weather.temperature * 9 / 5) + 32);
-        sprintf(strtmp, "t%03u", tempF);
+        if(weather.visable & WX_TEMP){
+            unsigned int tempF = (unsigned int)((weather.temperature * 9 / 5) + 32);
+            sprintf(strtmp, "t%03u", tempF);
+        }else{
+            sprintf(strtmp, "t...");
+        }
     }
     else
     {
@@ -214,7 +265,11 @@ int getRawWx(char *strData)
 
     if (config.wx_flage & WX_RAIN)
     {
-        sprintf(strtmp, "r%03u", rain);
+        if(weather.visable & WX_RAIN)
+            sprintf(strtmp, "r%03u", rain);
+        else
+            sprintf(strtmp, "r...");
+        
     }
     else
     {
@@ -223,16 +278,25 @@ int getRawWx(char *strData)
     strcat(strData, strtmp);
     if (config.wx_flage & WX_RAIN24HR)
     {
-        sprintf(strtmp, "p%03u", rain24);
+        if(weather.visable & WX_RAIN24HR)
+            sprintf(strtmp, "p%03u", rain24);
+        else
+            sprintf(strtmp, "p...");
+        
     }
     else
     {
         sprintf(strtmp, "p...");
     }
     strcat(strData, strtmp);
+
     if (config.wx_flage & WX_RAIN_GMT)
     {
-        sprintf(strtmp, "P%03u", rainGMT);
+        if(weather.visable & WX_RAIN_GMT)
+            sprintf(strtmp, "P%03u", rainGMT);
+        else
+            sprintf(strtmp, "P...");
+        
     }
     else
     {
@@ -242,7 +306,11 @@ int getRawWx(char *strData)
 
     if (config.wx_flage & WX_HUMIDITY)
     {
-        sprintf(strtmp, "h%02u", (unsigned int)weather.humidity);
+        if(weather.visable & WX_HUMIDITY)
+            sprintf(strtmp, "h%02u", (unsigned int)weather.humidity);
+        else
+            sprintf(strtmp, "h..");
+        
     }
     else
     {
@@ -252,7 +320,11 @@ int getRawWx(char *strData)
 
     if (config.wx_flage & WX_BARO)
     {
-        sprintf(strtmp, "b%05u", (unsigned int)(weather.barometric * 10));
+        if(weather.visable & WX_BARO)
+            sprintf(strtmp, "b%05u", (unsigned int)(weather.barometric * 10));
+        else
+            sprintf(strtmp, "b.....");
+        
     }
     else
     {
@@ -262,106 +334,104 @@ int getRawWx(char *strData)
 
     if (config.wx_flage & WX_LUMINOSITY)
     {
-        if (weather.solar < 1000)
-            sprintf(strtmp, "L%03u", (unsigned int)weather.solar);
-        else
-            sprintf(strtmp, "l%03u", (unsigned int)weather.solar - 1000);
-        strcat(strData, strtmp);
+        if(weather.visable & WX_LUMINOSITY){
+            if (weather.solar < 1000)
+                sprintf(strtmp, "L%03u", (unsigned int)weather.solar);
+            else
+                sprintf(strtmp, "l%03u", (unsigned int)weather.solar - 1000);
+            strcat(strData, strtmp);
+        }
     }
 
     if (config.wx_flage & WX_SNOW)
     {
-        sprintf(strtmp, "S%03u", (unsigned int)(weather.snow * 10));
+        if(weather.visable & WX_SNOW){
+            sprintf(strtmp, "S%03u", (unsigned int)(weather.snow * 10));
+            strcat(strData, strtmp);
+        }
     }
-    else
-    {
-        sprintf(strtmp, "S...");
-    }
-    strcat(strData, strtmp);
+    
 
     if (config.wx_flage & WX_SOIL_TEMP)
     {
-        sprintf(strtmp, "m%03u", (int)((weather.soil_temp * 9 / 5) + 32));
+        if(weather.visable & WX_SOIL_TEMP){
+            sprintf(strtmp, "m%03u", (int)((weather.soil_temp * 9 / 5) + 32));
+            strcat(strData, strtmp);
+        }        
     }
-    else
-    {
-        sprintf(strtmp, "m...");
-    }
-    strcat(strData, strtmp);
 
     if (config.wx_flage & WX_SOIL_MOISTURE)
     {
-        sprintf(strtmp, "M%03u", (unsigned int)(weather.soil_moisture * 10));
+        if(weather.visable & WX_SOIL_MOISTURE){
+            sprintf(strtmp, "M%03u", (unsigned int)(weather.soil_moisture * 10));
+            strcat(strData, strtmp);
+        }
+        
     }
-    else
-    {
-        sprintf(strtmp, "M...");
-    }
-    strcat(strData, strtmp);
 
     if (config.wx_flage & WX_WATER_TEMP)
     {
-        sprintf(strtmp, "w%03u", (int)((weather.water_temp * 9 / 5) + 32));
+        if(weather.visable & WX_WATER_TEMP){
+            sprintf(strtmp, "w%03u", (int)((weather.water_temp * 9 / 5) + 32));
+            strcat(strData, strtmp);
+        }
+        
     }
-    else
-    {
-        sprintf(strtmp, "w...");
-    }
-    strcat(strData, strtmp);
 
     if (config.wx_flage & WX_WATER_TDS)
     {
-        sprintf(strtmp, "W%03u", (int)weather.water_tds);
+        if(weather.visable & WX_WATER_TDS){
+            sprintf(strtmp, "W%03u", (int)weather.water_tds);
+            strcat(strData, strtmp);
+        }        
     }
-    else
-    {
-        sprintf(strtmp, "W...");
-    }
-    strcat(strData, strtmp);
 
     if (config.wx_flage & WX_WATER_LEVEL)
     {
-        sprintf(strtmp, "v%03u", (int)weather.water_level);
+        if(weather.visable & WX_WATER_LEVEL){
+            sprintf(strtmp, "v%03u", (int)weather.water_level);
+            strcat(strData, strtmp);
+        } 
+        
     }
-    else
-    {
-        sprintf(strtmp, "v...");
-    }
-    strcat(strData, strtmp);
 
     if (config.wx_flage & WX_PM25)
     {
-        sprintf(strtmp, "o%03u", (int)weather.pm25);
+        
+        if(weather.visable & WX_PM25){
+            sprintf(strtmp, "o%03u", (int)weather.pm25);
+            strcat(strData, strtmp);
+        } 
+        
     }
-    else
-    {
-        sprintf(strtmp, "o...");
-    }
-    strcat(strData, strtmp);
 
     if (config.wx_flage & WX_PM100)
     {
-        sprintf(strtmp, "O%03u", (int)weather.pm100);
-    }
-    else
-    {
-        sprintf(strtmp, "O...");
-    }
-    strcat(strData, strtmp);
+        if(weather.visable & WX_PM100){
+            sprintf(strtmp, "O%03u", (int)weather.pm100);
+            strcat(strData, strtmp);
+        }
+        
+    }    
 
     if (config.wx_flage & WX_CO2)
     {
-        if (weather.co2 < 10000)
-            sprintf(strtmp, "x%04u", (unsigned int)weather.co2);
-        else
-            sprintf(strtmp, "X%06u", (unsigned int)weather.co2 - 1000);
-        strcat(strData, strtmp);
+        if(weather.visable & WX_CO2){
+            if (weather.co2 < 10000)
+                sprintf(strtmp, "x%04u", (unsigned int)weather.co2);
+            else
+                sprintf(strtmp, "X%06u", (unsigned int)weather.co2 - 1000);
+            strcat(strData, strtmp);
+        }
     }
 
-    sprintf(strtmp, " BAT:%0.2fV/%dmA", weather.vbat, (int)(weather.ibat * 1000));
-    strcat(strData, strtmp);
+    //sprintf(strtmp, " BAT:%0.2fV/%dmA", weather.vbat, (int)(weather.ibat * 1000));
+    //strcat(strData, strtmp);
     // sprintf(strtmp,"/%0.1fmA",weather.ibat*1000);
     // strcat(strData,strtmp);
+    // i06L...
+    // i04S...
+    // i03I...
 
     i = strlen(strData);
     return i;

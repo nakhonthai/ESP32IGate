@@ -13,6 +13,7 @@
 #define WEATHER_H
 
 #include <WiFi.h>
+#include <ModbusMaster.h>
 
 // c...s...g...t...r...p...P...h..b.....L...S..m...M...w...W....v...o...O...x....
 #define WX_NONE 0
@@ -41,6 +42,7 @@ typedef struct Weather_Struct
 {
     unsigned long int timeStamp;
     uint16_t winddirection; // Wind Direction (in degrees)
+    uint32_t visable;
     float windspeed;        // Wind Speed (kph)
     float windgust;         // Wind Gust	(peak wind speed in kph in the last 5 minutes)
     float temperature;      // Temperature (Celsius)
@@ -70,5 +72,6 @@ extern WeatherData weather;
 
 int getRawWx(char *strData);
 bool getCSV2Wx(String stream);
+bool getM702Modbus(ModbusMaster &node);
 
 #endif

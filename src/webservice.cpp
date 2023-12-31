@@ -6211,7 +6211,8 @@ void handle_ws()
 
 void handle_ws_gnss(char *nmea)
 {
-	char jsonMsg[1000];
+	char jsonMsg[700];
+	char outp[500];
 	//char *jsonMsg;
 	time_t timeStamp;
 	time(&timeStamp);
@@ -6220,19 +6221,21 @@ void handle_ws_gnss(char *nmea)
 	//jsonMsg = (char *)malloc((input_length * 2) + 70);
 	//if (jsonMsg)
 	//{
-		char *input_buffer = (char *)malloc(input_length + 2);
-		char *output_buffer = (char *)malloc(input_length * 2);
-		if (output_buffer)
+		//char *input_buffer = (char *)malloc(input_length + 2);
+		//char *output_buffer = (char *)malloc(input_length * 2);
+		//if (output_buffer)
 		{
 			// lastPkgRaw.toCharArray(input_buffer, lastPkgRaw.length(), 0);
 			// lastPkgRaw.clear();
-			strncpy(input_buffer, nmea, input_length);
-			encode_base64((unsigned char *)input_buffer, input_length, (unsigned char *)output_buffer);
+			//strncpy(input_buffer, nmea, input_length);
+			//encode_base64((unsigned char *)input_buffer, input_length, (unsigned char *)output_buffer);
+			memset(outp,0,sizeof(outp));
+			encode_base64((unsigned char *)nmea, input_length, (unsigned char *)outp);
 			// Serial.println(output_buffer);
-			sprintf(jsonMsg, "{\"en\":\"%d\",\"lat\":\"%.5f\",\"lng\":\"%.5f\",\"alt\":\"%.2f\",\"spd\":\"%.2f\",\"csd\":\"%.1f\",\"hdop\":\"%.2f\",\"sat\":\"%d\",\"timeStamp\":\"%li\",\"RAW\":\"%s\"}",(int)config.gnss_enable, gps.location.lat(), gps.location.lng(),gps.altitude.meters(),gps.speed.kmph(),gps.course.deg(),gps.hdop.hdop(),gps.satellites.value(), timeStamp, output_buffer);
+			sprintf(jsonMsg, "{\"en\":\"%d\",\"lat\":\"%.5f\",\"lng\":\"%.5f\",\"alt\":\"%.2f\",\"spd\":\"%.2f\",\"csd\":\"%.1f\",\"hdop\":\"%.2f\",\"sat\":\"%d\",\"timeStamp\":\"%li\",\"RAW\":\"%s\"}",(int)config.gnss_enable, gps.location.lat(), gps.location.lng(),gps.altitude.meters(),gps.speed.kmph(),gps.course.deg(),gps.hdop.hdop(),gps.satellites.value(), timeStamp, outp);
 			// Serial.println(jsonMsg);
-			free(input_buffer);
-			free(output_buffer);
+			//free(input_buffer);
+		//	free(output_buffer);
 		}
 
 		afskSync = false;

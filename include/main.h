@@ -12,7 +12,7 @@
 #define MAIN_H
 
 #define VERSION "1.1"
-#define VERSION_BUILD ' '
+#define VERSION_BUILD 'b'
 
 // #define DEBUG
 // #define DEBUG_IS
@@ -535,6 +535,7 @@ void defaultConfig();
 String getValue(String data, char separator, int index);
 boolean isValidNumber(String str);
 void taskSerial(void *pvParameters);
+void taskGPS(void *pvParameters);
 void taskAPRS(void *pvParameters);
 void taskNetwork(void *pvParameters);
 void taskTNC(void *pvParameters);

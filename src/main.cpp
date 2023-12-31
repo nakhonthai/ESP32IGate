@@ -40,6 +40,8 @@
 #include <SoftwareSerial.h>
 // SoftwareSerial ss(-1, -1);
 
+#include <ModbusMaster.h>
+
 #include "AFSK.h"
 
 // #include <PPPoS.h>
@@ -69,6 +71,9 @@ struct pbuf_t aprs;
 ParseAPRS aprsParse;
 
 TinyGPSPlus gps;
+
+// instantiate ModbusMaster object
+ModbusMaster modbus;
 
 #define VBAT_PIN 35
 // #define WIRE 4
@@ -163,11 +168,7 @@ TelemetryType *Telemetry;
 TaskHandle_t taskNetworkHandle;
 TaskHandle_t taskAPRSHandle;
 TaskHandle_t taskSerialHandle;
-
-HardwareSerial *SerialModbus;
-HardwareSerial *SerialGNSS;
-HardwareSerial *SerialTNC;
-HardwareSerial *SerialWX;
+TaskHandle_t taskGPSHandle;
 
 SoftwareSerial SerialRF;
 
@@ -1285,7 +1286,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
             if (len > 500)
                 len = 500;
             memcpy(pkgList[i].raw, raw, len);
-            // SerialLOG.print("Update: ");
+            log_d("Update: pkgList_idx=%d", i);
         }
     }
     else
@@ -1313,6 +1314,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
         memcpy(pkgList[i].raw, raw, len);
         // strcpy(pkgList[i].raw, raw);
         pkgList[i].calsign[10] = 0;
+        log_d("New: pkgList_idx=%d", i);
         // SerialLOG.print("NEW: ");
     }
     psramBusy = false;
@@ -1852,6 +1854,16 @@ long oledSleepTimeout = 0;
 bool showDisp = false;
 uint8_t curTab = 0;
 
+void preTransmission()
+{
+    digitalWrite(config.modbus_de_gpio, 1);
+}
+
+void postTransmission()
+{
+    digitalWrite(config.modbus_de_gpio, 0);
+}
+
 void setup()
 {
     byte *ptr;
@@ -1881,9 +1893,6 @@ void setup()
 #else
     Serial.begin(9600); // monitor
 #endif
-    // Serial.setRxBufferSize(256);
-    //  SerialTNC.begin(9600, SERIAL_8N1, 16, 17);
-    //  SerialTNC.setRxBufferSize(500);
 
     Serial.println();
     Serial.println("Start ESP32IGate V" + String(VERSION));
@@ -2015,53 +2024,30 @@ void setup()
         Serial2.begin(config.uart2_baudrate, SERIAL_8N1, config.uart2_rx_gpio, config.uart2_tx_gpio);
     }
 
-    SerialGNSS = NULL;
-    SerialTNC = NULL;
-    if (config.gnss_enable)
+    if (config.modbus_enable)
     {
-        if (config.gnss_channel == 1)
+        if (config.modbus_channel == 1)
         {
-            SerialGNSS = &Serial;
+            modbus.begin(config.modbus_address, Serial);
         }
-        else if (config.gnss_channel == 2)
+        else if (config.modbus_channel == 2)
         {
-            SerialGNSS = &Serial1;
+            modbus.begin(config.modbus_address, Serial1);
         }
-        else if (config.gnss_channel == 3)
+        else if (config.modbus_channel == 3)
         {
-            SerialGNSS = &Serial2;
+            modbus.begin(config.modbus_address, Serial2);
         }
-    }
-
-    if (config.ext_tnc_enable)
-    {
-        if (config.gnss_channel == 1)
+        if (config.modbus_channel > 0 && config.modbus_channel < 4)
         {
-            SerialTNC = &Serial;
-        }
-        else if (config.gnss_channel == 2)
-        {
-            SerialTNC = &Serial1;
-        }
-        else if (config.gnss_channel == 3)
-        {
-            SerialTNC = &Serial2;
-        }
-    }
-
-    if (config.wx_en)
-    {
-        if (config.wx_channel == 1)
-        {
-            SerialWX = &Serial;
-        }
-        else if (config.wx_channel == 2)
-        {
-            SerialWX = &Serial1;
-        }
-        else if (config.wx_channel == 3)
-        {
-            SerialWX = &Serial2;
+            // Modbus slave ID 1
+            if (config.modbus_de_gpio > -1)
+            {
+                pinMode(config.modbus_de_gpio, OUTPUT);
+                // Callbacks allow us to configure the RS485 transceiver correctly
+                modbus.preTransmission(preTransmission);
+                modbus.postTransmission(postTransmission);
+            }
         }
     }
 
@@ -2111,14 +2097,25 @@ void setup()
         &taskNetworkHandle, /* Task handle. */
         1);                 /* Core where the task should run */
 
-    if (config.gnss_enable || config.ext_tnc_enable || (config.wx_en && (config.wx_channel > 0 && config.wx_channel < 4)))
+    if (config.gnss_enable)
+    {
+        xTaskCreatePinnedToCore(
+            taskGPS,        /* Function to implement the task */
+            "taskGPS",      /* Name of the task */
+            4096,           /* Stack size in words */
+            NULL,           /* Task input parameter */
+            2,              /* Priority of the task */
+            &taskGPSHandle, /* Task handle. */
+            0);             /* Core where the task should run */
+    }
+    if (config.ext_tnc_enable || (config.wx_en && (config.wx_channel > 0 && config.wx_channel < 4)))
     {
         xTaskCreatePinnedToCore(
             taskSerial,        /* Function to implement the task */
             "taskSerial",      /* Name of the task */
             4096,              /* Stack size in words */
             NULL,              /* Task input parameter */
-            2,                 /* Priority of the task */
+            3,                 /* Priority of the task */
             &taskSerialHandle, /* Task handle. */
             0);                /* Core where the task should run */
     }
@@ -2277,7 +2274,7 @@ String trk_gps_postion(String comment)
         aprs_symbol = config.trk_symbol[1];
     }
 
-    if (gps.location.isValid() && (gps.hdop.hdop() < 10.0))
+    if (gps.location.isValid()) // && (gps.hdop.hdop() < 10.0))
     {
         nowLat = gps.location.lat();
         nowLng = gps.location.lng();
@@ -2411,9 +2408,9 @@ String trk_gps_postion(String comment)
     String tnc2Raw = "";
     char strtmp[300];
     if (config.trk_ssid == 0)
-        sprintf(strtmp, "%s>APTWR", config.trk_mycall);
+        sprintf(strtmp, "%s>APE32I", config.trk_mycall);
     else
-        sprintf(strtmp, "%s-%d>APTWR", config.trk_mycall, config.trk_ssid);
+        sprintf(strtmp, "%s-%d>APE32I", config.trk_mycall, config.trk_ssid);
     tnc2Raw = String(strtmp);
     if (config.trk_path < 5)
     {
@@ -2524,9 +2521,9 @@ String trk_fix_position(String comment)
     }
 
     if (config.trk_ssid == 0)
-        sprintf(strtmp, "%s>APTWR", config.trk_mycall);
+        sprintf(strtmp, "%s>APE32I", config.trk_mycall);
     else
-        sprintf(strtmp, "%s-%d>APTWR", config.trk_mycall, config.trk_ssid);
+        sprintf(strtmp, "%s-%d>APE32I", config.trk_mycall, config.trk_ssid);
     tnc2Raw = String(strtmp);
     if (config.trk_path < 5)
     {
@@ -2720,11 +2717,6 @@ void loop()
         Bluetooth();
 #endif
 
-    // #ifdef WX
-    //     if (config.wx_en)
-    //         getCSV2Wx();
-    // #endif
-
     if (digitalRead(0) == LOW)
     {
         btn_count++;
@@ -2788,8 +2780,8 @@ void loop()
                     {
                         dispTxWindow(txs);
                         delay(1000);
-                        //if (menuSel == 0)
-                        //    curTabOld = curTab + 1;
+                        // if (menuSel == 0)
+                        //     curTabOld = curTab + 1;
                     }
                 }
             }
@@ -3190,172 +3182,93 @@ void GPS_INIT()
 WiFiClient gnssClient;
 // WiFiClient tncClient;
 
-void taskSerial(void *pvParameters)
+
+void taskGPS(void *pvParameters)
 {
-    String raw;
-    char c;
-    char rawP[300];
-    char call[10];
+    int c;
     log_d("GNSS Init");
     nmea_idx = 0;
-    if (config.gnss_enable && SerialGNSS != NULL)
+
+    if (config.gnss_enable)
     {
         if ((config.gnss_channel > 0) && (config.gnss_channel < 4))
         {
             if (strstr("AT", config.gnss_at_command) >= 0)
-                SerialGNSS->println(config.gnss_at_command);
+            {
+                if (config.gnss_channel == 1)
+                {
+                    Serial.println(config.gnss_at_command);
+                }
+                else if (config.gnss_channel == 2)
+                {
+                    Serial1.println(config.gnss_at_command);
+                }
+                else if (config.gnss_channel == 3)
+                {
+                    Serial2.println(config.gnss_at_command);
+                }
+            }
         }
     }
     for (;;)
     {
-        vTaskDelay(20 / portTICK_PERIOD_MS);
-        if (config.wx_en && SerialWX != NULL)
-        {
-            if (config.wx_channel > 0 && config.wx_channel < 4)
-            {
-                while (SerialWX->available())
-                {
-                    String wx = SerialWX->readString();
-                    if (wx != "" && wx.indexOf("DATA:") >= 0)
-                    {
-                        log_d("WX Raw >> %d", wx.c_str());
-                        getCSV2Wx(wx);
-                    }
-                }
-            }
-        }
-
-        if (config.ext_tnc_enable && SerialTNC != NULL)
-        {
-            while (SerialTNC->available())
-            {
-                if (config.ext_tnc_mode == 1)
-                { // KISS
-                    // KISS MODE
-                    c = (char)SerialGNSS->read();
-                    kiss_serial((uint8_t)c);
-                }
-                else if (config.ext_tnc_mode == 2)
-                { // TNC2RAW
-                    raw = SerialTNC->readStringUntil(0x0D);
-                    log_d("Ext TNC2RAW RX:%s", raw.c_str());
-                    String src_call = raw.substring(0, raw.indexOf('>'));
-                    if ((src_call != "") && (src_call.length() < 10) && (raw.length() < sizeof(rawP)))
-                    {
-                        memset(call, 0, sizeof(call));
-                        strcpy(call, src_call.c_str());
-                        strcpy(rawP, raw.c_str());
-                        uint16_t type = pkgType((const char *)rawP);
-                        pkgListUpdate(call, rawP, type, 1);
-                        if (config.rf2inet && aprsClient.connected())
-                        {
-                            // RF->INET
-                            aprsClient.write(&rawP[0], strlen(rawP)); // Send binary frame packet to APRS-IS (aprsc)
-                            aprsClient.write("\r\n");                 // Send CR LF the end frame packet
-                            status.rf2inet++;
-                            igateTLM.RF2INET++;
-                            igateTLM.RX++;
-                        }
-                    }
-                }
-                else if (config.ext_tnc_mode == 3)
-                { // YAESU FTM-350,FTM-400
-                    String info = SerialTNC->readString();
-                    // log_d("Ext Yaesu Packet >> %s",info.c_str());
-                    if (info != "")
-                    {
-                        int ed = info.indexOf(" [");
-                        if (ed < 0)
-                            ed = info.length();
-                        raw.clear();
-                        raw = info.substring(0, ed);
-                        int st = info.indexOf(">:");
-                        int idx = 0;
-                        st += 2;
-                        for (int i = 0; i < 5; i++)
-                        {
-                            if (info.charAt(st + i) == 0x0A || info.charAt(st + i) == 0x0D)
-                            {
-                                idx++;
-                            }
-                            else
-                            {
-                                break;
-                            }
-                        }
-                        st += idx;
-                        ed = info.indexOf(0x0D, st + 1);
-                        if (ed > info.length())
-                            ed = info.length();
-                        if (ed > st)
-                        {
-                            raw += ":" + info.substring(st, ed);
-
-                            String src_call = raw.substring(0, raw.indexOf('>'));
-                            if ((src_call != "") && (src_call.length() < 10) && (raw.length() < sizeof(rawP)))
-                            {
-                                memset(call, 0, sizeof(call));
-                                strcpy(call, src_call.c_str());
-                                memset(rawP, 0, sizeof(rawP));
-                                strcpy(rawP, raw.c_str());
-                                log_d("Yaesu Packet: CallSign:%s RAW:%s", call, rawP);
-                                // String hstr="";
-                                // for(int i=0;i<raw.length();i++){
-                                //     hstr+=" "+String(rawP[i],HEX);
-                                // }
-                                // log_d("HEX: %s",hstr.c_str());
-                                uint16_t type = pkgType((const char *)rawP);
-                                pkgListUpdate(call, rawP, type, 1);
-                                if (config.rf2inet && aprsClient.connected())
-                                {
-                                    // RF->INET
-                                    aprsClient.write(&rawP[0], strlen(rawP)); // Send binary frame packet to APRS-IS (aprsc)
-                                    aprsClient.write("\r\n");                 // Send CR LF the end frame packet
-                                    status.rf2inet++;
-                                    igateTLM.RF2INET++;
-                                    igateTLM.RX++;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
+        vTaskDelay(10 / portTICK_PERIOD_MS);
         if (config.gnss_enable)
         {
             if ((config.gnss_channel > 0) && (config.gnss_channel < 4))
             {
-                if(SerialGNSS != NULL){
-                    while (SerialGNSS->available())
+                do
+                {
+                    c = -1;
+                    if (config.gnss_channel == 1)
                     {
-                        c = (char)SerialGNSS->read();
-                        // Serial.print(c);
-                        gps.encode(c);
-                        if (nmea_idx > 195)
+                        c = Serial.read();
+                    }
+                    else if (config.gnss_channel == 2)
+                    {
+                        c = Serial1.read();
+                    }
+                    else if (config.gnss_channel == 3)
+                    {
+                        c = Serial2.read();
+                    }
+                    if (c > -1)
+                    {
+                        gps.encode((char)c);
+                        if (webServiceBegin == false)
                         {
-                            nmea_idx = 0;
-                            memset(nmea, 0, sizeof(nmea));
-                        }
-                        else
-                        {
-                            nmea[nmea_idx++] = c;
-                            if (c == '\r' || c == '\n')
+                            if (nmea_idx > 195)
                             {
-                                nmea[nmea_idx++] = 0;
-                                if (nmea_idx > 5)
-                                {
-                                    if (webServiceBegin == false)
-                                    {
-                                        handle_ws_gnss(nmea);
-                                    }
-                                    // log_d("%s",nmea);
-                                }
                                 nmea_idx = 0;
+                                memset(nmea, 0, sizeof(nmea));
+                                // SerialGNSS->flush();
+                            }
+                            else
+                            {
+                                nmea[nmea_idx++] = (char)c;
+                                if ((char)c == '\r' || (char)c == '\n')
+                                {
+                                    nmea[nmea_idx++] = 0;
+                                    if (nmea_idx > 5)
+                                    {
+                                        // if (webServiceBegin == false)
+                                        {
+                                            handle_ws_gnss(nmea);
+                                        }
+                                        // log_d("%s",nmea);
+                                    }
+                                    nmea_idx = 0;
+                                    break;
+                                }
                             }
                         }
+                        //}
                     }
-                }
+                    else
+                    {
+                        break;
+                    }
+                } while (1);
             }
             else if (config.gnss_channel == 4)
             { // TCP
@@ -3374,26 +3287,29 @@ void taskSerial(void *pvParameters)
                             c = (char)gnssClient.read();
                             // Serial.print(c);
                             gps.encode(c);
-                            if (nmea_idx > 195)
+                            if (webServiceBegin == false)
                             {
-                                nmea_idx = 0;
-                                memset(nmea, 0, sizeof(nmea));
-                            }
-                            else
-                            {
-                                nmea[nmea_idx++] = c;
-                                if (c == '\r' || c == '\n')
+                                if (nmea_idx > 195)
                                 {
-                                    nmea[nmea_idx++] = 0;
-                                    if (nmea_idx > 5)
-                                    {
-                                        if (webServiceBegin == false)
-                                        {
-                                            handle_ws_gnss(nmea);
-                                        }
-                                        // log_d("%s",nmea);
-                                    }
                                     nmea_idx = 0;
+                                    memset(nmea, 0, sizeof(nmea));
+                                }
+                                else
+                                {
+                                    nmea[nmea_idx++] = c;
+                                    if (c == '\r' || c == '\n')
+                                    {
+                                        nmea[nmea_idx++] = 0;
+                                        if (nmea_idx > 5)
+                                        {
+                                            // if (webServiceBegin == false)
+                                            {
+                                                handle_ws_gnss(nmea);
+                                            }
+                                            // log_d("%s",nmea);
+                                        }
+                                        nmea_idx = 0;
+                                    }
                                 }
                             }
                         }
@@ -3431,6 +3347,225 @@ void taskSerial(void *pvParameters)
     }
 }
 
+void taskSerial(void *pvParameters)
+{
+    String raw;
+    int c;
+    char rawP[500];
+    char call[11];
+    log_d("Serial task Init");
+    nmea_idx = 0;
+    if (config.ext_tnc_enable)
+    {
+        if (config.ext_tnc_channel == 1)
+        {
+            Serial.setTimeout(10);
+        }
+        else if (config.ext_tnc_channel == 2)
+        {
+            Serial1.setTimeout(10);
+        }
+        else if (config.ext_tnc_channel == 3)
+        {
+            Serial2.setTimeout(10);
+        }
+    }
+    if (config.wx_en)
+    {
+        if (config.wx_channel == 1)
+        {
+            Serial.setTimeout(10);
+        }
+        else if (config.wx_channel == 2)
+        {
+            Serial1.setTimeout(10);
+        }
+        else if (config.wx_channel == 3)
+        {
+            Serial2.setTimeout(10);
+        }
+    }
+    for (;;)
+    {
+        vTaskDelay(10 / portTICK_PERIOD_MS);
+        if (config.wx_en)
+        {
+            if (config.wx_channel > 0 && config.wx_channel < 4)
+            {
+                String wx = "";
+                if (config.wx_channel == 1)
+                {
+                    wx = Serial.readString();
+                }
+                else if (config.wx_channel == 2)
+                {
+                    wx = Serial1.readString();
+                }
+                else if (config.wx_channel == 3)
+                {
+                    wx = Serial2.readString();
+                }
+                // if (wx!="")
+                //{
+                // while (SerialWX->available())
+                //{
+                // String wx = SerialWX->readString();
+                if (wx != "" && wx.indexOf("DATA:") >= 0)
+                {
+                    log_d("WX Raw >> %d", wx.c_str());
+                    getCSV2Wx(wx);
+                }
+                //}
+                //}
+            }
+            // else if(config.wx_channel == 4){
+            //     bool result=getM702Modbus(modbus);
+            // }
+        }
+
+        if (config.ext_tnc_enable && (config.ext_tnc_mode > 0 && config.ext_tnc_mode < 4))
+        {
+            if (config.ext_tnc_mode == 1)
+            { // KISS
+                // KISS MODE
+                do
+                {
+                    c = -1;
+                    if (config.ext_tnc_channel == 1)
+                    {
+                        c = Serial.read();
+                    }
+                    else if (config.ext_tnc_channel == 2)
+                    {
+                        c = Serial1.read();
+                    }
+                    else if (config.ext_tnc_channel == 3)
+                    {
+                        c = Serial2.read();
+                    }
+
+                    if (c > -1)
+                        kiss_serial((uint8_t)c);
+                    else
+                        break;
+                } while (c > -1);
+            }
+            else if (config.ext_tnc_mode == 2)
+            { // TNC2RAW
+                raw.clear();
+                if (config.ext_tnc_channel == 1)
+                {
+                    raw = Serial.readStringUntil(0x0D);
+                }
+                else if (config.ext_tnc_channel == 2)
+                {
+                    raw = Serial1.readStringUntil(0x0D);
+                }
+                else if (config.ext_tnc_channel == 3)
+                {
+                    raw = Serial2.readStringUntil(0x0D);
+                }
+
+                log_d("Ext TNC2RAW RX:%s", raw.c_str());
+                String src_call = raw.substring(0, raw.indexOf('>'));
+                if ((src_call != "") && (src_call.length() < 10) && (raw.length() < sizeof(rawP)))
+                {
+                    memset(call, 0, sizeof(call));
+                    strcpy(call, src_call.c_str());
+                    strcpy(rawP, raw.c_str());
+                    uint16_t type = pkgType((const char *)rawP);
+                    pkgListUpdate(call, rawP, type, 1);
+                    if (config.rf2inet && aprsClient.connected())
+                    {
+                        // RF->INET
+                        aprsClient.write(&rawP[0], strlen(rawP)); // Send binary frame packet to APRS-IS (aprsc)
+                        aprsClient.write("\r\n");                 // Send CR LF the end frame packet
+                        status.rf2inet++;
+                        igateTLM.RF2INET++;
+                        igateTLM.RX++;
+                    }
+                }
+            }
+            else if (config.ext_tnc_mode == 3)
+            { // YAESU FTM-350,FTM-400
+                String info = "";
+                if (config.ext_tnc_channel == 1)
+                {
+                    info = Serial.readString();
+                }
+                else if (config.ext_tnc_channel == 2)
+                {
+                    info = Serial1.readString();
+                }
+                else if (config.ext_tnc_channel == 3)
+                {
+                    info = Serial2.readString();
+                }
+
+                //  log_d("Ext Yaesu Packet >> %s",info.c_str());
+                int ed = info.indexOf(" [");
+                if (info != "" && ed > 10)
+                {
+                    raw.clear();
+                    raw = info.substring(0, ed);
+                    int st = info.indexOf(">:");
+                    if (st > ed)
+                    {
+                        int idx = 0;
+                        st += 2;
+                        for (int i = 0; i < 5; i++)
+                        {
+                            if (info.charAt(st + i) == 0x0A || info.charAt(st + i) == 0x0D)
+                            {
+                                idx++;
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+                        st += idx;
+                        ed = info.indexOf(0x0D, st + 1);
+                        if (ed > info.length())
+                            ed = info.length();
+                        if (ed > st)
+                        {
+                            raw += ":" + info.substring(st, ed);
+
+                            String src_call = raw.substring(0, raw.indexOf('>'));
+                            if ((src_call != "") && (src_call.length() < 11) && (raw.length() < sizeof(rawP)))
+                            {
+                                memset(call, 0, sizeof(call));
+                                strcpy(call, src_call.c_str());
+                                memset(rawP, 0, sizeof(rawP));
+                                strcpy(rawP, raw.c_str());
+                                log_d("Yaesu Packet: CallSign:%s RAW:%s", call, rawP);
+                                // String hstr="";
+                                // for(int i=0;i<raw.length();i++){
+                                //     hstr+=" "+String(rawP[i],HEX);
+                                // }
+                                // log_d("HEX: %s",hstr.c_str());
+                                uint16_t type = pkgType((const char *)rawP);
+                                pkgListUpdate(call, rawP, type, 1);
+                                if (config.rf2inet && aprsClient.connected())
+                                {
+                                    // RF->INET
+                                    aprsClient.write(&rawP[0], strlen(rawP)); // Send binary frame packet to APRS-IS (aprsc)
+                                    aprsClient.write("\r\n");                 // Send CR LF the end frame packet
+                                    status.rf2inet++;
+                                    igateTLM.RF2INET++;
+                                    igateTLM.RX++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            //}
+        }
+    }
+}
+
 long timeSlot;
 unsigned long iGatetickInterval;
 bool initInterval = true;
@@ -3440,8 +3575,8 @@ void taskAPRS(void *pvParameters)
     char sts[50];
     // char *raw;
     // char *str;
-    unsigned long tickInterval;
-    unsigned long DiGiInterval;
+    unsigned long tickInterval = 0;
+    unsigned long DiGiInterval = 0;
 
     Serial.println("Task APRS has been start");
     PacketBuffer.clean();
@@ -3464,6 +3599,7 @@ void taskAPRS(void *pvParameters)
     afskSetHPF(config.audio_hpf);
     afskSetBPF(config.audio_bpf);
     timeSlot = millis();
+    tx_interval = config.trk_interval;
     tx_counter = tx_interval - 10;
     initInterval = true;
     for (;;)
@@ -3542,7 +3678,8 @@ void taskAPRS(void *pvParameters)
                     tx_interval = config.trk_interval;
                 }
 
-                if (config.trk_gps && gps.speed.isValid() && gps.location.isValid() && gps.course.isValid() && (gps.hdop.hdop() < 10.0) && (gps.satellites.value() > 3))
+                // if (config.trk_gps && gps.speed.isValid() && gps.location.isValid() && gps.course.isValid() && (gps.hdop.hdop() < 10.0) && (gps.satellites.value() > 3))
+                if (config.trk_gps && gps.speed.isValid() && gps.location.isValid() && gps.course.isValid())
                 {
                     SB_SPEED_OLD = SB_SPEED;
                     if (gps.speed.isUpdated())
@@ -3601,10 +3738,10 @@ void taskAPRS(void *pvParameters)
 
                 if (config.trk_gps)
                 {
-                    if (gps.location.isValid() && (gps.hdop.hdop() < 10.0))
-                        sprintf(sts, "POSITION GPS\nSPD %dkPh/%d\nINTERVAL %ds", SB_SPEED, SB_HEADING, tx_interval);
-                    else
-                        sprintf(sts, "POSITION GPS\nGPS INVALID\nINTERVAL %ds", tx_interval);
+                    // if (gps.location.isValid() && (gps.hdop.hdop() < 10.0))
+                    sprintf(sts, "POSITION GPS\nSPD %dkPh/%d\nINTERVAL %ds", SB_SPEED, SB_HEADING, tx_interval);
+                    // else
+                    //     sprintf(sts, "POSITION GPS\nGPS INVALID\nINTERVAL %ds", tx_interval);
                 }
                 else
                 {
@@ -3649,19 +3786,41 @@ void taskAPRS(void *pvParameters)
             newDigiPkg = true;
             if (config.ext_tnc_enable)
             {
-                if (SerialTNC != NULL)
+                if (config.ext_tnc_channel > 0 && config.ext_tnc_channel < 3)
                 {
                     if (config.ext_tnc_mode == 1)
                     {
                         // KISS MODE
                         uint8_t pkg[500];
                         int sz = kiss_wrapper(pkg);
-                        SerialTNC->write(pkg, sz);
+                        if (config.ext_tnc_channel == 1)
+                        {
+                            Serial.write(pkg, sz);
+                        }
+                        else if (config.ext_tnc_channel == 2)
+                        {
+                            Serial1.write(pkg, sz);
+                        }
+                        else if (config.ext_tnc_channel == 3)
+                        {
+                            Serial2.write(pkg, sz);
+                        }
                     }
                     else if (config.ext_tnc_mode == 2)
                     {
                         // TNC2
-                        SerialTNC->println(tnc2);
+                        if (config.ext_tnc_channel == 1)
+                        {
+                            Serial.println(tnc2);
+                        }
+                        else if (config.ext_tnc_channel == 2)
+                        {
+                            Serial1.println(tnc2);
+                        }
+                        else if (config.ext_tnc_channel == 3)
+                        {
+                            Serial2.println(tnc2);
+                        }
                     }
                 }
             }
