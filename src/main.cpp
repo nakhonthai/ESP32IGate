@@ -4175,6 +4175,7 @@ long wifiTTL = 0;
 
 // WiFi connect timeout per AP. Increase when connecting takes longer.
 const uint32_t connectTimeoutMs = 10000;
+uint8_t APStationNum=0;
 
 void taskNetwork(void *pvParameters)
 {
@@ -4246,7 +4247,16 @@ void taskNetwork(void *pvParameters)
         timeNetworkOld = now;
         // wdtNetworkTimer = millis();
         vTaskDelay(1 / portTICK_PERIOD_MS);
-        // if (WiFi.status() == WL_CONNECTED)
+        if (config.wifi_mode & WIFI_AP_FIX){
+            APStationNum = WiFi.softAPgetStationNum();
+            if(APStationNum>0){                
+                if(WiFi.isConnected() == false){
+                    serviceHandle();
+                    continue;
+                }
+            }
+        }
+
         if (wifiMulti.run(connectTimeoutMs) == WL_CONNECTED)
         {
             webService();
@@ -4341,7 +4351,6 @@ void taskNetwork(void *pvParameters)
                                     memcpy(raw, line.c_str(), line.length());
                                     raw[sizeof(raw) - 1] = 0;
                                     int idx = pkgListUpdate(call, raw, type, 1);
-                                    int cnt = 0;
 #ifdef OLED
                                     if (idx > -1)
                                     {
@@ -4420,10 +4429,6 @@ void taskNetwork(void *pvParameters)
                     }
                 }
             }
-        }
-        else if (config.wifi_mode & WIFI_AP_FIX)
-        { // WiFi connected
-            serviceHandle();
         }
     } // for loop
 }
