@@ -3614,6 +3614,8 @@ void taskAPRS(void *pvParameters)
             systemTLM.ParmTimeout = millis() + 20000;
             systemTLM.TeleTimeout = millis() + 30000;
             initInterval = false;
+            tx_interval = config.trk_interval;
+            tx_counter = tx_interval - 10;
         }
         vTaskDelay(10 / portTICK_PERIOD_MS);
 
@@ -3655,7 +3657,7 @@ void taskAPRS(void *pvParameters)
                 tickInterval = millis() + 1000;
 
                 tx_counter++;
-                // log_d("TRACKER tx_counter=%d\t INTERVAL=%d\n", tx_counter, tx_interval);
+                //log_d("TRACKER tx_counter=%d\t INTERVAL=%d\n", tx_counter, tx_interval);
                 //  Check interval timeout
                 if (config.trk_smartbeacon && config.trk_gps)
                 {
@@ -3679,12 +3681,14 @@ void taskAPRS(void *pvParameters)
                 }
 
                 // if (config.trk_gps && gps.speed.isValid() && gps.location.isValid() && gps.course.isValid() && (gps.hdop.hdop() < 10.0) && (gps.satellites.value() > 3))
-                if (config.trk_gps && gps.speed.isValid() && gps.location.isValid() && gps.course.isValid())
+                //if (config.trk_gps && gps.speed.isValid() && gps.location.isValid() && gps.course.isValid())
+                if (config.trk_gps)
                 {
                     SB_SPEED_OLD = SB_SPEED;
-                    if (gps.speed.isUpdated())
+                    //if (gps.speed.isUpdated())
                         SB_SPEED = (unsigned char)gps.speed.kmph();
-                    if (gps.course.isUpdated())
+                    //if (gps.course.isUpdated())
+                    if(gps.speed.kmph()>config.trk_lspeed)
                         SB_HEADING = (int16_t)gps.course.deg();
                     if (config.trk_smartbeacon) // SMART BEACON CAL
                     {
