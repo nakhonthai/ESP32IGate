@@ -16,6 +16,16 @@ extern "C"
 
 #define DEBUG_TNC
 
+uint16_t bitrate=1200;
+uint16_t sampleperbit=(SAMPLERATE/bitrate);
+uint8_t bit_sutuff_len=5;
+uint8_t phase_bits=32;
+uint8_t phase_inc=4;
+uint16_t phase_max=(sampleperbit*phase_bits);
+uint16_t phase_threshold=(phase_max/2);
+uint16_t mark_freq=1200;
+uint16_t space_freq=2200;
+
 extern unsigned long custom_preamble;
 extern unsigned long custom_tail;
 int adcVal;
@@ -236,6 +246,30 @@ bool getReceive()
   return ret;
 }
 
+void afskSetModem(uint8_t val){
+  if(val==0){
+    bitrate=300;
+    sampleperbit=(SAMPLERATE/bitrate);
+    bit_sutuff_len=5;
+    phase_bits=128;
+    phase_inc=16;
+    mark_freq=1600;
+    space_freq=1800;
+    phase_max=(sampleperbit*phase_bits);
+    phase_threshold=(phase_max/2);
+  }else{
+    bitrate=1200;
+    sampleperbit=(SAMPLERATE/bitrate);
+    bit_sutuff_len=5;
+    phase_bits=32;
+    phase_inc=4;
+    mark_freq=1200;
+    space_freq=2200;
+    phase_max=(sampleperbit*phase_bits);
+    phase_threshold=(phase_max/2);
+  }
+}
+
 void afskSetHPF(bool val)
 {
   input_HPF = val;
@@ -315,7 +349,7 @@ void AFSK_init(Afsk *afsk)
       .size = FIR_LPF_N,
       .sampling_freq = SAMPLERATE,
       .pass_freq = 0,
-      .cutoff_freq = 1200,
+      .cutoff_freq = mark_freq+((space_freq-mark_freq)/2),
   };
   int16_t *lpf_an, *bpf_an, *hpf_an;
   // LPF
@@ -354,7 +388,7 @@ static void AFSK_txStart(Afsk *afsk)
     // LED_TX_ON();
     digitalWrite(LED_TX_PIN, HIGH);
     digitalWrite(_ptt_pin, _ptt_active);
-    afsk->preambleLength = DIV_ROUND(custom_preamble * BITRATE, 9600);
+    afsk->preambleLength = DIV_ROUND(custom_preamble * bitrate, 9600);
     AFSK_DAC_IRQ_START();
 #ifdef I2S_INTERNAL
     i2s_zero_dma_buffer(I2S_NUM_0);
@@ -364,7 +398,7 @@ static void AFSK_txStart(Afsk *afsk)
 #endif
   }
   noInterrupts();
-  afsk->tailLength = DIV_ROUND(custom_tail * BITRATE, 9600);
+  afsk->tailLength = DIV_ROUND(custom_tail * bitrate, 9600);
   interrupts();
 }
 
@@ -462,7 +496,7 @@ uint8_t AFSK_dac_isr(Afsk *afsk)
       afsk->txBit = 0x01;
     }
 
-    if (afsk->bitStuff && afsk->bitstuffCount >= BIT_STUFF_LEN)
+    if (afsk->bitStuff && afsk->bitstuffCount >= bit_sutuff_len)
     {
       afsk->bitstuffCount = 0;
       afsk->phaseInc = SWITCH_TONE(afsk->phaseInc);
@@ -481,7 +515,7 @@ uint8_t AFSK_dac_isr(Afsk *afsk)
       afsk->txBit <<= 1;
     }
 
-    afsk->sampleIndex = SAMPLESPERBIT;
+    afsk->sampleIndex = sampleperbit;
   }
 
   afsk->phaseAcc += afsk->phaseInc;
@@ -523,7 +557,7 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
       // receiving data. For bling we also turn
       // on the RX LED.
       hdlc->receiving = true;
-      if (++hdlc_flag_count >= 3)
+      if (++hdlc_flag_count > 2)
       {
         fifo_flush(fifo);
         LED_RX_ON();
@@ -752,26 +786,26 @@ void AFSK_adc_isr(Afsk *afsk, int16_t currentSample)
   // a little off compared to our own.
   if (SIGNAL_TRANSITIONED(afsk->sampledBits))
   {
-    if (afsk->currentPhase < PHASE_THRESHOLD)
+    if (afsk->currentPhase < phase_threshold)
     {
-      afsk->currentPhase += PHASE_INC;
+      afsk->currentPhase += phase_inc;
     }
     else
     {
-      afsk->currentPhase -= PHASE_INC;
+      afsk->currentPhase -= phase_inc;
     }
   }
 
   // We increment our phase counter
-  afsk->currentPhase += PHASE_BITS;
+  afsk->currentPhase += phase_bits;
 
   // Check if we have reached the end of
   // our sampling window.
-  if (afsk->currentPhase >= PHASE_MAX)
+  if (afsk->currentPhase >= phase_max)
   {
     // If we have, wrap around our phase
     // counter by modulus
-    afsk->currentPhase %= PHASE_MAX;
+    afsk->currentPhase %= phase_max;
 
     // Bitshift to make room for the next
     // bit in our stream of demodulated bits

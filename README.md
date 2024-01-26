@@ -14,7 +14,8 @@ ESP32IGate is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weather(WX)
 * Support TNC External mod select UART0-2 and Yaesu packet
 * Support APRS IGATE/DIGI/WX with fix position for move position from GNSS
 * Using ESP-Arduino development on Visual studio code + Platform IO
-* Support Bell202 1200bps AFSK (It has a very good sine wave signal.)
+* Support AFSK 1600/1800Hz 300bps AFSK (For HF radio)
+* Support AFSK Bell202 1200bps (For VHF/UHF radio)
 * Implementing software modem, decoding and encoding
 * Support monitor display information and statistices
 * Support Wi-Fi multi station or WiFi Access point

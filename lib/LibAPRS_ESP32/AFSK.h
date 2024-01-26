@@ -158,22 +158,29 @@ inline static uint8_t sinSample(uint16_t i)
 
 #define CPU_FREQ F_CPU
 
-#define CONFIG_AFSK_RX_BUFLEN 50
-#define CONFIG_AFSK_TX_BUFLEN 50
+#define CONFIG_AFSK_RX_BUFLEN 100
+#define CONFIG_AFSK_TX_BUFLEN 100
 #define CONFIG_AFSK_RXTIMEOUT 0
 #define CONFIG_AFSK_PREAMBLE_LEN 350UL
 #define CONFIG_AFSK_TRAILER_LEN 50UL
 #define CONFIG_AFSK_DAC_SAMPLERATE 38400
 #define SAMPLERATE 38400
-#define BITRATE 1200
-#define SAMPLESPERBIT (SAMPLERATE / BITRATE)
-#define BIT_STUFF_LEN 5
-#define MARK_FREQ 1200
-#define SPACE_FREQ 2200
-#define PHASE_BITS 32                           // How much to increment phase counter each sample
-#define PHASE_INC 4                            // Nudge by an eigth of a sample each adjustment
-#define PHASE_MAX (SAMPLESPERBIT * PHASE_BITS) // Resolution of our phase counter = 64
-#define PHASE_THRESHOLD (PHASE_MAX / 2)        // Target transition point of our phase window
+// #define BITRATE 1200
+// #define SAMPLESPERBIT (SAMPLERATE / BITRATE)
+// #define BIT_STUFF_LEN 5
+// #define MARK_FREQ 1200
+// #define SPACE_FREQ 2200
+// #define PHASE_BITS 32                           // How much to increment phase counter each sample PHASE_BITS=SAMPLERATE/BITRATE
+// #define PHASE_INC 4                            // Nudge by an eigth of a sample each adjustment PHASE_BITS/8
+// #define BITRATE 300
+// #define SAMPLESPERBIT (SAMPLERATE / BITRATE)
+// #define BIT_STUFF_LEN 5
+// #define MARK_FREQ 1600
+// #define SPACE_FREQ 1800
+// #define PHASE_BITS 128                           // How much to increment phase counter each sample PHASE_BITS=SAMPLERATE/BITRATE
+// #define PHASE_INC 16                            // Nudge by an eigth of a sample each adjustment PHASE_BITS/8
+// #define PHASE_MAX (SAMPLESPERBIT * PHASE_BITS) // Resolution of our phase counter = 64
+// #define PHASE_THRESHOLD (PHASE_MAX / 2)        // Target transition point of our phase window
 
 #define I2S_INTERNAL
 #define SQL
@@ -195,7 +202,6 @@ inline static uint8_t sinSample(uint16_t i)
 #define PIN_I2S_LRC 27
 #define PIN_I2S_DIN 35
 #define PIN_I2S_DOUT 25
-
 typedef enum
 {
     LEFTCHANNEL = 0,
@@ -255,8 +261,10 @@ typedef struct Afsk
 } Afsk;
 
 #define DIV_ROUND(dividend, divisor) (((dividend) + (divisor) / 2) / (divisor))
-#define MARK_INC (uint16_t)(DIV_ROUND(SIN_LEN * (uint32_t)MARK_FREQ, CONFIG_AFSK_DAC_SAMPLERATE))
-#define SPACE_INC (uint16_t)(DIV_ROUND(SIN_LEN * (uint32_t)SPACE_FREQ, CONFIG_AFSK_DAC_SAMPLERATE))
+#define MARK_INC (uint16_t)(DIV_ROUND(SIN_LEN * (uint32_t)mark_freq, CONFIG_AFSK_DAC_SAMPLERATE))
+#define SPACE_INC (uint16_t)(DIV_ROUND(SIN_LEN * (uint32_t)space_freq, CONFIG_AFSK_DAC_SAMPLERATE))
+//#define MARK_INC (uint16_t)(DIV_ROUND(SIN_LEN * (uint32_t)MARK_FREQ, CONFIG_AFSK_DAC_SAMPLERATE))
+//#define SPACE_INC (uint16_t)(DIV_ROUND(SIN_LEN * (uint32_t)SPACE_FREQ, CONFIG_AFSK_DAC_SAMPLERATE))
 
 #define AFSK_DAC_IRQ_START()         \
     do                               \
@@ -305,5 +313,6 @@ void afskSetPWR(int8_t val, bool act);
 void afskSetSQL(int8_t val, bool act);
 bool getTransmit();
 bool getReceive();
+void afskSetModem(uint8_t val);
 
 #endif

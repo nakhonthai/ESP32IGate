@@ -875,6 +875,14 @@ void handle_radio()
 					}
 				}
 			}
+			if (server.argName(i) == "modem_type")
+			{
+				if (server.arg(i) != "")
+				{
+					if (isValidNumber(server.arg(i)))
+						config.modem_type = server.arg(i).toInt();
+				}
+			}
 		}
 		config.audio_hpf = hpf;
 		config.audio_bpf = bpf;
@@ -1090,6 +1098,19 @@ void handle_radio()
 		html += "<form id='formTNC' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
 		html += "<table>\n";
 		html += "<th colspan=\"2\"><span><b>AFSK/TNC Configuration</b></span></th>\n";
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>Modem Type:</b></td>\n";
+		html += "<td style=\"text-align: left;\">\n";
+		html += "<select name=\"modem_type\" id=\"modem_type\" \">\n";
+		for (int i = 0; i < 2; i++)
+		{
+			if (config.modem_type == i)
+				html += "<option value=\"" + String(i) + "\" selected>" + String(MODEM_TYPE[i]) + "</option>\n";
+			else
+				html += "<option value=\"" + String(i) + "\" >" + String(MODEM_TYPE[i]) + "</option>\n";
+		}
+		html += "</select>\n";
+		html += "</td>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Audio HPF:</b></td>\n";
 		String strFlag = "";
@@ -3363,6 +3384,8 @@ void handle_igate()
 				if (server.arg(i) != "")
 				{
 					strcpy(config.igate_comment, server.arg(i).c_str());
+				}else{
+					memset(config.igate_comment,0,sizeof(config.igate_comment));
 				}
 			}
 			if (server.argName(i) == "texttouse")
@@ -3370,13 +3393,6 @@ void handle_igate()
 				if (server.arg(i) != "")
 				{
 					strcpy(config.igate_phg, server.arg(i).c_str());
-				}
-			}
-			if (server.argName(i) == "aprsComment")
-			{
-				if (server.arg(i) != "")
-				{
-					strcpy(config.igate_comment, server.arg(i).c_str());
 				}
 			}
 
@@ -4143,6 +4159,8 @@ void handle_digi()
 				if (server.arg(i) != "")
 				{
 					strcpy(config.digi_comment, server.arg(i).c_str());
+				}else{
+					memset(config.digi_comment,0,sizeof(config.digi_comment));
 				}
 			}
 			if (server.argName(i) == "texttouse")
@@ -4680,6 +4698,8 @@ void handle_wx()
 				if (server.arg(i) != "")
 				{
 					strcpy(config.wx_comment, server.arg(i).c_str());
+				}else{
+					memset(config.wx_comment,0,sizeof(config.wx_comment));
 				}
 			}
 			if (server.argName(i) == "Pos2RF")
@@ -4930,6 +4950,8 @@ void handle_tlm()
 				if (server.arg(i) != "")
 				{
 					strcpy(config.tlm0_comment, server.arg(i).c_str());
+				}else{
+					memset(config.tlm0_comment,0,sizeof(config.tlm0_comment));
 				}
 			}
 			if (server.argName(i) == "Pos2RF")
@@ -5459,6 +5481,8 @@ void handle_tracker()
 				if (server.arg(i) != "")
 				{
 					strcpy(config.trk_comment, server.arg(i).c_str());
+				}else{
+					memset(config.trk_comment,0,sizeof(config.trk_comment));
 				}
 			}
 
@@ -5890,66 +5914,7 @@ void handle_wireless()
 		String html = "OK";
 		server.send(200, "text/html", html);
 		WiFi.setTxPower((wifi_power_t)config.wifi_power);
-	}
-	else if (server.hasArg("commitBluetooth"))
-	{
-		bool btMaster = false;
-		for (uint8_t i = 0; i < server.args(); i++)
-		{
-			if (server.argName(i) == "btMaster")
-			{
-				if (server.arg(i) != "")
-				{
-					if (String(server.arg(i)) == "OK")
-					{
-						btMaster = true;
-					}
-				}
-			}
-
-			if (server.argName(i) == "bt_name")
-			{
-				if (server.arg(i) != "")
-				{
-					strcpy(config.bt_name, server.arg(i).c_str());
-				}
-			}
-			if (server.argName(i) == "bt_uuid")
-			{
-				if (server.arg(i) != "")
-				{
-					strcpy(config.bt_uuid, server.arg(i).c_str());
-				}
-			}
-			if (server.argName(i) == "bt_uuid_rx")
-			{
-				if (server.arg(i) != "")
-				{
-					strcpy(config.bt_uuid_rx, server.arg(i).c_str());
-				}
-			}
-			if (server.argName(i) == "bt_uuid_tx")
-			{
-				if (server.arg(i) != "")
-				{
-					strcpy(config.bt_uuid_tx, server.arg(i).c_str());
-				}
-			}
-			if (server.argName(i) == "bt_mode")
-			{
-				if (server.arg(i) != "")
-				{
-					if (isValidNumber(server.arg(i)))
-						config.bt_mode = server.arg(i).toInt();
-				}
-			}
-		}
-		config.bt_master = btMaster;
-		saveEEPROM();
-		String html = "OK";
-		server.send(200, "text/html", html);
-	}
-	else
+	}else
 	{
 		String html = "<script type=\"text/javascript\">\n";
 		html += "$('form').submit(function (e) {\n";

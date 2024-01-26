@@ -170,6 +170,11 @@ TaskHandle_t taskAPRSHandle;
 TaskHandle_t taskSerialHandle;
 TaskHandle_t taskGPSHandle;
 
+unsigned long timerNetwork,timerNetwork_old;
+unsigned long timerAPRS,timerAPRS_old;
+unsigned long timerGPS,timerGPS_old;
+unsigned long timerSerial,timerSerial_old;
+
 SoftwareSerial SerialRF;
 
 bool firstGpsTime = true;
@@ -639,16 +644,6 @@ void defaultConfig()
     }
     sprintf(config.wifi_ap_ssid, "ESP32IGate");
     sprintf(config.wifi_ap_pass, "aprsthnetwork");
-    // Blutooth
-    config.bt_slave = false;
-    config.bt_master = false;
-    config.bt_mode = 1; // 0-None,1-TNC2RAW,2-KISS
-    config.bt_power = 1;
-    sprintf(config.bt_uuid, "6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
-    sprintf(config.bt_uuid_rx, "6E400002-B5A3-F393-E0A9-E50E24DCCA9E");
-    sprintf(config.bt_uuid_tx, "6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
-    sprintf(config.bt_name, "ESP32APRS");
-    config.bt_pin = 0;
 
     //--RF Module
     config.rf_en = false;
@@ -844,6 +839,9 @@ void defaultConfig()
     config.h_up = false;
     config.tx_display = true;
     config.rx_display = true;
+
+    //afsk,TNC
+    config.modem_type = 1; //0=AFSK300,1=AFSK1200
     config.audio_hpf = false;
     config.audio_bpf = false;
     config.preamble = 3;
@@ -2091,7 +2089,7 @@ void setup()
     xTaskCreatePinnedToCore(
         taskNetwork,        /* Function to implement the task */
         "taskNetwork",      /* Name of the task */
-        16384,              /* Stack size in words */
+        8192,              /* Stack size in words */
         NULL,               /* Task input parameter */
         1,                  /* Priority of the task */
         &taskNetworkHandle, /* Task handle. */
@@ -2102,7 +2100,7 @@ void setup()
         xTaskCreatePinnedToCore(
             taskGPS,        /* Function to implement the task */
             "taskGPS",      /* Name of the task */
-            4096,           /* Stack size in words */
+            2048,           /* Stack size in words */
             NULL,           /* Task input parameter */
             2,              /* Priority of the task */
             &taskGPSHandle, /* Task handle. */
@@ -2113,7 +2111,7 @@ void setup()
         xTaskCreatePinnedToCore(
             taskSerial,        /* Function to implement the task */
             "taskSerial",      /* Name of the task */
-            4096,              /* Stack size in words */
+            2048,              /* Stack size in words */
             NULL,              /* Task input parameter */
             3,                 /* Priority of the task */
             &taskSerialHandle, /* Task handle. */
@@ -2705,12 +2703,19 @@ int btn_count = 0;
 long timeCheck = 0;
 int timeHalfSec = 0;
 
+unsigned long timeTask;
 unsigned long timeSec;
 char nmea[200];
 int nmea_idx = 0;
 void loop()
 {
-    vTaskDelay(5 / portTICK_PERIOD_MS);
+    // if (millis() > timeTask)
+    // {
+    //     timeTask = millis() + 1000;
+    //     log_d("Task process APRS=%iuS\t NETWORK=%iuS\t GPS=%iuS\t SERIAL=%iuS\n",timerAPRS,timerNetwork,timerGPS,timerSerial);
+    // }
+
+    vTaskDelay(10 / portTICK_PERIOD_MS);
 
 #ifdef BLUETOOTH
     if (config.bt_master)
@@ -2844,20 +2849,6 @@ void loop()
         if (ESP.getFreeHeap() < 60000)
             esp_restart();
         // Serial.println(String(ESP.getFreeHeap()));
-    }
-#ifdef SA818
-    // if (SerialRF.available())
-    // {
-    //     Serial.print(Serial.readString());
-    // }
-#endif
-    if (AFSKInitAct == true)
-    {
-#ifdef SA818
-        AFSK_Poll(true, config.rf_power);
-#else
-        AFSK_Poll(false, LOW);
-#endif
     }
 }
 
@@ -3212,7 +3203,10 @@ void taskGPS(void *pvParameters)
     }
     for (;;)
     {
+        timerGPS=micros()-timerGPS_old;
         vTaskDelay(10 / portTICK_PERIOD_MS);
+        timerGPS_old=micros();
+
         if (config.gnss_enable)
         {
             if ((config.gnss_channel > 0) && (config.gnss_channel < 4))
@@ -3387,7 +3381,10 @@ void taskSerial(void *pvParameters)
     }
     for (;;)
     {
+        timerSerial=millis()-timerSerial_old;
         vTaskDelay(10 / portTICK_PERIOD_MS);
+        timerSerial_old=micros();
+
         if (config.wx_en)
         {
             if (config.wx_channel > 0 && config.wx_channel < 4)
@@ -3581,11 +3578,12 @@ void taskAPRS(void *pvParameters)
     Serial.println("Task APRS has been start");
     PacketBuffer.clean();
 
+    afskSetModem(config.modem_type);
     afskSetSQL(config.rf_sql_gpio, config.rf_sql_active);
     afskSetPTT(config.rf_ptt_gpio, config.rf_ptt_active);
     afskSetPWR(config.rf_pwr_gpio, config.rf_pwr_active);
     afskSetDCOffset(config.adc_dc_offset);
-    afskSetADCAtten(config.adc_atten);
+    afskSetADCAtten(config.adc_atten);    
     APRS_init();
     APRS_setCallsign(config.aprs_mycall, config.aprs_ssid);
     // APRS_setPath1("WIDE1-1", 1);
@@ -3617,7 +3615,14 @@ void taskAPRS(void *pvParameters)
             tx_interval = config.trk_interval;
             tx_counter = tx_interval - 10;
         }
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        timerAPRS=micros()-timerAPRS_old;
+        vTaskDelay(1 / portTICK_PERIOD_MS);
+        timerAPRS_old=micros();
+
+        if (AFSKInitAct == true)
+        {
+            AFSK_Poll(false, LOW);
+        }
 
         // if (config.rf_en)
         { // RF Module enable
@@ -4180,6 +4185,7 @@ uint8_t APStationNum=0;
 void taskNetwork(void *pvParameters)
 {
     int c = 0;
+    char raw[500];
     log_d("Task Network has been start");
 
     // WiFi.onEvent(Wifi_connected,SYSTEM_EVENT_STA_CONNECTED);
@@ -4226,7 +4232,6 @@ void taskNetwork(void *pvParameters)
         Serial.print("Access point running. IP address: ");
         Serial.print(WiFi.softAPIP());
         Serial.println("");
-        webService();
     }
 
     if (wifiMulti.run() == WL_CONNECTED)
@@ -4240,28 +4245,30 @@ void taskNetwork(void *pvParameters)
     pingTimeout = millis() + 10000;
     unsigned long timeNetworkOld = millis();
     timeNetwork = 0;
+    if (config.wifi_mode & WIFI_AP_STA_FIX) webService();
     for (;;)
     {
         unsigned long now = millis();
         timeNetwork = now - timeNetworkOld;
         timeNetworkOld = now;
         // wdtNetworkTimer = millis();
-        vTaskDelay(1 / portTICK_PERIOD_MS);
+        serviceHandle();
+        timerNetwork=micros()-timerNetwork_old;
+        vTaskDelay(9 / portTICK_PERIOD_MS);
+        timerNetwork_old=micros();
+
         if (config.wifi_mode & WIFI_AP_FIX){
             APStationNum = WiFi.softAPgetStationNum();
             if(APStationNum>0){                
                 if(WiFi.isConnected() == false){
-                    serviceHandle();
+                    vTaskDelay(9 / portTICK_PERIOD_MS);
                     continue;
                 }
             }
         }
 
         if (wifiMulti.run(connectTimeoutMs) == WL_CONNECTED)
-        {
-            webService();
-            serviceHandle();
-
+        {            
             if (millis() > NTP_Timeout)
             {
                 NTP_Timeout = millis() + 86400000;
@@ -4320,8 +4327,7 @@ void taskNetwork(void *pvParameters)
                             status.rxCount++;
                             igateTLM.RX++;
 
-                            log_d("INET: %s\n", line.c_str());
-                            char raw[500];
+                            log_d("INET: %s\n", line.c_str());                            
                             memset(&raw[0], 0, sizeof(raw));
                             start_val = line.indexOf(":", 10); // Search of info in ax25
                             if (start_val > 5)

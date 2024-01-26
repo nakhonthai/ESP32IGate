@@ -11,14 +11,14 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define VERSION "1.1"
-#define VERSION_BUILD 'd'
+#define VERSION "1.2"
+#define VERSION_BUILD ' '
 
 // #define DEBUG
 // #define DEBUG_IS
 #define WX
 
-#define OLED
+//#define OLED
 //  #define SDCARD
 //  #define BLUETOOTH
 
@@ -111,17 +111,6 @@ typedef struct Config_Struct
 	char wifi_ap_ch;
 	char wifi_ap_ssid[32];
 	char wifi_ap_pass[63];
-
-	//--Blue Tooth
-	bool bt_slave;
-	bool bt_master;
-	char bt_mode;
-	char bt_uuid[37];
-	char bt_uuid_rx[37];
-	char bt_uuid_tx[37];
-	char bt_name[20];
-	uint32_t bt_pin;
-	char bt_power;
 
 	//--RF Module
 	bool rf_en;
@@ -298,6 +287,7 @@ typedef struct Config_Struct
 	bool audio_hpf;
 	bool audio_bpf;
 	uint8_t preamble;
+	uint8_t modem_type;
 	uint16_t tx_timeslot;
 	char ntp_host[20];
 
@@ -528,6 +518,7 @@ const char GNSS_PORT[5][6] = {"NONE", "UART0", "UART1", "UART2", "TCP"};
 const char TNC_PORT[4][6] = {"NONE", "UART0", "UART1", "UART2"};
 const char TNC_MODE[4][6] = {"NONE", "KISS", "TNC2", "YAESU"};
 const char WX_PORT[7][11] = {"NONE", "UART0_CSV", "UART1_CSV", "UART2_CSV", "MODBUS","SENSOR","TCP/UDP"};
+const char MODEM_TYPE[2][10] = {"AFSK_300", "AFSK_1200"};
 
 uint8_t checkSum(uint8_t *ptr, size_t count);
 void saveEEPROM();
