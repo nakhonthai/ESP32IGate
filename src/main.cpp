@@ -167,6 +167,7 @@ TelemetryType *Telemetry;
 
 TaskHandle_t taskNetworkHandle;
 TaskHandle_t taskAPRSHandle;
+TaskHandle_t taskAPRSPollHandle;
 TaskHandle_t taskSerialHandle;
 TaskHandle_t taskGPSHandle;
 
@@ -1862,6 +1863,7 @@ void postTransmission()
     digitalWrite(config.modbus_de_gpio, 0);
 }
 
+bool AFSKInitAct = false;
 void setup()
 {
     byte *ptr;
@@ -2074,6 +2076,7 @@ void setup()
     enableCore1WDT();
 
     oledSleepTimeout = millis() + (config.oled_timeout * 1000);
+    AFSKInitAct = false;
 
     // Task 1
     xTaskCreatePinnedToCore(
@@ -2081,7 +2084,7 @@ void setup()
         "taskAPRS",      /* Name of the task */
         8192,            /* Stack size in words */
         NULL,            /* Task input parameter */
-        1,               /* Priority of the task */
+        2,               /* Priority of the task */
         &taskAPRSHandle, /* Task handle. */
         0);              /* Core where the task should run */
 
@@ -2094,6 +2097,15 @@ void setup()
         1,                  /* Priority of the task */
         &taskNetworkHandle, /* Task handle. */
         1);                 /* Core where the task should run */
+    
+    xTaskCreatePinnedToCore(
+            taskAPRSPoll,        /* Function to implement the task */
+            "taskAPRSPoll",      /* Name of the task */
+            4096,           /* Stack size in words */
+            NULL,           /* Task input parameter */
+            1,              /* Priority of the task */
+            &taskAPRSPollHandle, /* Task handle. */
+            0);             /* Core where the task should run */
 
     if (config.gnss_enable)
     {
@@ -2104,7 +2116,7 @@ void setup()
             NULL,           /* Task input parameter */
             2,              /* Priority of the task */
             &taskGPSHandle, /* Task handle. */
-            0);             /* Core where the task should run */
+            1);             /* Core where the task should run */
     }
     if (config.ext_tnc_enable || (config.wx_en && (config.wx_channel > 0 && config.wx_channel < 4)))
     {
@@ -2115,7 +2127,7 @@ void setup()
             NULL,              /* Task input parameter */
             3,                 /* Priority of the task */
             &taskSerialHandle, /* Task handle. */
-            0);                /* Core where the task should run */
+            1);                /* Core where the task should run */
     }
 }
 
@@ -2698,7 +2710,6 @@ int packet2Raw(String &tnc2, AX25Msg &Packet)
 }
 
 long sendTimer = 0;
-bool AFSKInitAct = false;
 int btn_count = 0;
 long timeCheck = 0;
 int timeHalfSec = 0;
@@ -3591,7 +3602,7 @@ void taskAPRS(void *pvParameters)
     APRS_setTail(0);
     sendTimer = millis() - (config.igate_interval * 1000) + 30000;
     igateTLM.TeleTimeout = millis() + 60000; // 1Min
-    AFSKInitAct = true;
+    
     timeSlot = millis();
     timeAprs = 0;
     afskSetHPF(config.audio_hpf);
@@ -3600,6 +3611,7 @@ void taskAPRS(void *pvParameters)
     tx_interval = config.trk_interval;
     tx_counter = tx_interval - 10;
     initInterval = true;
+    AFSKInitAct = true;
     for (;;)
     {
         long now = millis();
@@ -3616,13 +3628,8 @@ void taskAPRS(void *pvParameters)
             tx_counter = tx_interval - 10;
         }
         timerAPRS=micros()-timerAPRS_old;
-        vTaskDelay(1 / portTICK_PERIOD_MS);
+        vTaskDelay(10 / portTICK_PERIOD_MS);
         timerAPRS_old=micros();
-
-        if (AFSKInitAct == true)
-        {
-            AFSK_Poll(false, LOW);
-        }
 
         // if (config.rf_en)
         { // RF Module enable
@@ -4171,6 +4178,19 @@ void taskAPRS(void *pvParameters)
                 }
                 sendTelemetry_0(rawTlm, false);
             }
+        }
+    }
+}
+
+void taskAPRSPoll(void *pvParameters)
+{
+    for (;;)
+    {
+        vTaskDelay(1 / portTICK_PERIOD_MS);
+
+        if (AFSKInitAct == true)
+        {
+            AFSK_Poll(false, LOW);
         }
     }
 }

@@ -7,6 +7,7 @@
  Support IS: host:aprs.dprns.com port:14580 or aprs.hs5tqa.ampr.org:14580
  Support IS monitor: http://aprs.dprns.com:14501 or http://aprs.hs5tqa.ampr.org:14501
 */
+#include <Arduino.h>
 #include "AFSK.h"
 #include "webservice.h"
 #include "base64.hpp"
@@ -6111,7 +6112,8 @@ void handle_realtime()
 		char *output_buffer = (char *)malloc(input_length * 2);
 		if (output_buffer)
 		{
-			lastPkgRaw.toCharArray(input_buffer, lastPkgRaw.length(), 0);
+			//lastPkgRaw.toCharArray(input_buffer, lastPkgRaw.length(), 0);
+			memcpy(input_buffer, lastPkgRaw.c_str(), lastPkgRaw.length());
 			lastPkgRaw.clear();
 			encode_base64((unsigned char *)input_buffer, input_length, (unsigned char *)output_buffer);
 			// Serial.println(output_buffer);
@@ -6150,9 +6152,12 @@ void handle_ws()
 		char *input_buffer = (char *)malloc(input_length + 2);
 		char *output_buffer = (char *)malloc(input_length * 2);
 		if (output_buffer)
-		{
-			lastPkgRaw.toCharArray(input_buffer, lastPkgRaw.length(), 0);
-			lastPkgRaw.clear();
+		{			
+			memset(input_buffer,0,(input_length + 2));
+			memset(output_buffer,0,(input_length * 2));
+			//lastPkgRaw.toCharArray(input_buffer, input_length, 0);			
+			memcpy(input_buffer, lastPkgRaw.c_str(), lastPkgRaw.length());
+			lastPkgRaw.clear();			
 			encode_base64((unsigned char *)input_buffer, input_length, (unsigned char *)output_buffer);
 			// Serial.println(output_buffer);
 			sprintf(jsonMsg, "{\"Active\":\"1\",\"mVrms\":\"%d\",\"RAW\":\"%s\",\"timeStamp\":\"%li\"}", mVrms, output_buffer, timeStamp);

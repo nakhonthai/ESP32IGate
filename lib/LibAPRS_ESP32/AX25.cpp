@@ -141,6 +141,14 @@ void ax25_poll(AX25Ctx *ctx)
             {
                 ctx->buf[ctx->frame_len++] = c;
                 ctx->crc_in = update_crc_ccit(c, ctx->crc_in);
+                
+                if (ctx->crc_in == AX25_CRC_CORRECT)
+                {
+                    ax25_decode(ctx);
+                    ctx->sync = false;
+                    ctx->escape = true;
+                    ctx->frame_len = 0;
+                }
             }
             else
             {

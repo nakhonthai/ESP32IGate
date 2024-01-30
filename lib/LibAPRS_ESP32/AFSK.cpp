@@ -530,6 +530,7 @@ uint8_t AFSK_dac_isr(Afsk *afsk)
 int hdlc_flag_count = 0;
 bool hdlc_flage_end = false;
 bool sync_flage = false;
+uint16_t hdlc_data_count=0;
 static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
 {
   // Initialise a return value. We start with the
@@ -562,8 +563,15 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
         fifo_flush(fifo);
         LED_RX_ON();
         sync_flage = true;
+        // if(hdlc_flage_end == true){ //end of flage 7E
+        //   fifo_push(fifo, HDLC_FLAG);
+        //   hdlc_flage_end = false;
+        //   sync_flage = false;
+        //   hdlc_flag_count=0;
+        //   hdlc_data_count=0;
+        // }
+        fifo_push(fifo, HDLC_FLAG);
       }
-      fifo_push(fifo, HDLC_FLAG);
     }
     else
     {
@@ -586,8 +594,32 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
     hdlc->currentByte = 0;
     hdlc->bitIndex = 0;
     return ret;
+  }else{
+    // if(sync_flage == true){ //Start flage 7E
+    //   fifo_flush(fifo);
+    //   fifo_push(fifo, HDLC_FLAG);
+    //   fifo_push(fifo, HDLC_FLAG);
+    //   fifo_push(fifo, HDLC_FLAG);
+    //   fifo_push(fifo, HDLC_FLAG);
+    //   hdlc_flage_end = true;
+    //   hdlc_data_count=0;
+    // }
   }
   sync_flage = false;
+
+  // if(hdlc_flage_end == true){
+  //   if(++hdlc_data_count>300){
+  //       fifo_flush(fifo);
+  //       hdlc->receiving = false;
+  //       LED_RX_OFF();
+  //         hdlc_flage_end = false;
+  //         sync_flage = false;
+  //         hdlc_flag_count=0;
+  //         hdlc_data_count=0;
+  //         ret = false;
+  //         return ret;
+  //   }
+  // }
 
   // Check if we have received a RESET flag (01111111)
   // In this comparison we also detect when no transmission
@@ -613,7 +645,7 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
   if (!hdlc->receiving)
     return ret;
 
-  hdlc_flage_end = true;
+  //hdlc_flage_end = true;
 
   // First check if what we are seeing is a stuffed bit.
   // Since the different HDLC control characters like
@@ -710,6 +742,8 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
 
 static int delayed[DELAYED_N];
 static int delay_idx = 0;
+
+extern void APRS_poll();
 
 void AFSK_adc_isr(Afsk *afsk, int16_t currentSample)
 {
@@ -838,7 +872,7 @@ void AFSK_adc_isr(Afsk *afsk, int16_t currentSample)
     // We also check the return of the Link Control parser
     // to check if an error occured.
 
-    if (!hdlcParse(&afsk->hdlc, !TRANSITION_FOUND(afsk->actualBits), &afsk->rxFifo))
+    if (hdlcParse(&afsk->hdlc, !TRANSITION_FOUND(afsk->actualBits), &afsk->rxFifo))
     {
       afsk->status |= 1;
       if (fifo_isfull(&afsk->rxFifo))
@@ -847,6 +881,7 @@ void AFSK_adc_isr(Afsk *afsk, int16_t currentSample)
         afsk->status = 0;
         log_d("FIFO IS FULL");
       }
+      APRS_poll();
     }
   }
 }
@@ -855,7 +890,6 @@ void AFSK_adc_isr(Afsk *afsk, int16_t currentSample)
 int16_t abufPos = 0;
 // extern TaskHandle_t taskSensorHandle;
 
-extern void APRS_poll();
 uint8_t poll_timer = 0;
 // int adc_count = 0;
 int offset_new = 0, offset = 620, offset_count = 0;
@@ -1157,8 +1191,8 @@ void AFSK_Poll(bool SA818, bool RFPower)
 
           AFSK_adc_isr(AFSK_modem, adcR); // Process signal IIR
 
-          if (i % 32 == 0)
-            APRS_poll(); // Poll check every 1 bit
+          //if (i % 32 == 0)
+            //APRS_poll(); // Poll check every 1 bit
           
         }
         // Get mVrms on Sync flage 0x7E

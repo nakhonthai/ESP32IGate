@@ -12,7 +12,7 @@
 #define MAIN_H
 
 #define VERSION "1.2"
-#define VERSION_BUILD ' '
+#define VERSION_BUILD 'a'
 
 // #define DEBUG
 // #define DEBUG_IS
@@ -528,6 +528,7 @@ boolean isValidNumber(String str);
 void taskSerial(void *pvParameters);
 void taskGPS(void *pvParameters);
 void taskAPRS(void *pvParameters);
+void taskAPRSPoll(void *pvParameters);
 void taskNetwork(void *pvParameters);
 void taskTNC(void *pvParameters);
 void sort(pkgListType a[], int size);
