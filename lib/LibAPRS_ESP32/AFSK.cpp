@@ -241,7 +241,8 @@ bool getReceive()
   bool ret = false;
   if ((digitalRead(_ptt_pin) ^ _ptt_active) == 0) // signal active with ptt_active
       return false; // PTT Protection receive
-  if (AFSK_modem->hdlc.receiving == true)
+  //if (AFSK_modem->hdlc.receiving == true)
+  if(digitalRead(LED_PIN)) //Check RX LED receiving.
     ret = true;
   return ret;
 }
@@ -557,19 +558,12 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
       // the buffer and indicate that we are now
       // receiving data. For bling we also turn
       // on the RX LED.
-      hdlc->receiving = true;
       if (++hdlc_flag_count > 2)
       {
+        hdlc->receiving = true;
         fifo_flush(fifo);
         LED_RX_ON();
         sync_flage = true;
-        // if(hdlc_flage_end == true){ //end of flage 7E
-        //   fifo_push(fifo, HDLC_FLAG);
-        //   hdlc_flage_end = false;
-        //   sync_flage = false;
-        //   hdlc_flag_count=0;
-        //   hdlc_data_count=0;
-        // }
         fifo_push(fifo, HDLC_FLAG);
       }
     }
@@ -594,32 +588,8 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
     hdlc->currentByte = 0;
     hdlc->bitIndex = 0;
     return ret;
-  }else{
-    // if(sync_flage == true){ //Start flage 7E
-    //   fifo_flush(fifo);
-    //   fifo_push(fifo, HDLC_FLAG);
-    //   fifo_push(fifo, HDLC_FLAG);
-    //   fifo_push(fifo, HDLC_FLAG);
-    //   fifo_push(fifo, HDLC_FLAG);
-    //   hdlc_flage_end = true;
-    //   hdlc_data_count=0;
-    // }
   }
   sync_flage = false;
-
-  // if(hdlc_flage_end == true){
-  //   if(++hdlc_data_count>300){
-  //       fifo_flush(fifo);
-  //       hdlc->receiving = false;
-  //       LED_RX_OFF();
-  //         hdlc_flage_end = false;
-  //         sync_flage = false;
-  //         hdlc_flag_count=0;
-  //         hdlc_data_count=0;
-  //         ret = false;
-  //         return ret;
-  //   }
-  // }
 
   // Check if we have received a RESET flag (01111111)
   // In this comparison we also detect when no transmission

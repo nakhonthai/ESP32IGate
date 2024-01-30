@@ -1432,7 +1432,8 @@ bool pkgTxSend()
 
                 for (int i = 0; i < 100; i++)
                 {
-                    if (digitalRead(config.rf_ptt_gpio) ^ config.rf_ptt_active)
+                    //if (digitalRead(config.rf_ptt_gpio) ^ config.rf_ptt_active)
+                    if(!getReceive())
                         break;
                     delay(50); // TOT 5sec
                 }
@@ -3637,27 +3638,25 @@ void taskAPRS(void *pvParameters)
             if (now > (timeSlot + 10))
             {
                 // Transmit in timeslot if enabled
-                if (config.rf_sql_gpio > -1)
-                { // Set SQL pin
-                    if (digitalRead(config.rf_sql_gpio) ^ config.rf_sql_active)
-                    { // RX State Fail
-                        if (pkgTxSend())
-                            timeSlot = millis() + config.tx_timeslot; // Tx Time Slot >2sec.
-                        else
-                            timeSlot = millis() + 3000;
-                    }
-                    else
-                    {
-                        timeSlot = millis() + 1500;
-                    }
-                }
+                // if (config.rf_sql_gpio > -1)
+                // { // Set SQL pin
+                //     if (digitalRead(config.rf_sql_gpio) ^ config.rf_sql_active)
+                //     { // RX State Fail
+                //         if (pkgTxSend())
+                //             timeSlot = millis() + config.tx_timeslot; // Tx Time Slot >2sec.
+                //         else
+                //             timeSlot = millis() + 3000;
+                //     }
+                //     else
+                //     {
+                //         timeSlot = millis() + 1500;
+                //     }
+                // }
+                // else
+                if (pkgTxSend())
+                    timeSlot = millis() + config.tx_timeslot; // Tx Time Slot > 2sec.
                 else
-                {
-                    if (pkgTxSend())
-                        timeSlot = millis() + config.tx_timeslot; // Tx Time Slot > 2sec.
-                    else
-                        timeSlot = millis() + 3000;
-                }
+                    timeSlot = millis() + 3000;
             }
         }
 

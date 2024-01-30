@@ -12,13 +12,13 @@
 #define MAIN_H
 
 #define VERSION "1.2"
-#define VERSION_BUILD 'a'
+#define VERSION_BUILD 'b'
 
 // #define DEBUG
 // #define DEBUG_IS
 #define WX
 
-//#define OLED
+#define OLED
 //  #define SDCARD
 //  #define BLUETOOTH
 
