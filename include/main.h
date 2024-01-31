@@ -18,7 +18,7 @@
 // #define DEBUG_IS
 #define WX
 
-#define OLED
+//#define OLED
 //  #define SDCARD
 //  #define BLUETOOTH
 
