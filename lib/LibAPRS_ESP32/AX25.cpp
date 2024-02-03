@@ -148,6 +148,7 @@ void ax25_poll(AX25Ctx *ctx)
                     ctx->sync = false;
                     ctx->escape = true;
                     ctx->frame_len = 0;
+                    ctx->crc_in = CRC_CCIT_INIT_VAL;
                 }
             }
             else

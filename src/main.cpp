@@ -8,6 +8,7 @@
 */
 
 #include <Arduino.h>
+#include <esp_task_wdt.h>
 #include "main.h"
 #include <LibAPRSesp.h>
 #include <limits.h>
@@ -1864,6 +1865,9 @@ void postTransmission()
     digitalWrite(config.modbus_de_gpio, 0);
 }
 
+//3 seconds WDT
+#define WDT_TIMEOUT 3
+
 bool AFSKInitAct = false;
 void setup()
 {
@@ -2074,7 +2078,9 @@ void setup()
 
     // enableLoopWDT();
     // enableCore0WDT();
-    enableCore1WDT();
+    // enableCore1WDT();
+    esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
+    esp_task_wdt_add(NULL); //add current thread to WDT watch
 
     oledSleepTimeout = millis() + (config.oled_timeout * 1000);
     AFSKInitAct = false;
@@ -2093,7 +2099,7 @@ void setup()
     xTaskCreatePinnedToCore(
         taskNetwork,        /* Function to implement the task */
         "taskNetwork",      /* Name of the task */
-        8192,              /* Stack size in words */
+        16384,              /* Stack size in words */
         NULL,               /* Task input parameter */
         1,                  /* Priority of the task */
         &taskNetworkHandle, /* Task handle. */
@@ -2721,11 +2727,12 @@ char nmea[200];
 int nmea_idx = 0;
 void loop()
 {
-    // if (millis() > timeTask)
-    // {
-    //     timeTask = millis() + 1000;
-    //     log_d("Task process APRS=%iuS\t NETWORK=%iuS\t GPS=%iuS\t SERIAL=%iuS\n",timerAPRS,timerNetwork,timerGPS,timerSerial);
-    // }
+    if (millis() > timeTask)
+    {
+        timeTask = millis() + 10000;
+        log_d("Task process APRS=%iuS\t NETWORK=%iuS\t GPS=%iuS\t SERIAL=%iuS\n",timerAPRS,timerNetwork,timerGPS,timerSerial);
+        log_d("Free heap: %s KB \tWiFi:%s ,RSSI:%s dBm", String((float)ESP.getFreeHeap() / 1000, 1).c_str(),String(WiFi.SSID()).c_str(),String(WiFi.RSSI()).c_str());
+    }
 
     vTaskDelay(10 / portTICK_PERIOD_MS);
 
@@ -2857,7 +2864,8 @@ void loop()
     // Tick one secound
     if (millis() > timeCheck)
     {
-        timeCheck = millis() + 10000;
+        esp_task_wdt_reset();
+        timeCheck = millis() + 1000;
         if (ESP.getFreeHeap() < 60000)
             esp_restart();
         // Serial.println(String(ESP.getFreeHeap()));
@@ -4185,7 +4193,7 @@ void taskAPRSPoll(void *pvParameters)
 {
     for (;;)
     {
-        vTaskDelay(1 / portTICK_PERIOD_MS);
+        vTaskDelay(5 / portTICK_PERIOD_MS);
 
         if (AFSKInitAct == true)
         {
