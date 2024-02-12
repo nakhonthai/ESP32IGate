@@ -1318,6 +1318,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
         // SerialLOG.print("NEW: ");
     }
     psramBusy = false;
+    event_lastHeard();
     return i;
 }
 
@@ -2085,6 +2086,28 @@ void setup()
     oledSleepTimeout = millis() + (config.oled_timeout * 1000);
     AFSKInitAct = false;
 
+    if (config.gnss_enable)
+    {
+        if ((config.gnss_channel > 0) && (config.gnss_channel < 4))
+        {
+            if (strstr("AT", config.gnss_at_command) >= 0)
+            {
+                if (config.gnss_channel == 1)
+                {
+                    Serial.println(config.gnss_at_command);
+                }
+                else if (config.gnss_channel == 2)
+                {
+                    Serial1.println(config.gnss_at_command);
+                }
+                else if (config.gnss_channel == 3)
+                {
+                    Serial2.println(config.gnss_at_command);
+                }
+            }
+        }
+    }
+
     // Task 1
     xTaskCreatePinnedToCore(
         taskAPRS,        /* Function to implement the task */
@@ -2114,17 +2137,18 @@ void setup()
             &taskAPRSPollHandle, /* Task handle. */
             0);             /* Core where the task should run */
 
-    if (config.gnss_enable)
-    {
-        xTaskCreatePinnedToCore(
-            taskGPS,        /* Function to implement the task */
-            "taskGPS",      /* Name of the task */
-            2048,           /* Stack size in words */
-            NULL,           /* Task input parameter */
-            2,              /* Priority of the task */
-            &taskGPSHandle, /* Task handle. */
-            1);             /* Core where the task should run */
-    }
+    // if (config.gnss_enable)
+    // {
+    //     xTaskCreatePinnedToCore(
+    //         taskGPS,        /* Function to implement the task */
+    //         "taskGPS",      /* Name of the task */
+    //         2048,           /* Stack size in words */
+    //         NULL,           /* Task input parameter */
+    //         2,              /* Priority of the task */
+    //         &taskGPSHandle, /* Task handle. */
+    //         1);             /* Core where the task should run */
+    // }
+
     if (config.ext_tnc_enable || (config.wx_en && (config.wx_channel > 0 && config.wx_channel < 4)))
     {
         xTaskCreatePinnedToCore(
@@ -2866,8 +2890,8 @@ void loop()
     {
         esp_task_wdt_reset();
         timeCheck = millis() + 1000;
-        if (ESP.getFreeHeap() < 60000)
-            esp_restart();
+        // if (ESP.getFreeHeap() < 60000)
+        //     esp_restart();
         // Serial.println(String(ESP.getFreeHeap()));
     }
 }
@@ -3193,6 +3217,171 @@ void GPS_INIT()
 WiFiClient gnssClient;
 // WiFiClient tncClient;
 
+extern AsyncWebSocket ws_gnss;
+
+void taskGPSActive()
+{
+    int c;
+    //log_d("GNSS Init");
+    nmea_idx = 0;
+
+    // if (config.gnss_enable)
+    // {
+    //     if ((config.gnss_channel > 0) && (config.gnss_channel < 4))
+    //     {
+    //         if (strstr("AT", config.gnss_at_command) >= 0)
+    //         {
+    //             if (config.gnss_channel == 1)
+    //             {
+    //                 Serial.println(config.gnss_at_command);
+    //             }
+    //             else if (config.gnss_channel == 2)
+    //             {
+    //                 Serial1.println(config.gnss_at_command);
+    //             }
+    //             else if (config.gnss_channel == 3)
+    //             {
+    //                 Serial2.println(config.gnss_at_command);
+    //             }
+    //         }
+    //     }
+    // }
+    // for (;;)
+    {
+        if (config.gnss_enable)
+        {
+            if ((config.gnss_channel > 0) && (config.gnss_channel < 4))
+            {
+                do
+                {
+                    c = -1;
+                    if (config.gnss_channel == 1)
+                    {
+                        c = Serial.read();
+                    }
+                    else if (config.gnss_channel == 2)
+                    {
+                        c = Serial1.read();
+                    }
+                    else if (config.gnss_channel == 3)
+                    {
+                        c = Serial2.read();
+                    }
+                    if (c > -1)
+                    {
+                        gps.encode((char)c);
+                        if (webServiceBegin == false)
+                        {
+                            if (nmea_idx > 195)
+                            {
+                                nmea_idx = 0;
+                                memset(nmea, 0, sizeof(nmea));
+                                // SerialGNSS->flush();
+                            }
+                            else
+                            {
+                                nmea[nmea_idx++] = (char)c;
+                                if ((char)c == '\r' || (char)c == '\n')
+                                {
+                                    nmea[nmea_idx] = 0;
+                                    if (nmea_idx > 5)
+                                    {
+                                        if(ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
+                                        // if (webServiceBegin == false)
+                                        {
+                                            handle_ws_gnss(nmea,nmea_idx);
+                                        }
+                                        // log_d("%s",nmea);
+                                    }
+                                    nmea_idx = 0;
+                                    break;
+                                }
+                            }
+                        }
+                        //}
+                    }
+                    else
+                    {
+                        break;
+                    }
+                } while (1);
+            }
+            else if (config.gnss_channel == 4)
+            { // TCP
+                if (WiFi.isConnected())
+                {
+                    if (!gnssClient.connected())
+                    {
+                        gnssClient.connect(config.gnss_tcp_host, config.gnss_tcp_port);
+                        log_d("GNSS TCP ReConnect to %s:%d", config.gnss_tcp_host, config.gnss_tcp_port);
+                        delay(3000);
+                    }
+                    else
+                    {
+                        while (gnssClient.available())
+                        {
+                            c = (char)gnssClient.read();
+                            // Serial.print(c);
+                            gps.encode(c);
+                            if (webServiceBegin == false)
+                            {
+                                if (nmea_idx > 195)
+                                {
+                                    nmea_idx = 0;
+                                    memset(nmea, 0, sizeof(nmea));
+                                }
+                                else
+                                {
+                                    nmea[nmea_idx++] = c;
+                                    if (c == '\r' || c == '\n')
+                                    {
+                                        nmea[nmea_idx] = 0;
+                                        if (nmea_idx > 5)
+                                        {
+                                            if(ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
+                                            {
+                                                handle_ws_gnss(nmea,nmea_idx);
+                                            }
+                                            // log_d("%s",nmea);
+                                        }
+                                        nmea_idx = 0;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (firstGpsTime && gps.time.isValid())
+            {
+                if (gps.time.isUpdated())
+                {
+                    time_t timeGps = getGpsTime(); // Local gps time
+                    if (timeGps > 1700000000 && timeGps < 2347462800)
+                    {
+                        setTime(timeGps);
+                        time_t rtc = timeGps;
+                        timeval tv = {rtc, 0};
+                        timezone tz = {TZ_SEC + DST_MN, 0};
+                        settimeofday(&tv, &tz);
+#ifdef DEBUG
+                        log_d("\nSET GPS Timestamp = %u Year=%d\n", timeGps, year());
+#endif
+                        // firstGpsTime = false;
+                        firstGpsTime = false;
+                        if (startTime == 0)
+                            startTime = now();
+                    }
+                    else
+                    {
+                        startTime = 0;
+                    }
+                }
+            }
+        }
+    }
+}
 
 void taskGPS(void *pvParameters)
 {
@@ -3265,9 +3454,10 @@ void taskGPS(void *pvParameters)
                                     nmea[nmea_idx++] = 0;
                                     if (nmea_idx > 5)
                                     {
+                                        if(ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
                                         // if (webServiceBegin == false)
                                         {
-                                            handle_ws_gnss(nmea);
+                                            handle_ws_gnss(nmea,nmea_idx);
                                         }
                                         // log_d("%s",nmea);
                                     }
@@ -3316,9 +3506,9 @@ void taskGPS(void *pvParameters)
                                         nmea[nmea_idx++] = 0;
                                         if (nmea_idx > 5)
                                         {
-                                            // if (webServiceBegin == false)
+                                            if(ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
                                             {
-                                                handle_ws_gnss(nmea);
+                                                handle_ws_gnss(nmea,nmea_idx);
                                             }
                                             // log_d("%s",nmea);
                                         }
@@ -4283,6 +4473,9 @@ void taskNetwork(void *pvParameters)
         timerNetwork=micros()-timerNetwork_old;
         vTaskDelay(9 / portTICK_PERIOD_MS);
         timerNetwork_old=micros();
+
+        if (config.gnss_enable) taskGPSActive();
+
 
         if (config.wifi_mode & WIFI_AP_FIX){
             APStationNum = WiFi.softAPgetStationNum();

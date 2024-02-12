@@ -14,7 +14,7 @@
 
 #include <Update.h>
 #include <WiFi.h>
-#include <WebServer.h>
+//#include <WebServer.h>
 #include <ESPAsyncWebServer.h>
 #include <HTTPClient.h>
 #include <time.h>
@@ -88,6 +88,7 @@ extern TaskHandle_t taskNetworkHandle;
 extern TaskHandle_t taskAPRSHandle;
 extern TaskHandle_t taskTNCHandle;
 extern TaskHandle_t taskGpsHandle;
+extern TaskHandle_t taskAPRSPollHandle;
 extern time_t systemUptime;
 extern String RF_VERSION;
 extern pkgListType *pkgList;
@@ -108,17 +109,18 @@ extern "C"
 uint8_t temprature_sens_read();
 
 void serviceHandle();
-void setHTML(byte page);
-void handle_root();
-void handle_setting();
-void handle_service();
-void handle_system();
-void handle_firmware();
-void handle_default();
+//void setHTML(byte page);
+void handle_root(AsyncWebServerRequest *request);
+void handle_setting(AsyncWebServerRequest *request);
+void handle_service(AsyncWebServerRequest *request);
+void handle_system(AsyncWebServerRequest *request);
+void handle_firmware(AsyncWebServerRequest *request);
+void handle_default(AsyncWebServerRequest *request);
 void webService();
-void handle_radio();
+void handle_radio(AsyncWebServerRequest *request);
 extern void RF_MODULE(bool boot);
 void handle_ws();
-void handle_ws_gnss(char *nmea);
+void handle_ws_gnss(char *nmea,size_t size);
+void event_lastHeard();
 
 #endif

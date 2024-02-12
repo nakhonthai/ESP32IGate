@@ -16,11 +16,13 @@
 #include <parse_aprs.h>
 #include "jquery_min_js.h"
 
-// Web Server;
-WebServer server(80);
-AsyncWebServer async_server(81);
+AsyncWebServer async_server(80);
+AsyncWebServer async_websocket(81);
 AsyncWebSocket ws("/ws");
 AsyncWebSocket ws_gnss("/ws_gnss");
+
+// Create an Event Source on /events
+AsyncEventSource lastheard_events("/eventHeard");
 
 String webString;
 
@@ -28,20 +30,25 @@ bool defaultSetting = false;
 
 void serviceHandle()
 {
-	server.handleClient();
+	// server.handleClient();
 }
 
-void handle_logout()
+void notFound(AsyncWebServerRequest *request)
+{
+	request->send(404, "text/plain", "Not found");
+}
+
+void handle_logout(AsyncWebServerRequest *request)
 {
 	webString = "Log out";
-	server.send(401, "text/html", webString);
+	request->send(200, "text/html", webString);
 }
 
-void setMainPage()
+void setMainPage(AsyncWebServerRequest *request)
 {
-	if (!server.authenticate(config.http_username, config.http_password))
+	if (!request->authenticate(config.http_username, config.http_password))
 	{
-		return server.requestAuthentication();
+		return request->requestAuthentication();
 	}
 	webString = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n";
 	webString += "<meta name=\"robots\" content=\"index\" />\n";
@@ -54,11 +61,11 @@ void setMainPage()
 	webString += "<meta name=\"KeyWords\" content=\"ESP32IGATE,APRS\" />\n";
 	webString += "<meta http-equiv=\"Cache-Control\" content=\"no-cache, no-store, must-revalidate\" />\n";
 	webString += "<meta http-equiv=\"pragma\" content=\"no-cache\" />\n";
-	webString += "<link rel=\"shortcut icon\" href=\"http://aprs.dprns.com/images/favicon.ico\" type=\"image/x-icon\" />\n";
+	webString += "<link rel=\"shortcut icon\" href=\"http://aprs.dprns.com/favicon.ico\" type=\"image/x-icon\" />\n";
 	webString += "<meta http-equiv=\"Expires\" content=\"0\" />\n";
 	webString += "<title>ESP32IGATE</title>\n";
 	webString += "<link rel=\"stylesheet\" type=\"text/css\" href=\"style.css\" />\n";
-	webString += "<script src=\"jquery-3.7.1.js\"></script>\n";
+	webString += "<script src=\"/jquery-3.7.1.js\"></script>\n";
 	webString += "<script type=\"text/javascript\">\n";
 	webString += "function selectTab(evt, tabName) {\n";
 	webString += "var i, tabcontent, tablinks;\n";
@@ -96,6 +103,21 @@ void setMainPage()
 	webString += "\n";
 	webString += "if (evt != null) evt.currentTarget.className += \" active\";\n";
 	webString += "}\n";
+	webString += "if (!!window.EventSource) {";
+	webString += "var source = new EventSource('/eventHeard');";
+
+	webString += "source.addEventListener('open', function(e) {";
+	webString += "console.log(\"Events Connected\");";
+	webString += "}, false);";
+	webString += "source.addEventListener('error', function(e) {";
+	webString += "if (e.target.readyState != EventSource.OPEN) {";
+	webString += "console.log(\"Events Disconnected\");";
+	webString += "}\n}, false);";
+	webString += "source.addEventListener('lastHeard', function(e) {";
+	// webString += "console.log(\"lastHeard\", e.data);";
+	webString += "var lh=document.getElementById(\"lastHeard\");";
+	webString += "if(lh != null) {lh.innerHTML = e.data;}";
+	webString += "}, false);\n}";
 	webString += "</script>\n";
 	webString += "</head>\n";
 	webString += "\n";
@@ -150,32 +172,33 @@ void setMainPage()
 	webString += "</script>\n";
 	webString += "</body>\n";
 	webString += "</html>";
-	server.send(200, "text/html", webString); // send to someones browser when asked
+	request->send(200, "text/html", webString); // send to someones browser when asked
+	event_lastHeard();
 }
 
 ////////////////////////////////////////////////////////////
 // handler for web server request: http://IpAddress/      //
 ////////////////////////////////////////////////////////////
 
-void handle_css()
+void handle_css(AsyncWebServerRequest *request)
 {
 	const char *css = ".container{width:800px;text-align:left;margin:auto;border-radius:10px 10px 10px 10px;-moz-border-radius:10px 10px 10px 10px;-webkit-border-radius:10px 10px 10px 10px;-khtml-border-radius:10px 10px 10px 10px;-ms-border-radius:10px 10px 10px 10px;box-shadow:3px 3px 3px #707070;background:#fff;border-color: #2194ec;padding: 0px;border-width: 5px;border-style:solid;}body,font{font:12px verdana,arial,sans-serif;color:#fff}.header{background:#2194ec;text-decoration:none;color:#fff;font-family:verdana,arial,sans-serif;text-align:left;padding:5px 0;border-radius:10px 10px 0 0;-moz-border-radius:10px 10px 0 0;-webkit-border-radius:10px 10px 0 0;-khtml-border-radius:10px 10px 0 0;-ms-border-radius:10px 10px 0 0}.content{margin:0 0 0 166px;padding:1px 5px 5px;color:#000;background:#fff;text-align:center;font-size: 8pt;}.contentwide{padding:50px 5px 5px;color:#000;background:#fff;text-align:center}.contentwide h2{color:#000;font:1em verdana,arial,sans-serif;text-align:center;font-weight:700;padding:0;margin:0;font-size: 12pt;}.footer{background:#2194ec;text-decoration:none;color:#fff;font-family:verdana,arial,sans-serif;font-size:9px;text-align:center;padding:10px 0;border-radius:0 0 10px 10px;-moz-border-radius:0 0 10px 10px;-webkit-border-radius:0 0 10px 10px;-khtml-border-radius:0 0 10px 10px;-ms-border-radius:0 0 10px 10px;clear:both}#tail{height:450px;width:805px;overflow-y:scroll;overflow-x:scroll;color:#0f0;background:#000}table{vertical-align:middle;text-align:center;empty-cells:show;padding-left:3;padding-right:3;padding-top:3;padding-bottom:3;border-collapse:collapse;border-color:#0f07f2;border-style:solid;border-spacing:0px;border-width:3px;text-decoration:none;color:#fff;background:#000;font-family:verdana,arial,sans-serif;font-size : 12px;width:100%;white-space:nowrap}table th{font-size: 10pt;font-family:lucidia console,Monaco,monospace;text-shadow:1px 1px #0e038c;text-decoration:none;background:#0525f7;border:1px solid silver}table tr:nth-child(even){background:#f7f7f7}table tr:nth-child(odd){background:#eeeeee}table td{color:#000;font-family:lucidia console,Monaco,monospace;text-decoration:none;border:1px solid #010369}body{background:#edf0f5;color:#000}a{text-decoration:none}a:link,a:visited{text-decoration:none;color:#0000e0;font-weight:400}th:last-child a.tooltip:hover span{left:auto;right:0}ul{padding:5px;margin:10px 0;list-style:none;float:left}ul li{float:left;display:inline;margin:0 10px}ul li a{text-decoration:none;float:left;color:#999;cursor:pointer;font:900 14px/22px arial,Helvetica,sans-serif}ul li a span{margin:0 10px 0 -10px;padding:1px 8px 5px 18px;position:relative;float:left}h1{text-shadow:2px 2px #303030;text-align:center}.toggle{position:absolute;margin-left:-9999px;visibility:hidden}.toggle+label{display:block;position:relative;cursor:pointer;outline:none}input.toggle-round-flat+label{padding:1px;width:33px;height:18px;background-color:#ddd;border-radius:10px;transition:background .4s}input.toggle-round-flat+label:before,input.toggle-round-flat+label:after{display:block;position:absolute;}input.toggle-round-flat+label:before{top:1px;left:1px;bottom:1px;right:1px;background-color:#fff;border-radius:10px;transition:background .4s}input.toggle-round-flat+label:after{top:2px;left:2px;bottom:2px;width:16px;background-color:#ddd;border-radius:12px;transition:margin .4s,background .4s}input.toggle-round-flat:checked+label{background-color:#dd4b39}input.toggle-round-flat:checked+label:after{margin-left:14px;background-color:#dd4b39}@-moz-document url-prefix(){select,input{margin:0;padding:0;border-width:1px;font:12px verdana,arial,sans-serif}input[type=button],button,input[type=submit]{padding:0 3px;border-radius:3px 3px 3px 3px;-moz-border-radius:3px 3px 3px 3px}}.nice-select.small,.nice-select-dropdown li.option{height:24px!important;min-height:24px!important;line-height:24px!important}.nice-select.small ul li:nth-of-type(2){clear:both}.nav{margin-bottom:0;padding-left:10;list-style:none}.nav>li{position:relative;display:block}.nav>li>a{position:relative;display:block;padding:5px 10px}.nav>li>a:hover,.nav>li>a:focus{text-decoration:none;background-color:#eee}.nav>li.disabled>a{color:#999}.nav>li.disabled>a:hover,.nav>li.disabled>a:focus{color:#999;text-decoration:none;background-color:initial;cursor:not-allowed}.nav .open>a,.nav .open>a:hover,.nav .open>a:focus{background-color:#eee;border-color:#428bca}.nav .nav-divider{height:1px;margin:9px 0;overflow:hidden;background-color:#e5e5e5}.nav>li>a>img{max-width:none}.nav-tabs{border-bottom:1px solid #ddd}.nav-tabs>li{float:left;margin-bottom:-1px}.nav-tabs>li>a{margin-right:0;line-height:1.42857143;border:1px solid #ddd;border-radius:10px 10px 0 0}.nav-tabs>li>a:hover{border-color:#eee #eee #ddd}.nav-tabs>button{margin-right:0;line-height:1.42857143;border:2px solid #ddd;border-radius:10px 10px 0 0}.nav-tabs>button:hover{background-color:#25bbfc;border-color:#428bca;color:#eaf2f9;border-bottom-color:transparent;}.nav-tabs>button.active,.nav-tabs>button.active:hover,.nav-tabs>button.active:focus{color:#f7fdfd;background-color:#1aae0d;border:1px solid #ddd;border-bottom-color:transparent;cursor:default}.nav-tabs>li.active>a,.nav-tabs>li.active>a:hover,.nav-tabs>li.active>a:focus{color:#428bca;background-color:#e5e5e5;border:1px solid #ddd;border-bottom-color:transparent;cursor:default}.nav-tabs.nav-justified{width:100%;border-bottom:0}.nav-tabs.nav-justified>li{float:none}.nav-tabs.nav-justified>li>a{text-align:center;margin-bottom:5px}.nav-tabs.nav-justified>.dropdown .dropdown-menu{top:auto;left:auto}.nav-status{float:left;margin:0;padding:3px;width:160px;font-weight:400;min-height:600}#bar,#prgbar {background-color: #f1f1f1;border-radius: 14px}#bar {background-color: #3498db;width: 0%;height: 14px}.switch{position:relative;display:inline-block;width:34px;height:16px}.switch input{opacity:0;width:0;height:0}.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#f55959;-webkit-transition:.4s;transition:.4s}.slider:before{position:absolute;content:\"\";height:12px;width:12px;left:2px;bottom:2px;background-color:#fff;-webkit-transition:.4s;transition:.4s}input:checked+.slider{background-color:#5ca30a}input:focus+.slider{box-shadow:0 0 1px #5ca30a}input:checked+.slider:before{-webkit-transform:translateX(16px);-ms-transform:translateX(16px);transform:translateX(16px)}.slider.round{border-radius:34px}.slider.round:before{border-radius:50%}\n";
-	server.send_P(200, "text/css", css);
+	request->send_P(200, "text/css", css);
 }
 
-void handle_jquery()
+void handle_jquery(AsyncWebServerRequest *request)
 {
-	server.setContentLength(jquery_3_7_1_min_js_gz_len);
-	server.sendHeader(String(F("Content-Encoding")), String(F("gzip")));
-	server.send(200, String(F("application/javascript")), "");
-	server.sendContent_P(jquery_3_7_1_min_js_gz, jquery_3_7_1_min_js_gz_len);
+	AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("application/javascript")), (const uint8_t *)jquery_3_7_1_min_js_gz, jquery_3_7_1_min_js_gz_len);
+	response->addHeader(String(F("Content-Encoding")), String(F("gzip")));
+	response->setContentLength(jquery_3_7_1_min_js_gz_len);
+	request->send(response);
 }
 
-void handle_dashboard()
+void handle_dashboard(AsyncWebServerRequest *request)
 {
-	if (!server.authenticate(config.http_username, config.http_password))
+	if (!request->authenticate(config.http_username, config.http_password))
 	{
-		return server.requestAuthentication();
+		return request->requestAuthentication();
 	}
 	webString = "<script type=\"text/javascript\">\n";
 	webString += "function reloadSysInfo() {\n";
@@ -186,11 +209,8 @@ void handle_dashboard()
 	webString += "$(\"#sidebarInfo\").load(\"/sidebarInfo\", function () { setTimeout(reloadSidebarInfo, 10000) });\n";
 	webString += "}\n";
 	webString += "setTimeout(reloadSidebarInfo, 200);\n";
-	webString += "function reloadlastHeard() {\n";
-	webString += "$(\"#lastHeard\").load(\"/lastHeard\", function () { setTimeout(reloadlastHeard, 10000) });\n";
-	webString += "}\n";
-	webString += "setTimeout(reloadlastHeard, 300);\n";
 	webString += "$(window).trigger('resize');\n";
+
 	webString += "</script>\n";
 
 	webString += "<div id=\"sysInfo\">\n";
@@ -318,16 +338,17 @@ void handle_dashboard()
 	webString += "<div id=\"lastHeard\">\n";
 	webString += "</div>\n";
 
-	server.send(200, "text/html", webString); // send to someones browser when asked
+	request->send(200, "text/html", webString); // send to someones browser when asked
 	delay(100);
 	webString.clear();
+	event_lastHeard();
 }
 
-void handle_sidebar()
+void handle_sidebar(AsyncWebServerRequest *request)
 {
-	if (!server.authenticate(config.http_username, config.http_password))
+	if (!request->authenticate(config.http_username, config.http_password))
 	{
-		return server.requestAuthentication();
+		return request->requestAuthentication();
 	}
 	String html = "<table style=\"background:white;border-collapse: unset;\">\n";
 	html += "<tr>\n";
@@ -428,40 +449,74 @@ void handle_sidebar()
 	html += "<script>\n";
 	html += "$(window).trigger('resize');\n";
 	html += "</script>\n";
-	server.send(200, "text/html", html); // send to someones browser when asked
-	delay(100);
+	// request->send(200, "text/html", html); // send to someones browser when asked
+	// delay(100);
+	request->send(200, "text/html", html);
 	html.clear();
 }
 
-void handle_symbol()
+void handle_symbol(AsyncWebServerRequest *request)
 {
 	int i;
-	String html = "<table border=\"1\" align=\"center\">\n";
-	html += "<tr><th colspan=\"16\">Table '/'</th></tr>\n";
-	html += "<tr>\n";
-	for (i = 33; i < 129; i++)
+	char *web = (char *)malloc(25000);
+	int sel = -1;
+	for (i = 0; i < request->args(); i++)
 	{
-		html += "<td><img src=\"http://aprs.dprns.com/symbols/icons/" + String(i) + "-1.png\"></td>\n";
-		if (((i % 16) == 0) && (i < 126))
-			html += "</tr>\n<tr>\n";
+		if (request->argName(i) == "sel")
+		{
+			if (request->arg(i) != "")
+			{
+				if (isValidNumber(request->arg(i)))
+				{
+					sel = request->arg(i).toInt();
+				}
+			}
+		}
 	}
-	html += "</tr>";
-	html += "</table>\n<br />";
-	html += "<table border=\"1\" align=\"center\">\n";
-	html += "<tr><th colspan=\"16\">Table '\\'</th></tr>\n";
-	html += "<tr>\n";
-	for (i = 33; i < 129; i++)
+
+	if (web)
 	{
-		html += "<td><img src=\"http://aprs.dprns.com/symbols/icons/" + String(i) + "-2.png\"></td>\n";
-		if (((i % 16) == 0) && (i < 126))
-			html += "</tr>\n<tr>\n";
+		memset(web, 0, 25000);
+		strcat(web, "<table border=\"1\" align=\"center\">\n");
+		strcat(web, "<tr><th colspan=\"16\">Table '/'</th></tr>\n");
+		strcat(web, "<tr>\n");
+		for (i = 33; i < 129; i++)
+		{
+			//<td><img onclick="window.opener.setValue(113,2);" src="http://aprs.dprns.com/symbols/icons/113-2.png"></td>
+			char lnk[128];
+			if (sel == -1)
+				sprintf(lnk, "<td><img onclick=\"window.opener.setValue(%d,1);\" src=\"http://aprs.dprns.com/symbols/icons/%d-1.png\"></td>", i, i);
+			else
+				sprintf(lnk, "<td><img onclick=\"window.opener.setValue(%d,%d,1);\" src=\"http://aprs.dprns.com/symbols/icons/%d-1.png\"></td>", sel, i, i);
+			strcat(web, lnk);
+
+			if (((i % 16) == 0) && (i < 126))
+				strcat(web, "</tr>\n<tr>\n");
+		}
+		strcat(web, "</tr>");
+		strcat(web, "</table>\n<br />");
+		strcat(web, "<table border=\"1\" align=\"center\">\n");
+		strcat(web, "<tr><th colspan=\"16\">Table '\\'</th></tr>\n");
+		strcat(web, "<tr>\n");
+		for (i = 33; i < 129; i++)
+		{
+			char lnk[128];
+			if (sel == -1)
+				sprintf(lnk, "<td><img onclick=\"window.opener.setValue(%d,2);\" src=\"http://aprs.dprns.com/symbols/icons/%d-2.png\"></td>", i, i);
+			else
+				sprintf(lnk, "<td><img onclick=\"window.opener.setValue(%d,%d,2);\" src=\"http://aprs.dprns.com/symbols/icons/%d-2.png\"></td>", sel, i, i);
+			strcat(web, lnk);
+			if (((i % 16) == 0) && (i < 126))
+				strcat(web, "</tr>\n<tr>\n");
+		}
+		strcat(web, "</tr>");
+		strcat(web, "</table>\n");
+		request->send_P(200, "text/html", web);
+		free(web);
 	}
-	html += "</tr>";
-	html += "</table>\n";
-	server.send(200, "text/html", html); // send to someones browser when asked
 }
 
-void handle_sysinfo()
+void handle_sysinfo(AsyncWebServerRequest *request)
 {
 	String html = "<table style=\"table-layout: fixed;border-collapse: unset;border-radius: 10px;border-color: #ee800a;border-style: ridge;border-spacing: 1px;border-width: 4px;background: #ee800a;\">\n";
 	html += "<tr>\n";
@@ -486,11 +541,11 @@ void handle_sysinfo()
 	// html += "<td style=\"background: #f00\"><b>" + String(ESP.getCycleCount()) + "</b></td>\n";
 	html += "</tr>\n";
 	html += "</table>\n";
-	server.send(200, "text/html", html); // send to someones browser when asked
+	request->send(200, "text/html", html); // send to someones browser when asked
 	html.clear();
 }
 
-void handle_lastHeard()
+void handle_lastHeard(AsyncWebServerRequest *request)
 {
 	struct pbuf_t aprs;
 	ParseAPRS aprsParse;
@@ -683,46 +738,247 @@ void handle_lastHeard()
 		}
 	}
 	html += "</table>\n";
-	server.send(200, "text/html", html); // send to someones browser when asked
+	request->send(200, "text/html", html); // send to someones browser when asked
 	delay(100);
 	html.clear();
 }
 
-void handle_radio()
+void event_lastHeard()
 {
-	if (!server.authenticate(config.http_username, config.http_password))
+	// log_d("Event count: %d",lastheard_events.count());
+	if (lastheard_events.count() == 0)
+		return;
+
+	struct pbuf_t aprs;
+	ParseAPRS aprsParse;
+	struct tm tmstruct;
+
+	String html = "";
+	sort(pkgList, PKGLISTSIZE);
+
+	html = "<table>\n";
+	html += "<th colspan=\"7\" style=\"background-color: #070ac2;\">LAST HEARD <a href=\"/tnc2\" target=\"_tnc2\" style=\"color: yellow;font-size:8pt\">[RAW]</a></th>\n";
+	html += "<tr>\n";
+	html += "<th style=\"min-width:10ch\"><span><b>Time (";
+	if (config.timeZone >= 0)
+		html += "+";
+	// else
+	//	html += "-";
+
+	if (config.timeZone == (int)config.timeZone)
+		html += String((int)config.timeZone) + ")</b></span></th>\n";
+	else
+		html += String(config.timeZone, 1) + ")</b></span></th>\n";
+	html += "<th style=\"min-width:16px\">ICON</th>\n";
+	html += "<th style=\"min-width:10ch\">Callsign</th>\n";
+	html += "<th>VIA LAST PATH</th>\n";
+	html += "<th style=\"min-width:5ch\">DX</th>\n";
+	html += "<th style=\"min-width:5ch\">PACKET</th>\n";
+	html += "<th style=\"min-width:5ch\">AUDIO</th>\n";
+	html += "</tr>\n";
+
+	for (int i = 0; i < 30; i++)
 	{
-		return server.requestAuthentication();
+		if (i >= PKGLISTSIZE)
+			break;
+		pkgListType pkg = getPkgList(i);
+		if (pkg.time > 0)
+		{
+			String line = String(pkg.raw);
+			int packet = pkg.pkg;
+			int start_val = line.indexOf(">", 0); // หาตำแหน่งแรกของ >
+			if (start_val > 3)
+			{
+				String src_call = line.substring(0, start_val);
+				memset(&aprs, 0, sizeof(pbuf_t));
+				aprs.buf_len = 300;
+				aprs.packet_len = line.length();
+				line.toCharArray(&aprs.data[0], aprs.packet_len);
+				int start_info = line.indexOf(":", 0);
+				int end_ssid = line.indexOf(",", 0);
+				int start_dst = line.indexOf(">", 2);
+				int start_dstssid = line.indexOf("-", start_dst);
+				String path = "";
+
+				if ((end_ssid > start_dst) && (end_ssid < start_info))
+				{
+					path = line.substring(end_ssid + 1, start_info);
+				}
+				if (end_ssid < 5)
+					end_ssid = start_info;
+				if ((start_dstssid > start_dst) && (start_dstssid < start_dst + 10))
+				{
+					aprs.dstcall_end_or_ssid = &aprs.data[start_dstssid];
+				}
+				else
+				{
+					aprs.dstcall_end_or_ssid = &aprs.data[end_ssid];
+				}
+				aprs.info_start = &aprs.data[start_info + 1];
+				aprs.dstname = &aprs.data[start_dst + 1];
+				aprs.dstname_len = end_ssid - start_dst;
+				aprs.dstcall_end = &aprs.data[end_ssid];
+				aprs.srccall_end = &aprs.data[start_dst];
+
+				// Serial.println(aprs.info_start);
+				// aprsParse.parse_aprs(&aprs);
+				if (aprsParse.parse_aprs(&aprs))
+				{
+					pkg.calsign[10] = 0;
+					time_t tm = pkg.time;
+					localtime_r(&pkg.time, &tmstruct);
+					char strTime[10];
+					sprintf(strTime, "%02d:%02d:%02d", tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
+					// String str = String(tmstruct.tm_hour, DEC) + ":" + String(tmstruct.tm_min, DEC) + ":" + String(tmstruct.tm_sec, DEC);
+
+					html += "<tr><td>" + String(strTime) + "</td>";
+					String fileImg = "";
+					uint8_t sym = (uint8_t)aprs.symbol[1];
+					if (sym > 31 && sym < 127)
+					{
+						if (aprs.symbol[0] > 64 && aprs.symbol[0] < 91) // table A-Z
+						{
+							html += "<td><b>" + String(aprs.symbol[0]) + "</b></td>";
+						}
+						else
+						{
+							fileImg = String(sym, DEC);
+							if (aprs.symbol[0] == 92)
+							{
+								fileImg += "-2.png";
+							}
+							else if (aprs.symbol[0] == 47)
+							{
+								fileImg += "-1.png";
+							}
+							else
+							{
+								fileImg = "dot.png";
+							}
+							html += "<td><img src=\"http://aprs.dprns.com/symbols/icons/" + fileImg + "\"></td>";
+						}
+					}
+					else
+					{
+						html += "<td><img src=\"http://aprs.dprns.com/symbols/icons/dot.png\"></td>";
+					}
+					html += "<td>" + src_call;
+					if (aprs.srcname_len > 0 && aprs.srcname_len < 10) // Get Item/Object
+					{
+						char itemname[10];
+						memset(&itemname, 0, sizeof(itemname));
+						memcpy(&itemname, aprs.srcname, aprs.srcname_len);
+						html += "(" + String(itemname) + ")";
+					}
+					html += +"</td>";
+					if (path == "")
+					{
+						html += "<td style=\"text-align: left;\">RF: DIRECT</td>";
+					}
+					else
+					{
+						String LPath = path.substring(path.lastIndexOf(',') + 1);
+						// if(path.indexOf("qAR")>=0 || path.indexOf("qAS")>=0 || path.indexOf("qAC")>=0){ //Via from Internet Server
+						if (path.indexOf("qA") >= 0 || path.indexOf("TCPIP") >= 0)
+						{
+							html += "<td style=\"text-align: left;\">INET: " + LPath + "</td>";
+						}
+						else
+						{
+							if (LPath.indexOf("*") > 0)
+								html += "<td style=\"text-align: left;\">DIGI: " + path + "</td>";
+							else
+								html += "<td style=\"text-align: left;\">RF: " + path + "</td>";
+						}
+					}
+					// html += "<td>" + path + "</td>";
+					if (aprs.flags & F_HASPOS)
+					{
+						double lat, lon;
+						if (gps.location.isValid())
+						{
+							lat = gps.location.lat();
+							lon = gps.location.lng();
+						}
+						else
+						{
+							lat = config.igate_lat;
+							lon = config.igate_lon;
+						}
+						double dtmp = aprsParse.direction(lon, lat, aprs.lng, aprs.lat);
+						double dist = aprsParse.distance(lon, lat, aprs.lng, aprs.lat);
+						html += "<td>" + String(dist, 1) + "km/" + String(dtmp, 0) + "°</td>";
+					}
+					else
+					{
+						html += "<td>-</td>\n";
+					}
+					html += "<td>" + String(packet) + "</td>\n";
+					if (pkg.audio_level == 0)
+					{
+						html += "<td>-</td></tr>\n";
+					}
+					else
+					{
+						double Vrms = (double)pkg.audio_level / 1000;
+						double audBV = 20.0F * log10(Vrms);
+						if (audBV < -20.0F)
+						{
+							html += "<td style=\"color: #0000f0;\">";
+						}
+						else if (audBV > -5.0F)
+						{
+							html += "<td style=\"color: #f00000;\">";
+						}
+						else
+						{
+							html += "<td style=\"color: #008000;\">";
+						}
+						html += String(audBV, 1) + "dBV</td></tr>\n";
+					}
+				}
+			}
+		}
+	}
+	html += "</table>\n";
+	lastheard_events.send(html.c_str(), "lastHeard", millis());
+}
+
+void handle_radio(AsyncWebServerRequest *request)
+{
+	if (!request->authenticate(config.http_username, config.http_password))
+	{
+		return request->requestAuthentication();
 	}
 	// bool noiseEn=false;
 	bool radioEnable = false;
-	if (server.hasArg("commitRadio"))
+	if (request->hasArg("commitRadio"))
 	{
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			// Serial.print("SERVER ARGS ");
-			// Serial.print(server.argName(i));
+			// Serial.print(request->argName(i));
 			// Serial.print("=");
-			// Serial.println(server.arg(i));
-			if (server.argName(i) == "radioEnable")
+			// Serial.println(request->arg(i));
+			if (request->argName(i) == "radioEnable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 					{
 						radioEnable = true;
 					}
 				}
 			}
 
-			if (server.argName(i) == "nw_band")
+			if (request->argName(i) == "nw_band")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
+					if (isValidNumber(request->arg(i)))
 					{
-						config.band = server.arg(i).toInt();
-						// if (server.arg(i).toInt())
+						config.band = request->arg(i).toInt();
+						// if (request->arg(i).toInt())
 						// 	config.band = 1;
 						// else
 						// 	config.band = 0;
@@ -730,22 +986,22 @@ void handle_radio()
 				}
 			}
 
-			if (server.argName(i) == "volume")
+			if (request->argName(i) == "volume")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.volume = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.volume = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "rf_power")
+			if (request->argName(i) == "rf_power")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
+					if (isValidNumber(request->arg(i)))
 					{
-						if (server.arg(i).toInt())
+						if (request->arg(i).toInt())
 							config.rf_power = true;
 						else
 							config.rf_power = false;
@@ -753,71 +1009,71 @@ void handle_radio()
 				}
 			}
 
-			if (server.argName(i) == "sql_level")
+			if (request->argName(i) == "sql_level")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.sql_level = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.sql_level = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "tx_freq")
+			if (request->argName(i) == "tx_freq")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.freq_tx = server.arg(i).toFloat();
+					if (isValidNumber(request->arg(i)))
+						config.freq_tx = request->arg(i).toFloat();
 				}
 			}
-			if (server.argName(i) == "rx_freq")
+			if (request->argName(i) == "rx_freq")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.freq_rx = server.arg(i).toFloat();
-				}
-			}
-
-			if (server.argName(i) == "tx_offset")
-			{
-				if (server.arg(i) != "")
-				{
-					if (isValidNumber(server.arg(i)))
-						config.offset_tx = server.arg(i).toInt();
-				}
-			}
-			if (server.argName(i) == "rx_offset")
-			{
-				if (server.arg(i) != "")
-				{
-					if (isValidNumber(server.arg(i)))
-						config.offset_rx = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.freq_rx = request->arg(i).toFloat();
 				}
 			}
 
-			if (server.argName(i) == "tx_ctcss")
+			if (request->argName(i) == "tx_offset")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.tone_tx = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.offset_tx = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "rx_ctcss")
+			if (request->argName(i) == "rx_offset")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.tone_rx = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.offset_rx = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "rf_type")
+
+			if (request->argName(i) == "tx_ctcss")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.rf_type = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.tone_tx = request->arg(i).toInt();
+				}
+			}
+			if (request->argName(i) == "rx_ctcss")
+			{
+				if (request->arg(i) != "")
+				{
+					if (isValidNumber(request->arg(i)))
+						config.tone_rx = request->arg(i).toInt();
+				}
+			}
+			if (request->argName(i) == "rf_type")
+			{
+				if (request->arg(i) != "")
+				{
+					if (isValidNumber(request->arg(i)))
+						config.rf_type = request->arg(i).toInt();
 				}
 			}
 		}
@@ -825,63 +1081,63 @@ void handle_radio()
 		// config.agc=agcEn;
 		config.rf_en = radioEnable;
 		String html = "OK";
-		server.send(200, "text/html", html); // send to someones browser when asked
+		request->send(200, "text/html", html); // send to someones browser when asked
 		saveEEPROM();
 		delay(500);
 		RF_MODULE(false);
 	}
-	else if (server.hasArg("commitTNC"))
+	else if (request->hasArg("commitTNC"))
 	{
 		bool hpf = 0;
 		bool bpf = 0;
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			if (server.argName(i) == "HPF")
+			if (request->argName(i) == "HPF")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 					{
 						hpf = true;
 					}
 				}
 			}
-			if (server.argName(i) == "BPF")
+			if (request->argName(i) == "BPF")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 					{
 						bpf = true;
 					}
 				}
 			}
-			if (server.argName(i) == "timeSlot")
+			if (request->argName(i) == "timeSlot")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
+					if (isValidNumber(request->arg(i)))
 					{
-						config.tx_timeslot = server.arg(i).toInt();
+						config.tx_timeslot = request->arg(i).toInt();
 					}
 				}
 			}
-			if (server.argName(i) == "preamble")
+			if (request->argName(i) == "preamble")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
+					if (isValidNumber(request->arg(i)))
 					{
-						config.preamble = server.arg(i).toInt();
+						config.preamble = request->arg(i).toInt();
 					}
 				}
 			}
-			if (server.argName(i) == "modem_type")
+			if (request->argName(i) == "modem_type")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.modem_type = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.modem_type = request->arg(i).toInt();
 				}
 			}
 		}
@@ -890,7 +1146,7 @@ void handle_radio()
 		afskSetHPF(config.audio_hpf);
 		afskSetBPF(config.audio_bpf);
 		String html = "OK";
-		server.send(200, "text/html", html); // send to someones browser when asked
+		request->send(200, "text/html", html); // send to someones browser when asked
 		saveEEPROM();
 	}
 	else
@@ -1151,99 +1407,99 @@ void handle_radio()
 		html += "<br />\n";
 		html += "<input type=\"hidden\" name=\"commitTNC\"/>\n";
 		html += "</form>";
-		server.send(200, "text/html", html); // send to someones browser when asked
+		request->send(200, "text/html", html); // send to someones browser when asked
 	}
 }
 
-void handle_vpn()
+void handle_vpn(AsyncWebServerRequest *request)
 {
-	if (!server.authenticate(config.http_username, config.http_password))
+	if (!request->authenticate(config.http_username, config.http_password))
 	{
-		return server.requestAuthentication();
+		return request->requestAuthentication();
 	}
-	if (server.hasArg("commitVPN"))
+	if (request->hasArg("commitVPN"))
 	{
 		bool vpnEn = false;
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			// Serial.print("SERVER ARGS ");
-			// Serial.print(server.argName(i));
+			// Serial.print(request->argName(i));
 			// Serial.print("=");
-			// Serial.println(server.arg(i));
+			// Serial.println(request->arg(i));
 
-			if (server.argName(i) == "vpnEnable")
+			if (request->argName(i) == "vpnEnable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					// if (isValidNumber(server.arg(i)))
-					if (String(server.arg(i)) == "OK")
+					// if (isValidNumber(request->arg(i)))
+					if (String(request->arg(i)) == "OK")
 						vpnEn = true;
 				}
 			}
 
-			// if (server.argName(i) == "taretime") {
-			//	if (server.arg(i) != "")
+			// if (request->argName(i) == "taretime") {
+			//	if (request->arg(i) != "")
 			//	{
-			//		//if (isValidNumber(server.arg(i)))
-			//		if (String(server.arg(i)) == "OK")
+			//		//if (isValidNumber(request->arg(i)))
+			//		if (String(request->arg(i)) == "OK")
 			//			taretime = true;
 			//	}
 			// }
-			if (server.argName(i) == "wg_port")
+			if (request->argName(i) == "wg_port")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.wg_port = server.arg(i).toInt();
+					config.wg_port = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "wg_public_key")
+			if (request->argName(i) == "wg_public_key")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.wg_public_key, server.arg(i).c_str());
+					strcpy(config.wg_public_key, request->arg(i).c_str());
 					config.wg_public_key[44] = 0;
 				}
 			}
 
-			if (server.argName(i) == "wg_private_key")
+			if (request->argName(i) == "wg_private_key")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.wg_private_key, server.arg(i).c_str());
+					strcpy(config.wg_private_key, request->arg(i).c_str());
 					config.wg_private_key[44] = 0;
 				}
 			}
 
-			if (server.argName(i) == "wg_peer_address")
+			if (request->argName(i) == "wg_peer_address")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.wg_peer_address, server.arg(i).c_str());
+					strcpy(config.wg_peer_address, request->arg(i).c_str());
 				}
 			}
 
-			if (server.argName(i) == "wg_local_address")
+			if (request->argName(i) == "wg_local_address")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.wg_local_address, server.arg(i).c_str());
+					strcpy(config.wg_local_address, request->arg(i).c_str());
 				}
 			}
 
-			if (server.argName(i) == "wg_netmask_address")
+			if (request->argName(i) == "wg_netmask_address")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.wg_netmask_address, server.arg(i).c_str());
+					strcpy(config.wg_netmask_address, request->arg(i).c_str());
 				}
 			}
 
-			if (server.argName(i) == "wg_gw_address")
+			if (request->argName(i) == "wg_gw_address")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.wg_gw_address, server.arg(i).c_str());
+					strcpy(config.wg_gw_address, request->arg(i).c_str());
 				}
 			}
 		}
@@ -1251,7 +1507,7 @@ void handle_vpn()
 		config.vpn = vpnEn;
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
 	else
 	{
@@ -1330,67 +1586,69 @@ void handle_vpn()
 		html += "<input type=\"hidden\" name=\"commitVPN\"/>\n";
 		html += "</form>\n";
 
-		server.send(200, "text/html", html); // send to someones browser when asked
+		request->send(200, "text/html", html); // send to someones browser when asked
 	}
 }
 
-void handle_mod()
+void handle_mod(AsyncWebServerRequest *request)
 {
-	if (!server.authenticate(config.http_username, config.http_password))
+	if (!request->authenticate(config.http_username, config.http_password))
 	{
-		return server.requestAuthentication();
+		return request->requestAuthentication();
 	}
-	if (server.hasArg("commitGNSS"))
+	if (request->hasArg("commitGNSS"))
 	{
 		bool En = false;
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			// Serial.print("SERVER ARGS ");
-			// Serial.print(server.argName(i));
+			// Serial.print(request->argName(i));
 			// Serial.print("=");
-			// Serial.println(server.arg(i));
+			// Serial.println(request->arg(i));
 
-			if (server.argName(i) == "Enable")
+			if (request->argName(i) == "Enable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					// if (isValidNumber(server.arg(i)))
-					if (String(server.arg(i)) == "OK")
+					// if (isValidNumber(request->arg(i)))
+					if (String(request->arg(i)) == "OK")
 						En = true;
 				}
 			}
 
-			if (server.argName(i) == "atc")
+			if (request->argName(i) == "atc")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.gnss_at_command,server.arg(i).c_str());
-				}else{
-					memset(config.gnss_at_command,0,sizeof(config.gnss_at_command));
+					strcpy(config.gnss_at_command, request->arg(i).c_str());
+				}
+				else
+				{
+					memset(config.gnss_at_command, 0, sizeof(config.gnss_at_command));
 				}
 			}
 
-			if (server.argName(i) == "Host")
+			if (request->argName(i) == "Host")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.gnss_tcp_host,server.arg(i).c_str());
+					strcpy(config.gnss_tcp_host, request->arg(i).c_str());
 				}
 			}
 
-			if (server.argName(i) == "Port")
+			if (request->argName(i) == "Port")
 			{
-				if (isValidNumber(server.arg(i)))
+				if (isValidNumber(request->arg(i)))
 				{
-					config.gnss_tcp_port = server.arg(i).toInt();
+					config.gnss_tcp_port = request->arg(i).toInt();
 				}
 			}
-			
-			if (server.argName(i) == "channel")
+
+			if (request->argName(i) == "channel")
 			{
-				if (isValidNumber(server.arg(i)))
+				if (isValidNumber(request->arg(i)))
 				{
-					config.gnss_channel = server.arg(i).toInt();
+					config.gnss_channel = request->arg(i).toInt();
 				}
 			}
 		}
@@ -1398,56 +1656,56 @@ void handle_mod()
 		config.gnss_enable = En;
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
-	else if (server.hasArg("commitUART0"))
+	else if (request->hasArg("commitUART0"))
 	{
 		bool En = false;
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			// Serial.print("SERVER ARGS ");
-			// Serial.print(server.argName(i));
+			// Serial.print(request->argName(i));
 			// Serial.print("=");
-			// Serial.println(server.arg(i));
+			// Serial.println(request->arg(i));
 
-			if (server.argName(i) == "Enable")
+			if (request->argName(i) == "Enable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						En = true;
 				}
 			}
 
-			if (server.argName(i) == "baudrate")
+			if (request->argName(i) == "baudrate")
 			{
-				if (isValidNumber(server.arg(i)))
+				if (isValidNumber(request->arg(i)))
 				{
-					config.uart0_baudrate = server.arg(i).toInt();
+					config.uart0_baudrate = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "rx")
+			if (request->argName(i) == "rx")
 			{
-				if (isValidNumber(server.arg(i)))
+				if (isValidNumber(request->arg(i)))
 				{
-					config.uart0_rx_gpio = server.arg(i).toInt();
+					config.uart0_rx_gpio = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "tx")
+			if (request->argName(i) == "tx")
 			{
-				if (isValidNumber(server.arg(i)))
+				if (isValidNumber(request->arg(i)))
 				{
-					config.uart0_tx_gpio = server.arg(i).toInt();
+					config.uart0_tx_gpio = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "rts")
+			if (request->argName(i) == "rts")
 			{
-				if (isValidNumber(server.arg(i)))
+				if (isValidNumber(request->arg(i)))
 				{
-					config.uart0_rts_gpio = server.arg(i).toInt();
+					config.uart0_rts_gpio = request->arg(i).toInt();
 				}
 			}
 		}
@@ -1455,56 +1713,56 @@ void handle_mod()
 		config.uart0_enable = En;
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
-	else if (server.hasArg("commitUART1"))
+	else if (request->hasArg("commitUART1"))
 	{
 		bool En = false;
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			// Serial.print("SERVER ARGS ");
-			// Serial.print(server.argName(i));
+			// Serial.print(request->argName(i));
 			// Serial.print("=");
-			// Serial.println(server.arg(i));
+			// Serial.println(request->arg(i));
 
-			if (server.argName(i) == "Enable")
+			if (request->argName(i) == "Enable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						En = true;
 				}
 			}
 
-			if (server.argName(i) == "baudrate")
+			if (request->argName(i) == "baudrate")
 			{
-				if (isValidNumber(server.arg(i)))
+				if (isValidNumber(request->arg(i)))
 				{
-					config.uart1_baudrate = server.arg(i).toInt();
+					config.uart1_baudrate = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "rx")
+			if (request->argName(i) == "rx")
 			{
-				if (isValidNumber(server.arg(i)))
+				if (isValidNumber(request->arg(i)))
 				{
-					config.uart1_rx_gpio = server.arg(i).toInt();
+					config.uart1_rx_gpio = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "tx")
+			if (request->argName(i) == "tx")
 			{
-				if (isValidNumber(server.arg(i)))
+				if (isValidNumber(request->arg(i)))
 				{
-					config.uart1_tx_gpio = server.arg(i).toInt();
+					config.uart1_tx_gpio = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "rts")
+			if (request->argName(i) == "rts")
 			{
-				if (isValidNumber(server.arg(i)))
+				if (isValidNumber(request->arg(i)))
 				{
-					config.uart1_rts_gpio = server.arg(i).toInt();
+					config.uart1_rts_gpio = request->arg(i).toInt();
 				}
 			}
 		}
@@ -1512,56 +1770,56 @@ void handle_mod()
 		config.uart1_enable = En;
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
-	else if (server.hasArg("commitUART2"))
+	else if (request->hasArg("commitUART2"))
 	{
 		bool En = false;
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			// Serial.print("SERVER ARGS ");
-			// Serial.print(server.argName(i));
+			// Serial.print(request->argName(i));
 			// Serial.print("=");
-			// Serial.println(server.arg(i));
+			// Serial.println(request->arg(i));
 
-			if (server.argName(i) == "Enable")
+			if (request->argName(i) == "Enable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						En = true;
 				}
 			}
 
-			if (server.argName(i) == "baudrate")
+			if (request->argName(i) == "baudrate")
 			{
-				if (isValidNumber(server.arg(i)))
+				if (isValidNumber(request->arg(i)))
 				{
-					config.uart2_baudrate = server.arg(i).toInt();
+					config.uart2_baudrate = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "rx")
+			if (request->argName(i) == "rx")
 			{
-				if (isValidNumber(server.arg(i)))
+				if (isValidNumber(request->arg(i)))
 				{
-					config.uart2_rx_gpio = server.arg(i).toInt();
+					config.uart2_rx_gpio = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "tx")
+			if (request->argName(i) == "tx")
 			{
-				if (isValidNumber(server.arg(i)))
+				if (isValidNumber(request->arg(i)))
 				{
-					config.uart2_tx_gpio = server.arg(i).toInt();
+					config.uart2_tx_gpio = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "rts")
+			if (request->argName(i) == "rts")
 			{
-				if (isValidNumber(server.arg(i)))
+				if (isValidNumber(request->arg(i)))
 				{
-					config.uart2_rts_gpio = server.arg(i).toInt();
+					config.uart2_rts_gpio = request->arg(i).toInt();
 				}
 			}
 		}
@@ -1569,49 +1827,49 @@ void handle_mod()
 		config.uart2_enable = En;
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
-	else if (server.hasArg("commitMODBUS"))
+	else if (request->hasArg("commitMODBUS"))
 	{
 		bool En = false;
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			// Serial.print("SERVER ARGS ");
-			// Serial.print(server.argName(i));
+			// Serial.print(request->argName(i));
 			// Serial.print("=");
-			// Serial.println(server.arg(i));
+			// Serial.println(request->arg(i));
 
-			if (server.argName(i) == "Enable")
+			if (request->argName(i) == "Enable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					// if (isValidNumber(server.arg(i)))
-					if (String(server.arg(i)) == "OK")
+					// if (isValidNumber(request->arg(i)))
+					if (String(request->arg(i)) == "OK")
 						En = true;
 				}
 			}
 
-			if (server.argName(i) == "channel")
+			if (request->argName(i) == "channel")
 			{
-				if (isValidNumber(server.arg(i)))
+				if (isValidNumber(request->arg(i)))
 				{
-					config.modbus_channel = server.arg(i).toInt();
+					config.modbus_channel = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "address")
+			if (request->argName(i) == "address")
 			{
-				if (isValidNumber(server.arg(i)))
+				if (isValidNumber(request->arg(i)))
 				{
-					config.modbus_address = server.arg(i).toInt();
+					config.modbus_address = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "de")
+			if (request->argName(i) == "de")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.modbus_de_gpio = server.arg(i).toInt();
+					config.modbus_de_gpio = request->arg(i).toInt();
 				}
 			}
 		}
@@ -1619,41 +1877,41 @@ void handle_mod()
 		config.modbus_enable = En;
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
-	else if (server.hasArg("commitTNC"))
+	else if (request->hasArg("commitTNC"))
 	{
 		bool En = false;
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			// Serial.print("SERVER ARGS ");
-			// Serial.print(server.argName(i));
+			// Serial.print(request->argName(i));
 			// Serial.print("=");
-			// Serial.println(server.arg(i));
+			// Serial.println(request->arg(i));
 
-			if (server.argName(i) == "Enable")
+			if (request->argName(i) == "Enable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					// if (isValidNumber(server.arg(i)))
-					if (String(server.arg(i)) == "OK")
+					// if (isValidNumber(request->arg(i)))
+					if (String(request->arg(i)) == "OK")
 						En = true;
 				}
 			}
 
-			if (server.argName(i) == "channel")
+			if (request->argName(i) == "channel")
 			{
-				if (isValidNumber(server.arg(i)))
+				if (isValidNumber(request->arg(i)))
 				{
-					config.ext_tnc_channel = server.arg(i).toInt();
+					config.ext_tnc_channel = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "mode")
+			if (request->argName(i) == "mode")
 			{
-				if (isValidNumber(server.arg(i)))
+				if (isValidNumber(request->arg(i)))
 				{
-					config.ext_tnc_mode = server.arg(i).toInt();
+					config.ext_tnc_mode = request->arg(i).toInt();
 				}
 			}
 		}
@@ -1661,33 +1919,33 @@ void handle_mod()
 		config.ext_tnc_enable = En;
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
-	else if (server.hasArg("commitONEWIRE"))
+	else if (request->hasArg("commitONEWIRE"))
 	{
 		bool En = false;
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			// Serial.print("SERVER ARGS ");
-			// Serial.print(server.argName(i));
+			// Serial.print(request->argName(i));
 			// Serial.print("=");
-			// Serial.println(server.arg(i));
+			// Serial.println(request->arg(i));
 
-			if (server.argName(i) == "Enable")
+			if (request->argName(i) == "Enable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					// if (isValidNumber(server.arg(i)))
-					if (String(server.arg(i)) == "OK")
+					// if (isValidNumber(request->arg(i)))
+					if (String(request->arg(i)) == "OK")
 						En = true;
 				}
 			}
 
-			if (server.argName(i) == "data")
+			if (request->argName(i) == "data")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.onewire_gpio = server.arg(i).toInt();
+					config.onewire_gpio = request->arg(i).toInt();
 				}
 			}
 		}
@@ -1695,156 +1953,156 @@ void handle_mod()
 		config.onewire_enable = En;
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
-	else if (server.hasArg("commitRF"))
+	else if (request->hasArg("commitRF"))
 	{
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			// Serial.print("SERVER ARGS ");
-			// Serial.print(server.argName(i));
+			// Serial.print(request->argName(i));
 			// Serial.print("=");
-			// Serial.println(server.arg(i));
+			// Serial.println(request->arg(i));
 
-			if (server.argName(i) == "sql_active")
+			if (request->argName(i) == "sql_active")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.rf_sql_active = (bool)server.arg(i).toInt();
+					config.rf_sql_active = (bool)request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "pd_active")
+			if (request->argName(i) == "pd_active")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.rf_pd_active = (bool)server.arg(i).toInt();
+					config.rf_pd_active = (bool)request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "pwr_active")
+			if (request->argName(i) == "pwr_active")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.rf_pwr_active = (bool)server.arg(i).toInt();
+					config.rf_pwr_active = (bool)request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "ptt_active")
+			if (request->argName(i) == "ptt_active")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.rf_ptt_active = (bool)server.arg(i).toInt();
-				}
-			}
-
-			if (server.argName(i) == "baudrate")
-			{
-				if (server.arg(i) != "")
-				{
-					config.rf_baudrate = server.arg(i).toInt();
+					config.rf_ptt_active = (bool)request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "rx")
+			if (request->argName(i) == "baudrate")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.rf_rx_gpio = server.arg(i).toInt();
+					config.rf_baudrate = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "tx")
+			if (request->argName(i) == "rx")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.rf_tx_gpio = server.arg(i).toInt();
+					config.rf_rx_gpio = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "pd")
+			if (request->argName(i) == "tx")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.rf_pd_gpio = server.arg(i).toInt();
+					config.rf_tx_gpio = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "pwr")
+			if (request->argName(i) == "pd")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.rf_pwr_gpio = server.arg(i).toInt();
+					config.rf_pd_gpio = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "ptt")
+
+			if (request->argName(i) == "pwr")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.rf_ptt_gpio = server.arg(i).toInt();
+					config.rf_pwr_gpio = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "sql")
+			if (request->argName(i) == "ptt")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.rf_sql_gpio = server.arg(i).toInt();
+					config.rf_ptt_gpio = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "atten")
+			if (request->argName(i) == "sql")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.adc_atten = server.arg(i).toInt();
+					config.rf_sql_gpio = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "offset")
+			if (request->argName(i) == "atten")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.adc_dc_offset = server.arg(i).toInt();
+					config.adc_atten = request->arg(i).toInt();
+				}
+			}
+			if (request->argName(i) == "offset")
+			{
+				if (request->arg(i) != "")
+				{
+					config.adc_dc_offset = request->arg(i).toInt();
 				}
 			}
 		}
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
-	else if (server.hasArg("commitI2C0"))
+	else if (request->hasArg("commitI2C0"))
 	{
 		bool En = false;
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			// Serial.print("SERVER ARGS ");
-			// Serial.print(server.argName(i));
+			// Serial.print(request->argName(i));
 			// Serial.print("=");
-			// Serial.println(server.arg(i));
+			// Serial.println(request->arg(i));
 
-			if (server.argName(i) == "Enable")
+			if (request->argName(i) == "Enable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						En = true;
 				}
 			}
 
-			if (server.argName(i) == "sda")
+			if (request->argName(i) == "sda")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.i2c_sda_pin = server.arg(i).toInt();
+					config.i2c_sda_pin = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "sck")
+			if (request->argName(i) == "sck")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.i2c_sck_pin = server.arg(i).toInt();
+					config.i2c_sck_pin = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "freq")
+			if (request->argName(i) == "freq")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.i2c_freq = server.arg(i).toInt();
+					config.i2c_freq = request->arg(i).toInt();
 				}
 			}
 		}
@@ -1852,46 +2110,46 @@ void handle_mod()
 		config.i2c_enable = En;
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
-	else if (server.hasArg("commitI2C1"))
+	else if (request->hasArg("commitI2C1"))
 	{
 		bool En = false;
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			// Serial.print("SERVER ARGS ");
-			// Serial.print(server.argName(i));
+			// Serial.print(request->argName(i));
 			// Serial.print("=");
-			// Serial.println(server.arg(i));
+			// Serial.println(request->arg(i));
 
-			if (server.argName(i) == "Enable")
+			if (request->argName(i) == "Enable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						En = true;
 				}
 			}
 
-			if (server.argName(i) == "sda")
+			if (request->argName(i) == "sda")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.i2c1_sda_pin = server.arg(i).toInt();
+					config.i2c1_sda_pin = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "sck")
+			if (request->argName(i) == "sck")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.i2c1_sck_pin = server.arg(i).toInt();
+					config.i2c1_sck_pin = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "freq")
+			if (request->argName(i) == "freq")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.i2c1_freq = server.arg(i).toInt();
+					config.i2c1_freq = request->arg(i).toInt();
 				}
 			}
 		}
@@ -1899,39 +2157,39 @@ void handle_mod()
 		config.i2c1_enable = En;
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
-	else if (server.hasArg("commitCOUNTER0"))
+	else if (request->hasArg("commitCOUNTER0"))
 	{
 		bool En = false;
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			// Serial.print("SERVER ARGS ");
-			// Serial.print(server.argName(i));
+			// Serial.print(request->argName(i));
 			// Serial.print("=");
-			// Serial.println(server.arg(i));
+			// Serial.println(request->arg(i));
 
-			if (server.argName(i) == "Enable")
+			if (request->argName(i) == "Enable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						En = true;
 				}
 			}
 
-			if (server.argName(i) == "gpio")
+			if (request->argName(i) == "gpio")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.counter0_gpio = server.arg(i).toInt();
+					config.counter0_gpio = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "active")
+			if (request->argName(i) == "active")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.counter0_active = (bool)server.arg(i).toInt();
+					config.counter0_active = (bool)request->arg(i).toInt();
 				}
 			}
 		}
@@ -1939,39 +2197,39 @@ void handle_mod()
 		config.counter0_enable = En;
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
-	else if (server.hasArg("commitCOUNTER1"))
+	else if (request->hasArg("commitCOUNTER1"))
 	{
 		bool En = false;
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			// Serial.print("SERVER ARGS ");
-			// Serial.print(server.argName(i));
+			// Serial.print(request->argName(i));
 			// Serial.print("=");
-			// Serial.println(server.arg(i));
+			// Serial.println(request->arg(i));
 
-			if (server.argName(i) == "Enable")
+			if (request->argName(i) == "Enable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						En = true;
 				}
 			}
 
-			if (server.argName(i) == "gpio")
+			if (request->argName(i) == "gpio")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.counter1_gpio = server.arg(i).toInt();
+					config.counter1_gpio = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "active")
+			if (request->argName(i) == "active")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.counter1_active = (bool)server.arg(i).toInt();
+					config.counter1_active = (bool)request->arg(i).toInt();
 				}
 			}
 		}
@@ -1979,7 +2237,7 @@ void handle_mod()
 		config.counter0_enable = En;
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
 	else
 	{
@@ -1994,7 +2252,7 @@ void handle_mod()
 		html += "if(e.currentTarget.id===\"formGNSS\") document.getElementById(\"submitGNSS\").disabled=true;\n";
 		html += "if(e.currentTarget.id===\"formMODBUS\") document.getElementById(\"submitMODBUS\").disabled=true;\n";
 		html += "if(e.currentTarget.id===\"formTNC\") document.getElementById(\"submitTNC\").disabled=true;\n";
-		//html += "if(e.currentTarget.id===\"formONEWIRE\") document.getElementById(\"submitONEWIRE\").disabled=true;\n";
+		// html += "if(e.currentTarget.id===\"formONEWIRE\") document.getElementById(\"submitONEWIRE\").disabled=true;\n";
 		html += "if(e.currentTarget.id===\"formRF\") document.getElementById(\"submitRF\").disabled=true;\n";
 		html += "if(e.currentTarget.id===\"formI2C0\") document.getElementById(\"submitI2C0\").disabled=true;\n";
 		html += "if(e.currentTarget.id===\"formI2C1\") document.getElementById(\"submitI2C1\").disabled=true;\n";
@@ -2166,7 +2424,7 @@ void handle_mod()
 		html += "</td></tr></table>\n";
 
 		html += "</form><br />\n";
-		html += "</td></tr></table>\n";		
+		html += "</td></tr></table>\n";
 
 		// html += "</td><td width=\"32%\" style=\"border:unset;\">";
 
@@ -2235,7 +2493,7 @@ void handle_mod()
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>ADC DC OFFSET:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"100\" max=\"2500\" name=\"offset\" type=\"number\" value=\"" + String(config.adc_dc_offset) + "\" /> mV     (Current: "+String(offset)+" mV)</td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"100\" max=\"2500\" name=\"offset\" type=\"number\" value=\"" + String(config.adc_dc_offset) + "\" /> mV     (Current: " + String(offset) + " mV)</td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
@@ -2581,7 +2839,6 @@ void handle_mod()
 		html += "</td>\n";
 		html += "</tr>\n";
 
-
 		html += "<tr><td colspan=\"2\" align=\"right\">\n";
 		html += "<input class=\"btn btn-primary\" id=\"submitTNC\" name=\"commitTNC\" type=\"submit\" value=\"Apply\" maxlength=\"80\"/>\n";
 		html += "<input type=\"hidden\" name=\"commitTNC\"/>\n";
@@ -2590,25 +2847,25 @@ void handle_mod()
 
 		html += "</td></tr></table>\n";
 
-		server.send(200, "text/html", html); // send to someones browser when asked
+		request->send(200, "text/html", html); // send to someones browser when asked
 	}
 }
 
-void handle_system()
+void handle_system(AsyncWebServerRequest *request)
 {
-	if (!server.authenticate(config.http_username, config.http_password))
+	if (!request->authenticate(config.http_username, config.http_password))
 	{
-		return server.requestAuthentication();
+		return request->requestAuthentication();
 	}
-	if (server.hasArg("updateTimeZone"))
+	if (request->hasArg("updateTimeZone"))
 	{
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			if (server.argName(i) == "SetTimeZone")
+			if (request->argName(i) == "SetTimeZone")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.timeZone = server.arg(i).toFloat();
+					config.timeZone = request->arg(i).toFloat();
 					// Serial.println("WEB Config Time Zone);
 					configTime(3600 * config.timeZone, 0, config.ntp_host);
 				}
@@ -2617,22 +2874,22 @@ void handle_system()
 		}
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
-	else if (server.hasArg("updateTimeNtp"))
+	else if (request->hasArg("updateTimeNtp"))
 	{
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			// Serial.print("SERVER ARGS ");
-			// Serial.print(server.argName(i));
+			// Serial.print(request->argName(i));
 			// Serial.print("=");
-			// Serial.println(server.arg(i));
-			if (server.argName(i) == "SetTimeNtp")
+			// Serial.println(request->arg(i));
+			if (request->argName(i) == "SetTimeNtp")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
 					// Serial.println("WEB Config NTP");
-					strcpy(config.ntp_host, server.arg(i).c_str());
+					strcpy(config.ntp_host, request->arg(i).c_str());
 					configTime(3600 * config.timeZone, 0, config.ntp_host);
 				}
 				break;
@@ -2640,23 +2897,23 @@ void handle_system()
 		}
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
-	else if (server.hasArg("updateTime"))
+	else if (request->hasArg("updateTime"))
 	{
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			// Serial.print("SERVER ARGS ");
-			// Serial.print(server.argName(i));
+			// Serial.print(request->argName(i));
 			// Serial.print("=");
-			// Serial.println(server.arg(i));
-			if (server.argName(i) == "SetTime")
+			// Serial.println(request->arg(i));
+			if (request->argName(i) == "SetTime")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
 					// struct tm tmn;
-					String date = getValue(server.arg(i), ' ', 0);
-					String time = getValue(server.arg(i), ' ', 1);
+					String date = getValue(request->arg(i), ' ', 0);
+					String time = getValue(request->arg(i), ' ', 1);
 					int yyyy = getValue(date, '-', 0).toInt();
 					int mm = getValue(date, '-', 1).toInt();
 					int dd = getValue(date, '-', 2).toInt();
@@ -2681,7 +2938,7 @@ void handle_system()
 					timezone tz = {(0) + DST_MN, 0};
 					settimeofday(&tv, &tz);
 
-					// Serial.println("Update TIME " + server.arg(i));
+					// Serial.println("Update TIME " + request->arg(i));
 					Serial.print("Set New Time at ");
 					Serial.print(dd);
 					Serial.print("/");
@@ -2702,81 +2959,81 @@ void handle_system()
 		}
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
-	else if (server.hasArg("REBOOT"))
+	else if (request->hasArg("REBOOT"))
 	{
 		esp_restart();
 	}
-	else if (server.hasArg("commitWebAuth"))
+	else if (request->hasArg("commitWebAuth"))
 	{
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			// Serial.print("SERVER ARGS ");
-			// Serial.print(server.argName(i));
+			// Serial.print(request->argName(i));
 			// Serial.print("=");
-			// Serial.println(server.arg(i));
-			if (server.argName(i) == "webauth_user")
+			// Serial.println(request->arg(i));
+			if (request->argName(i) == "webauth_user")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.http_username, server.arg(i).c_str());
+					strcpy(config.http_username, request->arg(i).c_str());
 				}
 			}
-			if (server.argName(i) == "webauth_pass")
+			if (request->argName(i) == "webauth_pass")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.http_password, server.arg(i).c_str());
+					strcpy(config.http_password, request->arg(i).c_str());
 				}
 			}
 		}
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
-	else if (server.hasArg("commitPath"))
+	else if (request->hasArg("commitPath"))
 	{
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			// Serial.print("SERVER ARGS ");
-			// Serial.print(server.argName(i));
+			// Serial.print(request->argName(i));
 			// Serial.print("=");
-			// Serial.println(server.arg(i));
-			if (server.argName(i) == "path1")
+			// Serial.println(request->arg(i));
+			if (request->argName(i) == "path1")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.path[0], server.arg(i).c_str());
+					strcpy(config.path[0], request->arg(i).c_str());
 				}
 			}
-			if (server.argName(i) == "path2")
+			if (request->argName(i) == "path2")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.path[1], server.arg(i).c_str());
+					strcpy(config.path[1], request->arg(i).c_str());
 				}
 			}
-			if (server.argName(i) == "path3")
+			if (request->argName(i) == "path3")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.path[1], server.arg(i).c_str());
+					strcpy(config.path[1], request->arg(i).c_str());
 				}
 			}
-			if (server.argName(i) == "path4")
+			if (request->argName(i) == "path4")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.path[3], server.arg(i).c_str());
+					strcpy(config.path[3], request->arg(i).c_str());
 				}
 			}
 		}
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
-	else if (server.hasArg("commitDISP"))
+	else if (request->hasArg("commitDISP"))
 	{
 		bool dispRX = false;
 		bool dispTX = false;
@@ -2786,167 +3043,167 @@ void handle_system()
 
 		config.dispFilter = 0;
 
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			// Serial.print("SERVER ARGS ");
-			// Serial.print(server.argName(i));
+			// Serial.print(request->argName(i));
 			// Serial.print("=");
-			// Serial.println(server.arg(i));
-			if (server.argName(i) == "oledEnable")
+			// Serial.println(request->arg(i));
+			if (request->argName(i) == "oledEnable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 					{
 						oledEN = true;
 					}
 				}
 			}
-			if (server.argName(i) == "filterMessage")
+			if (request->argName(i) == "filterMessage")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.dispFilter |= FILTER_MESSAGE;
 				}
 			}
 
-			if (server.argName(i) == "filterTelemetry")
+			if (request->argName(i) == "filterTelemetry")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.dispFilter |= FILTER_TELEMETRY;
 				}
 			}
 
-			if (server.argName(i) == "filterStatus")
+			if (request->argName(i) == "filterStatus")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.dispFilter |= FILTER_STATUS;
 				}
 			}
 
-			if (server.argName(i) == "filterWeather")
+			if (request->argName(i) == "filterWeather")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.dispFilter |= FILTER_WX;
 				}
 			}
 
-			if (server.argName(i) == "filterObject")
+			if (request->argName(i) == "filterObject")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.dispFilter |= FILTER_OBJECT;
 				}
 			}
 
-			if (server.argName(i) == "filterItem")
+			if (request->argName(i) == "filterItem")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.dispFilter |= FILTER_ITEM;
 				}
 			}
 
-			if (server.argName(i) == "filterQuery")
+			if (request->argName(i) == "filterQuery")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.dispFilter |= FILTER_QUERY;
 				}
 			}
-			if (server.argName(i) == "filterBuoy")
+			if (request->argName(i) == "filterBuoy")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.dispFilter |= FILTER_BUOY;
 				}
 			}
-			if (server.argName(i) == "filterPosition")
+			if (request->argName(i) == "filterPosition")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.dispFilter |= FILTER_POSITION;
 				}
 			}
 
-			if (server.argName(i) == "dispRF")
+			if (request->argName(i) == "dispRF")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						dispRF = true;
 				}
 			}
 
-			if (server.argName(i) == "dispINET")
+			if (request->argName(i) == "dispINET")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						dispINET = true;
 				}
 			}
-			if (server.argName(i) == "txdispEnable")
+			if (request->argName(i) == "txdispEnable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						dispTX = true;
 				}
 			}
-			if (server.argName(i) == "rxdispEnable")
+			if (request->argName(i) == "rxdispEnable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						dispRX = true;
 				}
 			}
 
-			if (server.argName(i) == "dispDelay")
+			if (request->argName(i) == "dispDelay")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
+					if (isValidNumber(request->arg(i)))
 					{
-						config.dispDelay = server.arg(i).toInt();
+						config.dispDelay = request->arg(i).toInt();
 						if (config.dispDelay < 0)
 							config.dispDelay = 0;
 					}
 				}
 			}
 
-			if (server.argName(i) == "oled_timeout")
+			if (request->argName(i) == "oled_timeout")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
+					if (isValidNumber(request->arg(i)))
 					{
-						config.oled_timeout = server.arg(i).toInt();
+						config.oled_timeout = request->arg(i).toInt();
 						if (config.oled_timeout < 0)
 							config.oled_timeout = 0;
 					}
 				}
 			}
-			if (server.argName(i) == "filterDX")
+			if (request->argName(i) == "filterDX")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
+					if (isValidNumber(request->arg(i)))
 					{
-						config.filterDistant = server.arg(i).toInt();
+						config.filterDistant = request->arg(i).toInt();
 					}
 				}
 			}
@@ -2966,7 +3223,7 @@ void handle_system()
 		// config.filterPosition = filterPosition;
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
 	else
 	{
@@ -3091,6 +3348,9 @@ void handle_system()
 		html += "<div><button type='submit' id='submitPath'  name=\"commitPath\"> Apply Change </button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitPath\"/>\n";
 		html += "</form><br /><br />";
+		delay(1);
+// log_d("%s",html.c_str());
+// log_d("Length: %d",html.length());
 #ifdef OLED
 		html += "<form id='formDisp' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
 		// html += "<h2>Display Setting</h2>\n";
@@ -3229,15 +3489,15 @@ void handle_system()
 		html += "<input type=\"hidden\" name=\"commitDISP\"/>\n";
 		html += "</form><br />";
 #endif
-		server.send(200, "text/html", html); // send to someones browser when asked
+		request->send(200, "text/html", html); // send to someones browser when asked
 	}
 }
 
-void handle_igate()
+void handle_igate(AsyncWebServerRequest *request)
 {
-	if (!server.authenticate(config.http_username, config.http_password))
+	if (!request->authenticate(config.http_username, config.http_password))
 	{
-		return server.requestAuthentication();
+		return request->requestAuthentication();
 	}
 	bool aprsEn = false;
 	bool rf2inetEn = false;
@@ -3248,200 +3508,202 @@ void handle_igate()
 	bool pos2INET = false;
 	bool timeStamp = false;
 
-	if (server.hasArg("commitIGATE"))
+	if (request->hasArg("commitIGATE"))
 	{
 
-		for (int i = 0; i < server.args(); i++)
+		for (int i = 0; i < request->args(); i++)
 		{
-			if (server.argName(i) == "igateEnable")
+			if (request->argName(i) == "igateEnable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						aprsEn = true;
 				}
 			}
-			if (server.argName(i) == "myCall")
+			if (request->argName(i) == "myCall")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					String name = server.arg(i);
+					String name = request->arg(i);
 					name.trim();
 					name.toUpperCase();
 					strcpy(config.aprs_mycall, name.c_str());
 				}
 			}
-			if (server.argName(i) == "igateObject")
+			if (request->argName(i) == "igateObject")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					String name = server.arg(i);
+					String name = request->arg(i);
 					name.trim();
 					strcpy(config.igate_object, name.c_str());
 				}
 				else
 				{
-					memset(config.igate_object,0,sizeof(config.igate_object));
+					memset(config.igate_object, 0, sizeof(config.igate_object));
 				}
 			}
-			if (server.argName(i) == "mySSID")
+			if (request->argName(i) == "mySSID")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.aprs_ssid = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.aprs_ssid = request->arg(i).toInt();
 					if (config.aprs_ssid > 15)
 						config.aprs_ssid = 13;
 				}
 			}
-			if (server.argName(i) == "igatePosInv")
+			if (request->argName(i) == "igatePosInv")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.igate_interval = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.igate_interval = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "igatePosLat")
+			if (request->argName(i) == "igatePosLat")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.igate_lat = server.arg(i).toFloat();
+					if (isValidNumber(request->arg(i)))
+						config.igate_lat = request->arg(i).toFloat();
 				}
 			}
 
-			if (server.argName(i) == "igatePosLon")
+			if (request->argName(i) == "igatePosLon")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.igate_lon = server.arg(i).toFloat();
+					if (isValidNumber(request->arg(i)))
+						config.igate_lon = request->arg(i).toFloat();
 				}
 			}
-			if (server.argName(i) == "igatePosAlt")
+			if (request->argName(i) == "igatePosAlt")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.igate_alt = server.arg(i).toFloat();
+					if (isValidNumber(request->arg(i)))
+						config.igate_alt = request->arg(i).toFloat();
 				}
 			}
-			if (server.argName(i) == "igatePosSel")
+			if (request->argName(i) == "igatePosSel")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (server.arg(i).toInt() == 1)
+					if (request->arg(i).toInt() == 1)
 						posGPS = true;
 				}
 			}
 
-			if (server.argName(i) == "igateTable")
+			if (request->argName(i) == "igateTable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.igate_symbol[0] = server.arg(i).charAt(0);
+					config.igate_symbol[0] = request->arg(i).charAt(0);
 				}
 			}
-			if (server.argName(i) == "igateSymbol")
+			if (request->argName(i) == "igateSymbol")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.igate_symbol[1] = server.arg(i).charAt(0);
+					config.igate_symbol[1] = request->arg(i).charAt(0);
 				}
 			}
-			if (server.argName(i) == "aprsHost")
+			if (request->argName(i) == "aprsHost")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.aprs_host, server.arg(i).c_str());
+					strcpy(config.aprs_host, request->arg(i).c_str());
 				}
 			}
-			if (server.argName(i) == "aprsPort")
+			if (request->argName(i) == "aprsPort")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.aprs_port = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.aprs_port = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "aprsFilter")
+			if (request->argName(i) == "aprsFilter")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.aprs_filter, server.arg(i).c_str());
+					strcpy(config.aprs_filter, request->arg(i).c_str());
 				}
 			}
-			if (server.argName(i) == "igatePath")
+			if (request->argName(i) == "igatePath")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.igate_path = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.igate_path = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "igateComment")
+			if (request->argName(i) == "igateComment")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.igate_comment, server.arg(i).c_str());
-				}else{
-					memset(config.igate_comment,0,sizeof(config.igate_comment));
+					strcpy(config.igate_comment, request->arg(i).c_str());
+				}
+				else
+				{
+					memset(config.igate_comment, 0, sizeof(config.igate_comment));
 				}
 			}
-			if (server.argName(i) == "texttouse")
+			if (request->argName(i) == "texttouse")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.igate_phg, server.arg(i).c_str());
+					strcpy(config.igate_phg, request->arg(i).c_str());
 				}
 			}
 
-			if (server.argName(i) == "rf2inetEnable")
+			if (request->argName(i) == "rf2inetEnable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						rf2inetEn = true;
 				}
 			}
-			if (server.argName(i) == "inet2rfEnable")
+			if (request->argName(i) == "inet2rfEnable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						inet2rfEn = true;
 				}
 			}
-			if (server.argName(i) == "igatePos2RF")
+			if (request->argName(i) == "igatePos2RF")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						pos2RF = true;
 				}
 			}
-			if (server.argName(i) == "igatePos2INET")
+			if (request->argName(i) == "igatePos2INET")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						pos2INET = true;
 				}
 			}
-			if (server.argName(i) == "igateBcnEnable")
+			if (request->argName(i) == "igateBcnEnable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						bcnEN = true;
 				}
 			}
-			if (server.argName(i) == "igateTimeStamp")
+			if (request->argName(i) == "igateTimeStamp")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						timeStamp = true;
 				}
 			}
@@ -3459,177 +3721,177 @@ void handle_igate()
 		saveEEPROM();
 		initInterval = true;
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
-	else if (server.hasArg("commitIGATEfilter"))
+	else if (request->hasArg("commitIGATEfilter"))
 	{
 		config.rf2inetFilter = 0;
 		config.inet2rfFilter = 0;
-		for (int i = 0; i < server.args(); i++)
+		for (int i = 0; i < request->args(); i++)
 		{
 			// config rf2inet filter
-			if (server.argName(i) == "rf2inetFilterMessage")
+			if (request->argName(i) == "rf2inetFilterMessage")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.rf2inetFilter |= FILTER_MESSAGE;
 				}
 			}
 
-			if (server.argName(i) == "rf2inetFilterTelemetry")
+			if (request->argName(i) == "rf2inetFilterTelemetry")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.rf2inetFilter |= FILTER_TELEMETRY;
 				}
 			}
 
-			if (server.argName(i) == "rf2inetFilterStatus")
+			if (request->argName(i) == "rf2inetFilterStatus")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.rf2inetFilter |= FILTER_STATUS;
 				}
 			}
 
-			if (server.argName(i) == "rf2inetFilterWeather")
+			if (request->argName(i) == "rf2inetFilterWeather")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.rf2inetFilter |= FILTER_WX;
 				}
 			}
 
-			if (server.argName(i) == "rf2inetFilterObject")
+			if (request->argName(i) == "rf2inetFilterObject")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.rf2inetFilter |= FILTER_OBJECT;
 				}
 			}
 
-			if (server.argName(i) == "rf2inetFilterItem")
+			if (request->argName(i) == "rf2inetFilterItem")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.rf2inetFilter |= FILTER_ITEM;
 				}
 			}
 
-			if (server.argName(i) == "rf2inetFilterQuery")
+			if (request->argName(i) == "rf2inetFilterQuery")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.rf2inetFilter |= FILTER_QUERY;
 				}
 			}
-			if (server.argName(i) == "rf2inetFilterBuoy")
+			if (request->argName(i) == "rf2inetFilterBuoy")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.rf2inetFilter |= FILTER_BUOY;
 				}
 			}
-			if (server.argName(i) == "rf2inetFilterPosition")
+			if (request->argName(i) == "rf2inetFilterPosition")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.rf2inetFilter |= FILTER_POSITION;
 				}
 			}
 			// config inet2rf filter
 
-			if (server.argName(i) == "inet2rfFilterMessage")
+			if (request->argName(i) == "inet2rfFilterMessage")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.inet2rfFilter |= FILTER_MESSAGE;
 				}
 			}
 
-			if (server.argName(i) == "inet2rfFilterTelemetry")
+			if (request->argName(i) == "inet2rfFilterTelemetry")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.inet2rfFilter |= FILTER_TELEMETRY;
 				}
 			}
 
-			if (server.argName(i) == "inet2rfFilterStatus")
+			if (request->argName(i) == "inet2rfFilterStatus")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.inet2rfFilter |= FILTER_STATUS;
 				}
 			}
 
-			if (server.argName(i) == "inet2rfFilterWeather")
+			if (request->argName(i) == "inet2rfFilterWeather")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.inet2rfFilter |= FILTER_WX;
 				}
 			}
 
-			if (server.argName(i) == "inet2rfFilterObject")
+			if (request->argName(i) == "inet2rfFilterObject")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.inet2rfFilter |= FILTER_OBJECT;
 				}
 			}
 
-			if (server.argName(i) == "inet2rfFilterItem")
+			if (request->argName(i) == "inet2rfFilterItem")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.inet2rfFilter |= FILTER_ITEM;
 				}
 			}
 
-			if (server.argName(i) == "inet2rfFilterQuery")
+			if (request->argName(i) == "inet2rfFilterQuery")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.inet2rfFilter |= FILTER_QUERY;
 				}
 			}
-			if (server.argName(i) == "inet2rfFilterBuoy")
+			if (request->argName(i) == "inet2rfFilterBuoy")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.inet2rfFilter |= FILTER_BUOY;
 				}
 			}
-			if (server.argName(i) == "inet2rfFilterPosition")
+			if (request->argName(i) == "inet2rfFilterPosition")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.inet2rfFilter |= FILTER_POSITION;
 				}
 			}
 		}
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
 	else
 	{
@@ -3656,6 +3918,7 @@ void handle_igate()
 		html += "});\n";
 		html += "});\n";
 		html += "</script>\n<script type=\"text/javascript\">\n";
+
 		html += "function openWindowSymbol() {\n";
 		html += "var i, l, options = [{\n";
 		html += "value: 'first',\n";
@@ -3664,30 +3927,7 @@ void handle_igate()
 		html += "value: 'second',\n";
 		html += "text: 'Second'\n";
 		html += "}],\n";
-		html += "newWindow = window.open(\"\", null, \"height=400,width=400,status=no,toolbar=no,menubar=no,location=no\");\n";
-
-		int i;
-
-		html += "newWindow.document.write(\"<table border=\\\"1\\\" align=\\\"center\\\">\");\n";
-		html += "newWindow.document.write(\"<tr><th colspan=\\\"16\\\">Table '/'</th></tr><tr>\");\n";
-		for (i = 33; i < 129; i++)
-		{
-			html += "newWindow.document.write(\"<td><img onclick=\\\"window.opener.setValue(" + String(i) + ",1);\\\" src=\\\"http://aprs.dprns.com/symbols/icons/" + String(i) + "-1.png\\\"></td>\");\n";
-			if (((i % 16) == 0) && (i < 126))
-				html += "newWindow.document.write(\"</tr><tr>\");\n";
-		}
-		html += "newWindow.document.write(\"</tr></table><br />\");\n";
-		html += "newWindow.document.write(\"<table border=\\\"1\\\" align=\\\"center\\\">\");\n";
-		html += "newWindow.document.write(\"<tr><th colspan=\\\"16\\\">Table '\\\'</th></tr><tr>\");\n";
-		for (i = 33; i < 129; i++)
-		{
-			html += "newWindow.document.write(\"<td><img onclick=\\\"window.opener.setValue(" + String(i) + ",2);\\\" src=\\\"http://aprs.dprns.com/symbols/icons/" + String(i, DEC) + "-2.png\\\"></td>\");\n";
-			if (((i % 16) == 0) && (i < 126))
-				html += "newWindow.document.write(\"</tr><tr>\");\n";
-		}
-		html += "newWindow.document.write(\"</tr></table>\");\n";
-
-		// html += "newWindow.document.write(\"</select>\");\");\n";
+		html += "newWindow = window.open(\"/symbol\", null, \"height=400,width=400,status=no,toolbar=no,menubar=no,location=no\");\n";
 		html += "}\n";
 
 		html += "function setValue(symbol,table) {\n";
@@ -3714,7 +3954,7 @@ void handle_igate()
 		html += "document.getElementById(\"inet2rfFilterGrp\").disabled=true;\n";
 		html += "}\n}\n";
 		html += "</script>\n";
-
+		delay(1);
 		/************************ IGATE Mode **************************/
 		html += "<form id='formIgate' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
 		// html += "<h2>[IGATE] Internet Gateway Mode</h2>\n";
@@ -3905,7 +4145,7 @@ void handle_igate()
 		html += "<div><button type='submit' id='submitIGATE'  name=\"commitIGATE\"> Apply Change </button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitIGATE\"/>\n";
 		html += "</form><br /><br />";
-
+		delay(1);
 		html += "<form id='formIgateFilter' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
 		html += "<table>\n";
 		html += "<th colspan=\"2\"><span><b>[IGATE] Filter</b></span></th>\n";
@@ -4033,15 +4273,15 @@ void handle_igate()
 		html += "<div><button type='submit' id='submitIGATEfilter'  name=\"commitIGATEfilter\"> Apply Change </button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitIGATEfilter\"/>\n";
 		html += "</form><br />";
-		server.send(200, "text/html", html); // send to someones browser when asked
+		request->send(200, "text/html", html); // send to someones browser when asked
 	}
 }
 
-void handle_digi()
+void handle_digi(AsyncWebServerRequest *request)
 {
-	if (!server.authenticate(config.http_username, config.http_password))
+	if (!request->authenticate(config.http_username, config.http_password))
 	{
-		return server.requestAuthentication();
+		return request->requestAuthentication();
 	}
 	bool digiEn = false;
 	bool posGPS = false;
@@ -4050,242 +4290,244 @@ void handle_digi()
 	bool pos2INET = false;
 	bool timeStamp = false;
 
-	if (server.hasArg("commitDIGI"))
+	if (request->hasArg("commitDIGI"))
 	{
 		config.digiFilter = 0;
-		for (int i = 0; i < server.args(); i++)
+		for (int i = 0; i < request->args(); i++)
 		{
-			if (server.argName(i) == "digiEnable")
+			if (request->argName(i) == "digiEnable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						digiEn = true;
 				}
 			}
-			if (server.argName(i) == "myCall")
+			if (request->argName(i) == "myCall")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					String name = server.arg(i);
+					String name = request->arg(i);
 					name.trim();
 					name.toUpperCase();
 					strcpy(config.digi_mycall, name.c_str());
 				}
 			}
-			if (server.argName(i) == "mySSID")
+			if (request->argName(i) == "mySSID")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.digi_ssid = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.digi_ssid = request->arg(i).toInt();
 					if (config.digi_ssid > 15)
 						config.digi_ssid = 3;
 				}
 			}
-			if (server.argName(i) == "digiDelay")
+			if (request->argName(i) == "digiDelay")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.digi_delay = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.digi_delay = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "digiPosInv")
+			if (request->argName(i) == "digiPosInv")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.digi_interval = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.digi_interval = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "digiPosLat")
+			if (request->argName(i) == "digiPosLat")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.digi_lat = server.arg(i).toFloat();
+					if (isValidNumber(request->arg(i)))
+						config.digi_lat = request->arg(i).toFloat();
 				}
 			}
 
-			if (server.argName(i) == "digiPosLon")
+			if (request->argName(i) == "digiPosLon")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.digi_lon = server.arg(i).toFloat();
+					if (isValidNumber(request->arg(i)))
+						config.digi_lon = request->arg(i).toFloat();
 				}
 			}
-			if (server.argName(i) == "digiPosAlt")
+			if (request->argName(i) == "digiPosAlt")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.digi_alt = server.arg(i).toFloat();
+					if (isValidNumber(request->arg(i)))
+						config.digi_alt = request->arg(i).toFloat();
 				}
 			}
-			if (server.argName(i) == "digiPosSel")
+			if (request->argName(i) == "digiPosSel")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (server.arg(i).toInt() == 1)
+					if (request->arg(i).toInt() == 1)
 						posGPS = true;
 				}
 			}
 
-			if (server.argName(i) == "digiTable")
+			if (request->argName(i) == "digiTable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.digi_symbol[0] = server.arg(i).charAt(0);
+					config.digi_symbol[0] = request->arg(i).charAt(0);
 				}
 			}
-			if (server.argName(i) == "digiSymbol")
+			if (request->argName(i) == "digiSymbol")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					config.digi_symbol[1] = server.arg(i).charAt(0);
+					config.digi_symbol[1] = request->arg(i).charAt(0);
 				}
 			}
-			if (server.argName(i) == "digiPath")
+			if (request->argName(i) == "digiPath")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.digi_path = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.digi_path = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "digiComment")
+			if (request->argName(i) == "digiComment")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.digi_comment, server.arg(i).c_str());
-				}else{
-					memset(config.digi_comment,0,sizeof(config.digi_comment));
+					strcpy(config.digi_comment, request->arg(i).c_str());
+				}
+				else
+				{
+					memset(config.digi_comment, 0, sizeof(config.digi_comment));
 				}
 			}
-			if (server.argName(i) == "texttouse")
+			if (request->argName(i) == "texttouse")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.digi_phg, server.arg(i).c_str());
+					strcpy(config.digi_phg, request->arg(i).c_str());
 				}
 			}
-			if (server.argName(i) == "digiComment")
+			if (request->argName(i) == "digiComment")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.digi_comment, server.arg(i).c_str());
+					strcpy(config.digi_comment, request->arg(i).c_str());
 				}
 			}
-			if (server.argName(i) == "digiPos2RF")
+			if (request->argName(i) == "digiPos2RF")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						pos2RF = true;
 				}
 			}
-			if (server.argName(i) == "digiPos2INET")
+			if (request->argName(i) == "digiPos2INET")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						pos2INET = true;
 				}
 			}
-			if (server.argName(i) == "digiBcnEnable")
+			if (request->argName(i) == "digiBcnEnable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						bcnEN = true;
 				}
 			}
 			// Filter
-			if (server.argName(i) == "FilterMessage")
+			if (request->argName(i) == "FilterMessage")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.digiFilter |= FILTER_MESSAGE;
 				}
 			}
 
-			if (server.argName(i) == "FilterTelemetry")
+			if (request->argName(i) == "FilterTelemetry")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.digiFilter |= FILTER_TELEMETRY;
 				}
 			}
 
-			if (server.argName(i) == "FilterStatus")
+			if (request->argName(i) == "FilterStatus")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.digiFilter |= FILTER_STATUS;
 				}
 			}
 
-			if (server.argName(i) == "FilterWeather")
+			if (request->argName(i) == "FilterWeather")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.digiFilter |= FILTER_WX;
 				}
 			}
 
-			if (server.argName(i) == "FilterObject")
+			if (request->argName(i) == "FilterObject")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.digiFilter |= FILTER_OBJECT;
 				}
 			}
 
-			if (server.argName(i) == "FilterItem")
+			if (request->argName(i) == "FilterItem")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.digiFilter |= FILTER_ITEM;
 				}
 			}
 
-			if (server.argName(i) == "FilterQuery")
+			if (request->argName(i) == "FilterQuery")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.digiFilter |= FILTER_QUERY;
 				}
 			}
-			if (server.argName(i) == "FilterBuoy")
+			if (request->argName(i) == "FilterBuoy")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.digiFilter |= FILTER_BUOY;
 				}
 			}
-			if (server.argName(i) == "FilterPosition")
+			if (request->argName(i) == "FilterPosition")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						config.digiFilter |= FILTER_POSITION;
 				}
 			}
-			if (server.argName(i) == "digiTimeStamp")
+			if (request->argName(i) == "digiTimeStamp")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						timeStamp = true;
 				}
 			}
@@ -4300,7 +4542,7 @@ void handle_digi()
 		saveEEPROM();
 		initInterval = true;
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
 	else
 	{
@@ -4333,28 +4575,7 @@ void handle_digi()
 		html += "value: 'second',\n";
 		html += "text: 'Second'\n";
 		html += "}],\n";
-		html += "newWindow = window.open(\"\", null, \"height=400,width=400,status=no,toolbar=no,menubar=no,titlebar=no,location=no\");\n";
-
-		int i;
-
-		html += "newWindow.document.write(\"<table border=\\\"1\\\" align=\\\"center\\\">\");\n";
-		html += "newWindow.document.write(\"<tr><th colspan=\\\"16\\\">Table '/'</th></tr><tr>\");\n";
-		for (i = 33; i < 129; i++)
-		{
-			html += "newWindow.document.write(\"<td><img onclick=\\\"window.opener.setValue(" + String(i) + ",1);\\\" src=\\\"http://aprs.dprns.com/symbols/icons/" + String(i) + "-1.png\\\"></td>\");\n";
-			if (((i % 16) == 0) && (i < 126))
-				html += "newWindow.document.write(\"</tr><tr>\");\n";
-		}
-		html += "newWindow.document.write(\"</tr></table><br />\");\n";
-		html += "newWindow.document.write(\"<table border=\\\"1\\\" align=\\\"center\\\">\");\n";
-		html += "newWindow.document.write(\"<tr><th colspan=\\\"16\\\">Table '\\\'</th></tr><tr>\");\n";
-		for (i = 33; i < 129; i++)
-		{
-			html += "newWindow.document.write(\"<td><img onclick=\\\"window.opener.setValue(" + String(i) + ",2);\\\" src=\\\"http://aprs.dprns.com/symbols/icons/" + String(i, DEC) + "-2.png\\\"></td>\");\n";
-			if (((i % 16) == 0) && (i < 126))
-				html += "newWindow.document.write(\"</tr><tr>\");\n";
-		}
-		html += "newWindow.document.write(\"</tr></table>\");\n";
+		html += "newWindow = window.open(\"/symbol\", null, \"height=400,width=400,status=no,toolbar=no,menubar=no,titlebar=no,location=no\");\n";
 		html += "}\n";
 
 		html += "function setValue(symbol,table) {\n";
@@ -4473,7 +4694,7 @@ void handle_digi()
 		html += "<tr><td style=\"text-align: right;\">Altitude:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"10000\" step=\"0.1\" id=\"digiPosAlt\" name=\"digiPosAlt\" type=\"number\" value=\"" + String(config.digi_alt, 2) + "\" /> meter. *Value 0 is not send height</td></tr>\n";
 		html += "</table></td>";
 		html += "</tr>\n";
-
+		delay(1);
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>PHG:</b></td>\n";
 		html += "<td align=\"center\">\n";
@@ -4583,15 +4804,15 @@ void handle_digi()
 		html += "<div><button type='submit' id='submitDIGI'  name=\"commitDIGI\"> Apply Change </button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitDIGI\"/>\n";
 		html += "</form><br />";
-		server.send(200, "text/html", html); // send to someones browser when asked
+		request->send(200, "text/html", html); // send to someones browser when asked
 	}
 }
 
-void handle_wx()
+void handle_wx(AsyncWebServerRequest *request)
 {
-	if (!server.authenticate(config.http_username, config.http_password))
+	if (!request->authenticate(config.http_username, config.http_password))
 	{
-		return server.requestAuthentication();
+		return request->requestAuthentication();
 	}
 	bool En = false;
 	bool posGPS = false;
@@ -4599,23 +4820,23 @@ void handle_wx()
 	bool pos2INET = false;
 	bool timeStamp = false;
 
-	if (server.hasArg("commitWX"))
+	if (request->hasArg("commitWX"))
 	{
-		for (int i = 0; i < server.args(); i++)
+		for (int i = 0; i < request->args(); i++)
 		{
-			if (server.argName(i) == "Enable")
+			if (request->argName(i) == "Enable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						En = true;
 				}
 			}
-			if (server.argName(i) == "Object")
+			if (request->argName(i) == "Object")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					String name = server.arg(i);
+					String name = request->arg(i);
 					name.trim();
 					strcpy(config.wx_object, name.c_str());
 				}
@@ -4624,106 +4845,108 @@ void handle_wx()
 					config.wx_object[0] = 0;
 				}
 			}
-			if (server.argName(i) == "myCall")
+			if (request->argName(i) == "myCall")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					String name = server.arg(i);
+					String name = request->arg(i);
 					name.trim();
 					name.toUpperCase();
 					strcpy(config.wx_mycall, name.c_str());
 				}
 			}
-			if (server.argName(i) == "mySSID")
+			if (request->argName(i) == "mySSID")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.wx_ssid = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.wx_ssid = request->arg(i).toInt();
 					if (config.wx_ssid > 15)
 						config.wx_ssid = 3;
 				}
 			}
-			if (server.argName(i) == "PosInv")
+			if (request->argName(i) == "PosInv")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.wx_interval = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.wx_interval = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "PosLat")
+			if (request->argName(i) == "PosLat")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.wx_lat = server.arg(i).toFloat();
+					if (isValidNumber(request->arg(i)))
+						config.wx_lat = request->arg(i).toFloat();
 				}
 			}
 
-			if (server.argName(i) == "PosLon")
+			if (request->argName(i) == "PosLon")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.wx_lon = server.arg(i).toFloat();
+					if (isValidNumber(request->arg(i)))
+						config.wx_lon = request->arg(i).toFloat();
 				}
 			}
-			if (server.argName(i) == "PosAlt")
+			if (request->argName(i) == "PosAlt")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.wx_alt = server.arg(i).toFloat();
+					if (isValidNumber(request->arg(i)))
+						config.wx_alt = request->arg(i).toFloat();
 				}
 			}
-			if (server.argName(i) == "PosSel")
+			if (request->argName(i) == "PosSel")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (server.arg(i).toInt() == 1)
+					if (request->arg(i).toInt() == 1)
 						posGPS = true;
 				}
 			}
 
-			if (server.argName(i) == "Path")
+			if (request->argName(i) == "Path")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.wx_path = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.wx_path = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "Comment")
+			if (request->argName(i) == "Comment")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.wx_comment, server.arg(i).c_str());
-				}else{
-					memset(config.wx_comment,0,sizeof(config.wx_comment));
+					strcpy(config.wx_comment, request->arg(i).c_str());
+				}
+				else
+				{
+					memset(config.wx_comment, 0, sizeof(config.wx_comment));
 				}
 			}
-			if (server.argName(i) == "Pos2RF")
+			if (request->argName(i) == "Pos2RF")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						pos2RF = true;
 				}
 			}
-			if (server.argName(i) == "Pos2INET")
+			if (request->argName(i) == "Pos2INET")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						pos2INET = true;
 				}
 			}
-			if (server.argName(i) == "wxTimeStamp")
+			if (request->argName(i) == "wxTimeStamp")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						timeStamp = true;
 				}
 			}
@@ -4737,7 +4960,7 @@ void handle_wx()
 		saveEEPROM();
 		initInterval = true;
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
 	else
 	{
@@ -4874,125 +5097,127 @@ void handle_wx()
 		html += "<div><button type='submit' id='submitWX'  name=\"commitWX\"> Apply Change </button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitWX\"/>\n";
 		html += "</form><br />";
-		server.send(200, "text/html", html); // send to someones browser when asked
+		request->send(200, "text/html", html); // send to someones browser when asked
 	}
 }
 
-void handle_tlm()
+void handle_tlm(AsyncWebServerRequest *request)
 {
-	if (!server.authenticate(config.http_username, config.http_password))
+	if (!request->authenticate(config.http_username, config.http_password))
 	{
-		return server.requestAuthentication();
+		return request->requestAuthentication();
 	}
 	bool En = false;
 	bool pos2RF = false;
 	bool pos2INET = false;
 	String arg = "";
 
-	if (server.hasArg("commitTLM"))
+	if (request->hasArg("commitTLM"))
 	{
-		for (int i = 0; i < server.args(); i++)
+		for (int i = 0; i < request->args(); i++)
 		{
-			if (server.argName(i) == "Enable")
+			if (request->argName(i) == "Enable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						En = true;
 				}
 			}
-			if (server.argName(i) == "myCall")
+			if (request->argName(i) == "myCall")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					String name = server.arg(i);
+					String name = request->arg(i);
 					name.trim();
 					name.toUpperCase();
 					strcpy(config.tlm0_mycall, name.c_str());
 				}
 			}
-			if (server.argName(i) == "mySSID")
+			if (request->argName(i) == "mySSID")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.tlm0_ssid = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.tlm0_ssid = request->arg(i).toInt();
 					if (config.tlm0_ssid > 15)
 						config.tlm0_ssid = 3;
 				}
 			}
-			if (server.argName(i) == "infoInv")
+			if (request->argName(i) == "infoInv")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.tlm0_info_interval = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.tlm0_info_interval = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "dataInv")
+			if (request->argName(i) == "dataInv")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.tlm0_data_interval = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.tlm0_data_interval = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "Path")
+			if (request->argName(i) == "Path")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.tlm0_path = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.tlm0_path = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "Comment")
+			if (request->argName(i) == "Comment")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.tlm0_comment, server.arg(i).c_str());
-				}else{
-					memset(config.tlm0_comment,0,sizeof(config.tlm0_comment));
+					strcpy(config.tlm0_comment, request->arg(i).c_str());
+				}
+				else
+				{
+					memset(config.tlm0_comment, 0, sizeof(config.tlm0_comment));
 				}
 			}
-			if (server.argName(i) == "Pos2RF")
+			if (request->argName(i) == "Pos2RF")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						pos2RF = true;
 				}
 			}
-			if (server.argName(i) == "Pos2INET")
+			if (request->argName(i) == "Pos2INET")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						pos2INET = true;
 				}
 			}
 			for (int x = 0; x < 13; x++)
 			{
 				arg = "sensorCH" + String(x);
-				if (server.argName(i) == arg)
+				if (request->argName(i) == arg)
 				{
-					if (isValidNumber(server.arg(i)))
-						config.tml0_data_channel[x] = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.tml0_data_channel[x] = request->arg(i).toInt();
 				}
 				arg = "param" + String(x);
-				if (server.argName(i) == arg)
+				if (request->argName(i) == arg)
 				{
-					if (server.arg(i) != "")
+					if (request->arg(i) != "")
 					{
-						strcpy(config.tlm0_PARM[x], server.arg(i).c_str());
+						strcpy(config.tlm0_PARM[x], request->arg(i).c_str());
 					}
 				}
 				arg = "unit" + String(x);
-				if (server.argName(i) == arg)
+				if (request->argName(i) == arg)
 				{
-					if (server.arg(i) != "")
+					if (request->arg(i) != "")
 					{
-						strcpy(config.tlm0_UNIT[x], server.arg(i).c_str());
+						strcpy(config.tlm0_UNIT[x], request->arg(i).c_str());
 					}
 				}
 				if (x < 5)
@@ -5000,10 +5225,10 @@ void handle_tlm()
 					for (int y = 0; y < 3; y++)
 					{
 						arg = "eqns" + String(x) + String((char)(y + 'a'));
-						if (server.argName(i) == arg)
+						if (request->argName(i) == arg)
 						{
-							if (isValidNumber(server.arg(i)))
-								config.tlm0_EQNS[x][y] = server.arg(i).toFloat();
+							if (isValidNumber(request->arg(i)))
+								config.tlm0_EQNS[x][y] = request->arg(i).toFloat();
 						}
 					}
 				}
@@ -5012,11 +5237,11 @@ void handle_tlm()
 			for (int x = 0; x < 8; x++)
 			{
 				arg = "bitact" + String(x);
-				if (server.argName(i) == arg)
+				if (request->argName(i) == arg)
 				{
-					if (isValidNumber(server.arg(i)))
+					if (isValidNumber(request->arg(i)))
 					{
-						if (server.arg(i).toInt() == 1)
+						if (request->arg(i).toInt() == 1)
 						{
 							config.tlm0_BITS_Active |= b;
 						}
@@ -5036,7 +5261,7 @@ void handle_tlm()
 		saveEEPROM();
 		initInterval = true;
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
 	else
 	{
@@ -5219,15 +5444,15 @@ void handle_tlm()
 		html += "<div><button type='submit' id='submitTLM'  name=\"commitTLM\"> Apply Change </button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitTLM\"/>\n";
 		html += "</form><br />";
-		server.send(200, "text/html", html); // send to someones browser when asked
+		request->send(200, "text/html", html); // send to someones browser when asked
 	}
 }
 
-void handle_tracker()
+void handle_tracker(AsyncWebServerRequest *request)
 {
-	if (!server.authenticate(config.http_username, config.http_password))
+	if (!request->authenticate(config.http_username, config.http_password))
 	{
-		return server.requestAuthentication();
+		return request->requestAuthentication();
 	}
 	bool trakerEn = false;
 	bool smartEn = false;
@@ -5243,271 +5468,273 @@ void handle_tracker()
 	bool optSat = false;
 	bool timeStamp = false;
 
-	if (server.hasArg("commitTRACKER"))
+	if (request->hasArg("commitTRACKER"))
 	{
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			if (server.argName(i) == "trackerEnable")
+			if (request->argName(i) == "trackerEnable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						trakerEn = true;
 				}
 			}
-			if (server.argName(i) == "smartBcnEnable")
+			if (request->argName(i) == "smartBcnEnable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						smartEn = true;
 				}
 			}
-			if (server.argName(i) == "compressEnable")
+			if (request->argName(i) == "compressEnable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						compEn = true;
 				}
 			}
-			if (server.argName(i) == "trackerOptCST")
+			if (request->argName(i) == "trackerOptCST")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						optCST = true;
 				}
 			}
-			if (server.argName(i) == "trackerOptAlt")
+			if (request->argName(i) == "trackerOptAlt")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						optAlt = true;
 				}
 			}
-			if (server.argName(i) == "trackerOptBat")
+			if (request->argName(i) == "trackerOptBat")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						optBat = true;
 				}
 			}
-			if (server.argName(i) == "trackerOptSat")
+			if (request->argName(i) == "trackerOptSat")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						optSat = true;
 				}
 			}
-			if (server.argName(i) == "myCall")
+			if (request->argName(i) == "myCall")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					String name=server.arg(i);
+					String name = request->arg(i);
 					name.trim();
 					name.toUpperCase();
-					strcpy(config.trk_mycall, name.c_str());				
+					strcpy(config.trk_mycall, name.c_str());
 				}
 			}
-			if (server.argName(i) == "trackerObject")
+			if (request->argName(i) == "trackerObject")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					String name=server.arg(i);
+					String name = request->arg(i);
 					name.trim();
 					strcpy(config.trk_item, name.c_str());
 				}
 				else
 				{
-					memset(config.trk_item,0,sizeof(config.trk_item));
+					memset(config.trk_item, 0, sizeof(config.trk_item));
 				}
 			}
-			if (server.argName(i) == "mySSID")
+			if (request->argName(i) == "mySSID")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.trk_ssid = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.trk_ssid = request->arg(i).toInt();
 					if (config.trk_ssid > 15)
 						config.trk_ssid = 13;
 				}
 			}
-			if (server.argName(i) == "trackerPosInv")
+			if (request->argName(i) == "trackerPosInv")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.trk_interval = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.trk_interval = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "trackerPosLat")
+			if (request->argName(i) == "trackerPosLat")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.trk_lat = server.arg(i).toFloat();
+					if (isValidNumber(request->arg(i)))
+						config.trk_lat = request->arg(i).toFloat();
 				}
 			}
 
-			if (server.argName(i) == "trackerPosLon")
+			if (request->argName(i) == "trackerPosLon")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.trk_lon = server.arg(i).toFloat();
+					if (isValidNumber(request->arg(i)))
+						config.trk_lon = request->arg(i).toFloat();
 				}
 			}
-			if (server.argName(i) == "trackerPosAlt")
+			if (request->argName(i) == "trackerPosAlt")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.trk_alt = server.arg(i).toFloat();
+					if (isValidNumber(request->arg(i)))
+						config.trk_alt = request->arg(i).toFloat();
 				}
 			}
-			if (server.argName(i) == "trackerPosSel")
+			if (request->argName(i) == "trackerPosSel")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (server.arg(i).toInt() == 1)
+					if (request->arg(i).toInt() == 1)
 						posGPS = true;
 				}
 			}
-			if (server.argName(i) == "hspeed")
+			if (request->argName(i) == "hspeed")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.trk_hspeed = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.trk_hspeed = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "lspeed")
+			if (request->argName(i) == "lspeed")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.trk_lspeed = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.trk_lspeed = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "slowInterval")
+			if (request->argName(i) == "slowInterval")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.trk_slowinterval = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.trk_slowinterval = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "maxInterval")
+			if (request->argName(i) == "maxInterval")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.trk_maxinterval = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.trk_maxinterval = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "minInterval")
+			if (request->argName(i) == "minInterval")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.trk_mininterval = server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.trk_mininterval = request->arg(i).toInt();
 				}
 			}
-			if (server.argName(i) == "minAngle")
+			if (request->argName(i) == "minAngle")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.trk_minangle = server.arg(i).toInt();
-				}
-			}
-
-			if (server.argName(i) == "trackerTable")
-			{
-				if (server.arg(i) != "")
-				{
-					config.trk_symbol[0] = server.arg(i).charAt(0);
-				}
-			}
-			if (server.argName(i) == "trackerSymbol")
-			{
-				if (server.arg(i) != "")
-				{
-					config.trk_symbol[1] = server.arg(i).charAt(0);
-				}
-			}
-			if (server.argName(i) == "moveTable")
-			{
-				if (server.arg(i) != "")
-				{
-					config.trk_symmove[0] = server.arg(i).charAt(0);
-				}
-			}
-			if (server.argName(i) == "moveSymbol")
-			{
-				if (server.arg(i) != "")
-				{
-					config.trk_symmove[1] = server.arg(i).charAt(0);
-				}
-			}
-			if (server.argName(i) == "stopTable")
-			{
-				if (server.arg(i) != "")
-				{
-					config.trk_symstop[0] = server.arg(i).charAt(0);
-				}
-			}
-			if (server.argName(i) == "stopSymbol")
-			{
-				if (server.arg(i) != "")
-				{
-					config.trk_symstop[1] = server.arg(i).charAt(0);
+					if (isValidNumber(request->arg(i)))
+						config.trk_minangle = request->arg(i).toInt();
 				}
 			}
 
-			if (server.argName(i) == "trackerPath")
+			if (request->argName(i) == "trackerTable")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.trk_path = server.arg(i).toInt();
+					config.trk_symbol[0] = request->arg(i).charAt(0);
 				}
 			}
-			if (server.argName(i) == "trackerComment")
+			if (request->argName(i) == "trackerSymbol")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.trk_comment, server.arg(i).c_str());
-				}else{
-					memset(config.trk_comment,0,sizeof(config.trk_comment));
+					config.trk_symbol[1] = request->arg(i).charAt(0);
+				}
+			}
+			if (request->argName(i) == "moveTable")
+			{
+				if (request->arg(i) != "")
+				{
+					config.trk_symmove[0] = request->arg(i).charAt(0);
+				}
+			}
+			if (request->argName(i) == "moveSymbol")
+			{
+				if (request->arg(i) != "")
+				{
+					config.trk_symmove[1] = request->arg(i).charAt(0);
+				}
+			}
+			if (request->argName(i) == "stopTable")
+			{
+				if (request->arg(i) != "")
+				{
+					config.trk_symstop[0] = request->arg(i).charAt(0);
+				}
+			}
+			if (request->argName(i) == "stopSymbol")
+			{
+				if (request->arg(i) != "")
+				{
+					config.trk_symstop[1] = request->arg(i).charAt(0);
 				}
 			}
 
-			if (server.argName(i) == "trackerPos2RF")
+			if (request->argName(i) == "trackerPath")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (isValidNumber(request->arg(i)))
+						config.trk_path = request->arg(i).toInt();
+				}
+			}
+			if (request->argName(i) == "trackerComment")
+			{
+				if (request->arg(i) != "")
+				{
+					strcpy(config.trk_comment, request->arg(i).c_str());
+				}
+				else
+				{
+					memset(config.trk_comment, 0, sizeof(config.trk_comment));
+				}
+			}
+
+			if (request->argName(i) == "trackerPos2RF")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
 						pos2RF = true;
 				}
 			}
-			if (server.argName(i) == "trackerPos2INET")
+			if (request->argName(i) == "trackerPos2INET")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						pos2INET = true;
 				}
 			}
-			if (server.argName(i) == "trackerTimeStamp")
+			if (request->argName(i) == "trackerTimeStamp")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 						timeStamp = true;
 				}
 			}
@@ -5527,9 +5754,9 @@ void handle_tracker()
 		config.trk_timestamp = timeStamp;
 
 		saveEEPROM();
-		initInterval=true;
+		initInterval = true;
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
 
 	String html = "<script type=\"text/javascript\">\n";
@@ -5560,29 +5787,7 @@ void handle_tracker()
 	html += "value: 'second',\n";
 	html += "text: 'Second'\n";
 	html += "}],\n";
-	html += "newWindow = window.open(\"\", null, \"height=400,width=400,status=no,toolbar=no,menubar=no,location=no\");\n";
-
-	int i;
-
-	html += "newWindow.document.write(\"<table border=\\\"1\\\" align=\\\"center\\\">\");\n";
-	html += "newWindow.document.write(\"<tr><th colspan=\\\"16\\\">Table '/'</th></tr><tr>\");\n";
-	for (i = 33; i < 129; i++)
-	{
-		html += "newWindow.document.write(\"<td><img onclick=\\\"window.opener.setValue(\"+sel.toString()+\"," + String(i) + ",1);\\\" src=\\\"http://aprs.dprns.com/symbols/icons/" + String(i) + "-1.png\\\"></td>\");\n";
-		if (((i % 16) == 0) && (i < 126))
-			html += "newWindow.document.write(\"</tr><tr>\");\n";
-	}
-	html += "newWindow.document.write(\"</tr></table><br />\");\n";
-	html += "newWindow.document.write(\"<table border=\\\"1\\\" align=\\\"center\\\">\");\n";
-	html += "newWindow.document.write(\"<tr><th colspan=\\\"16\\\">Table '\\\'</th></tr><tr>\");\n";
-	for (i = 33; i < 129; i++)
-	{
-		html += "newWindow.document.write(\"<td><img onclick=\\\"window.opener.setValue(\"+sel.toString()+\"," + String(i) + ",2);\\\" src=\\\"http://aprs.dprns.com/symbols/icons/" + String(i, DEC) + "-2.png\\\"></td>\");\n";
-		if (((i % 16) == 0) && (i < 126))
-			html += "newWindow.document.write(\"</tr><tr>\");\n";
-	}
-	html += "newWindow.document.write(\"</tr></table>\");\n";
-
+	html += "newWindow = window.open(\"/symbol?sel=\"+sel.toString(), null, \"height=400,width=400,status=no,toolbar=no,menubar=no,location=no\");\n";
 	html += "}\n";
 
 	html += "function setValue(sel,symbol,table) {\n";
@@ -5614,6 +5819,7 @@ void handle_tracker()
 
 	html += "</script>\n";
 
+	delay(1);
 	/************************ tracker Mode **************************/
 	html += "<form id='formtracker' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
 	// html += "<h2>[TRACKER] Tracker Position Mode</h2>\n";
@@ -5672,7 +5878,7 @@ void handle_tracker()
 		}
 	}
 	html += "</select></td>\n";
-	//html += "<td style=\"text-align: left;\"><input maxlength=\"72\" size=\"72\" id=\"trackerPath\" name=\"trackerPath\" type=\"text\" value=\"" + String(config.trk_path) + "\" /></td>\n";
+	// html += "<td style=\"text-align: left;\"><input maxlength=\"72\" size=\"72\" id=\"trackerPath\" name=\"trackerPath\" type=\"text\" value=\"" + String(config.trk_path) + "\" /></td>\n";
 	html += "</tr>\n";
 
 	html += "<tr>\n";
@@ -5792,43 +5998,43 @@ void handle_tracker()
 	html += "<div><button type='submit' id='submitTRACKER'  name=\"commitTRACKER\"> Apply Change </button></div>\n";
 	html += "<input type=\"hidden\" name=\"commitTRACKER\"/>\n";
 	html += "</form><br />";
-	server.send(200, "text/html", html); // send to someones browser when asked
+	request->send(200, "text/html", html); // send to someones browser when asked
 }
 
-void handle_wireless()
+void handle_wireless(AsyncWebServerRequest *request)
 {
-	if (!server.authenticate(config.http_username, config.http_password))
+	if (!request->authenticate(config.http_username, config.http_password))
 	{
-		return server.requestAuthentication();
+		return request->requestAuthentication();
 	}
-	if (server.hasArg("commitWiFiAP"))
+	if (request->hasArg("commitWiFiAP"))
 	{
 		bool wifiAP = false;
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			if (server.argName(i) == "wifiAP")
+			if (request->argName(i) == "wifiAP")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 					{
 						wifiAP = true;
 					}
 				}
 			}
 
-			if (server.argName(i) == "wifi_ssidAP")
+			if (request->argName(i) == "wifi_ssidAP")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.wifi_ap_ssid, server.arg(i).c_str());
+					strcpy(config.wifi_ap_ssid, request->arg(i).c_str());
 				}
 			}
-			if (server.argName(i) == "wifi_passAP")
+			if (request->argName(i) == "wifi_passAP")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					strcpy(config.wifi_ap_pass, server.arg(i).c_str());
+					strcpy(config.wifi_ap_pass, request->arg(i).c_str());
 				}
 			}
 		}
@@ -5842,21 +6048,21 @@ void handle_wireless()
 		}
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 	}
-	else if (server.hasArg("commitWiFiClient"))
+	else if (request->hasArg("commitWiFiClient"))
 	{
 		bool wifiSTA = false;
 		String nameSSID, namePASS;
 		for (int n = 0; n < 5; n++)
 			config.wifi_sta[n].enable = false;
-		for (uint8_t i = 0; i < server.args(); i++)
+		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			if (server.argName(i) == "wificlient")
+			if (request->argName(i) == "wificlient")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (String(server.arg(i)) == "OK")
+					if (String(request->arg(i)) == "OK")
 					{
 						wifiSTA = true;
 					}
@@ -5866,40 +6072,40 @@ void handle_wireless()
 			for (int n = 0; n < 5; n++)
 			{
 				nameSSID = "wifiStation" + String(n);
-				if (server.argName(i) == nameSSID)
+				if (request->argName(i) == nameSSID)
 				{
-					if (server.arg(i) != "")
+					if (request->arg(i) != "")
 					{
-						if (String(server.arg(i)) == "OK")
+						if (String(request->arg(i)) == "OK")
 						{
 							config.wifi_sta[n].enable = true;
 						}
 					}
 				}
 				nameSSID = "wifi_ssid" + String(n);
-				if (server.argName(i) == nameSSID)
+				if (request->argName(i) == nameSSID)
 				{
-					if (server.arg(i) != "")
+					if (request->arg(i) != "")
 					{
-						strcpy(config.wifi_sta[n].wifi_ssid, server.arg(i).c_str());
+						strcpy(config.wifi_sta[n].wifi_ssid, request->arg(i).c_str());
 					}
 				}
 				namePASS = "wifi_pass" + String(n);
-				if (server.argName(i) == namePASS)
+				if (request->argName(i) == namePASS)
 				{
-					if (server.arg(i) != "")
+					if (request->arg(i) != "")
 					{
-						strcpy(config.wifi_sta[n].wifi_pass, server.arg(i).c_str());
+						strcpy(config.wifi_sta[n].wifi_pass, request->arg(i).c_str());
 					}
 				}
 			}
 
-			if (server.argName(i) == "wifi_pwr")
+			if (request->argName(i) == "wifi_pwr")
 			{
-				if (server.arg(i) != "")
+				if (request->arg(i) != "")
 				{
-					if (isValidNumber(server.arg(i)))
-						config.wifi_power = (int8_t)server.arg(i).toInt();
+					if (isValidNumber(request->arg(i)))
+						config.wifi_power = (int8_t)request->arg(i).toInt();
 				}
 			}
 		}
@@ -5913,9 +6119,10 @@ void handle_wireless()
 		}
 		saveEEPROM();
 		String html = "OK";
-		server.send(200, "text/html", html);
+		request->send(200, "text/html", html);
 		WiFi.setTxPower((wifi_power_t)config.wifi_power);
-	}else
+	}
+	else
 	{
 		String html = "<script type=\"text/javascript\">\n";
 		html += "$('form').submit(function (e) {\n";
@@ -6089,7 +6296,7 @@ void handle_wireless()
 		html += "<input type=\"hidden\" name=\"commitBluetooth\"/>\n";
 		html += "</form>";
 #endif
-		server.send(200, "text/html", html); // send to someones browser when asked
+		request->send(200, "text/html", html); // send to someones browser when asked
 	}
 }
 
@@ -6097,7 +6304,7 @@ extern bool afskSync;
 extern String lastPkgRaw;
 extern float dBV;
 extern int mVrms;
-void handle_realtime()
+void handle_realtime(AsyncWebServerRequest *request)
 {
 	// char jsonMsg[1000];
 	char *jsonMsg;
@@ -6112,7 +6319,7 @@ void handle_realtime()
 		char *output_buffer = (char *)malloc(input_length * 2);
 		if (output_buffer)
 		{
-			//lastPkgRaw.toCharArray(input_buffer, lastPkgRaw.length(), 0);
+			// lastPkgRaw.toCharArray(input_buffer, lastPkgRaw.length(), 0);
 			memcpy(input_buffer, lastPkgRaw.c_str(), lastPkgRaw.length());
 			lastPkgRaw.clear();
 			encode_base64((unsigned char *)input_buffer, input_length, (unsigned char *)output_buffer);
@@ -6132,7 +6339,7 @@ void handle_realtime()
 			sprintf(jsonMsg, "{\"Active\":\"0\",\"mVrms\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%li\"}", timeStamp);
 	}
 	afskSync = false;
-	server.send(200, "text/html", String(jsonMsg));
+	request->send(200, "text/html", String(jsonMsg));
 
 	delay(100);
 	free(jsonMsg);
@@ -6152,12 +6359,12 @@ void handle_ws()
 		char *input_buffer = (char *)malloc(input_length + 2);
 		char *output_buffer = (char *)malloc(input_length * 2);
 		if (output_buffer)
-		{			
-			memset(input_buffer,0,(input_length + 2));
-			memset(output_buffer,0,(input_length * 2));
-			//lastPkgRaw.toCharArray(input_buffer, input_length, 0);			
+		{
+			memset(input_buffer, 0, (input_length + 2));
+			memset(output_buffer, 0, (input_length * 2));
+			// lastPkgRaw.toCharArray(input_buffer, input_length, 0);
 			memcpy(input_buffer, lastPkgRaw.c_str(), lastPkgRaw.length());
-			lastPkgRaw.clear();			
+			lastPkgRaw.clear();
 			encode_base64((unsigned char *)input_buffer, input_length, (unsigned char *)output_buffer);
 			// Serial.println(output_buffer);
 			sprintf(jsonMsg, "{\"Active\":\"1\",\"mVrms\":\"%d\",\"RAW\":\"%s\",\"timeStamp\":\"%li\"}", mVrms, output_buffer, timeStamp);
@@ -6179,64 +6386,42 @@ void handle_ws()
 	free(jsonMsg);
 }
 
-void handle_ws_gnss(char *nmea)
+void handle_ws_gnss(char *nmea, size_t size)
 {
-	char jsonMsg[700];
-	char outp[500];
-	//char *jsonMsg;
 	time_t timeStamp;
 	time(&timeStamp);
 
-	int input_length = strlen(nmea);
-	//jsonMsg = (char *)malloc((input_length * 2) + 70);
-	//if (jsonMsg)
-	//{
-		//char *input_buffer = (char *)malloc(input_length + 2);
-		//char *output_buffer = (char *)malloc(input_length * 2);
-		//if (output_buffer)
-		{
-			// lastPkgRaw.toCharArray(input_buffer, lastPkgRaw.length(), 0);
-			// lastPkgRaw.clear();
-			//strncpy(input_buffer, nmea, input_length);
-			//encode_base64((unsigned char *)input_buffer, input_length, (unsigned char *)output_buffer);
-			memset(outp,0,sizeof(outp));
-			encode_base64((unsigned char *)nmea, input_length, (unsigned char *)outp);
-			// Serial.println(output_buffer);
-			sprintf(jsonMsg, "{\"en\":\"%d\",\"lat\":\"%.5f\",\"lng\":\"%.5f\",\"alt\":\"%.2f\",\"spd\":\"%.2f\",\"csd\":\"%.1f\",\"hdop\":\"%.2f\",\"sat\":\"%d\",\"timeStamp\":\"%li\",\"RAW\":\"%s\"}",(int)config.gnss_enable, gps.location.lat(), gps.location.lng(),gps.altitude.meters(),gps.speed.kmph(),gps.course.deg(),gps.hdop.hdop(),gps.satellites.value(), timeStamp, outp);
-			// Serial.println(jsonMsg);
-			//free(input_buffer);
-		//	free(output_buffer);
-		}
-
-		afskSync = false;
-		//if(ws_gnss.getClients().isEmpty())
-		ws_gnss.textAll(jsonMsg);
-		//free(jsonMsg);
-	//}
+	unsigned int output_length = encode_base64_length(size);
+	unsigned char nmea_enc[output_length];
+	char jsonMsg[output_length + 100];
+	encode_base64((unsigned char *)nmea, size, (unsigned char *)nmea_enc);
+	// Serial.println(output_buffer);
+	sprintf(jsonMsg, "{\"en\":\"%d\",\"lat\":\"%.5f\",\"lng\":\"%.5f\",\"alt\":\"%.2f\",\"spd\":\"%.2f\",\"csd\":\"%.1f\",\"hdop\":\"%.2f\",\"sat\":\"%d\",\"timeStamp\":\"%li\",\"RAW\":\"%s\"}", (int)config.gnss_enable, gps.location.lat(), gps.location.lng(), gps.altitude.meters(), gps.speed.kmph(), gps.course.deg(), gps.hdop.hdop(), gps.satellites.value(), timeStamp, nmea_enc);
+	ws_gnss.textAll(jsonMsg, strlen(jsonMsg));
 }
 
-void handle_test()
+void handle_test(AsyncWebServerRequest *request)
 {
-	// if (server.hasArg("sendBeacon"))
+	// if (request->hasArg("sendBeacon"))
 	// {
 	// 	String tnc2Raw = send_fix_location();
 	// 	if (config.rf_en)
 	// 		pkgTxPush(tnc2Raw.c_str(), tnc2Raw.length(), 0);
 	// 	// APRS_sendTNC2Pkt(tnc2Raw); // Send packet to RF
 	// }
-	// else if (server.hasArg("sendRaw"))
+	// else if (request->hasArg("sendRaw"))
 	// {
-	// 	for (uint8_t i = 0; i < server.args(); i++)
+	// 	for (uint8_t i = 0; i < request->args(); i++)
 	// 	{
-	// 		if (server.argName(i) == "raw")
+	// 		if (request->argName(i) == "raw")
 	// 		{
-	// 			if (server.arg(i) != "")
+	// 			if (request->arg(i) != "")
 	// 			{
-	// 				String tnc2Raw = server.arg(i);
+	// 				String tnc2Raw = request->arg(i);
 	// 				if (config.rf_en)
 	// 				{
 	// 					pkgTxPush(tnc2Raw.c_str(), tnc2Raw.length(), 0);
-	// 					// APRS_sendTNC2Pkt(server.arg(i)); // Send packet to RF
+	// 					// APRS_sendTNC2Pkt(request->arg(i)); // Send packet to RF
 	// 					// Serial.println("Send RAW: " + tnc2Raw);
 	// 				}
 	// 			}
@@ -6280,7 +6465,7 @@ void handle_test()
 	webString += "if(active==1){\nleft.update(dBV,false);\nchart.redraw();\n";
 	webString += "var date=new Date(timeStamp * 1000);\n";
 	webString += "var head=date+\"[\"+Vrms.toFixed(3)+\"Vrms,\"+dBV.toFixed(1)+\"dBV]\\n\";\n";
-	//webString += "document.getElementById(\"raw_txt\").value+=head+atob(raw)+\"\\n\";\n";
+	// webString += "document.getElementById(\"raw_txt\").value+=head+atob(raw)+\"\\n\";\n";
 	webString += "var textArea=document.getElementById(\"raw_txt\");\n";
 	webString += "textArea.value+=head+atob(raw)+\"\\n\";\n";
 	webString += "textArea.scrollTop = textArea.scrollHeight;\n";
@@ -6301,17 +6486,17 @@ void handle_test()
 	webString += "</table>\n";
 
 	webString += "</body></html>\n";
-	server.send(200, "text/html", webString); // send to someones browser when asked
+	request->send(200, "text/html", webString); // send to someones browser when asked
 
 	delay(100);
 	webString.clear();
 }
 
-void handle_about()
+void handle_about(AsyncWebServerRequest *request)
 {
-	if (!server.authenticate(config.http_username, config.http_password))
+	if (!request->authenticate(config.http_username, config.http_password))
 	{
-		return server.requestAuthentication();
+		return request->requestAuthentication();
 	}
 	char strCID[50];
 	uint64_t chipid = ESP.getEfuseMac();
@@ -6484,10 +6669,10 @@ void handle_about()
 				 "</script>";
 
 	webString += "</body></html>\n";
-	server.send(200, "text/html", webString); // send to someones browser when asked
+	request->send(200, "text/html", webString); // send to someones browser when asked
 }
 
-void handle_gnss()
+void handle_gnss(AsyncWebServerRequest *request)
 {
 	webString = "<html>\n<head>\n";
 	webString += "<script src=\"https://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js\"></script>\n";
@@ -6500,7 +6685,7 @@ void handle_gnss()
 	webString += "var Vrms=0;\nvar dBV=-40;\nvar active=0;var raw=\"\";var timeStamp;\n";
 	// webString += "if (chart.series) {\n";
 	// webString += "var left = chart.series[0].points[0];\n";
-	//webString += "const ws = new WebSocket(\"ws://" + WiFi.localIP().toString() + ":81/ws_gnss\");\n";
+	// webString += "const ws = new WebSocket(\"ws://" + WiFi.localIP().toString() + ":81/ws_gnss\");\n";
 	webString += "var host='ws://'+location.hostname+':81/ws_gnss'\n";
 	webString += "const ws = new WebSocket(host);\n";
 	webString += "ws.onopen = function() { console.log('Connection opened');};\n ws.onclose = function() { console.log('Connection closed');};\n";
@@ -6536,14 +6721,14 @@ void handle_gnss()
 	webString += "<table width=\"200\" border=\"1\">";
 	webString += "<th colspan=\"2\" style=\"background-color: #00BCD4;\"><span><b>GNSS Information</b></span></th>\n";
 	// webString += "<tr><th width=\"200\"><span><b>Name</b></span></th><th><span><b>Information</b></span></th></tr>";
-	webString += "<tr><td align=\"right\"><b>Enable: </b></td><td align=\"left\"> <label id=\"en\">"+String(config.gnss_enable)+"</label></td></tr>";
-	webString += "<tr><td align=\"right\"><b>Latitude: </b></td><td align=\"left\"> <label id=\"lat\">"+String(gps.location.lat(),5)+"</label></td></tr>";
-	webString += "<tr><td align=\"right\"><b>Longitude: </b></td><td align=\"left\"> <label id=\"lng\">"+String(gps.location.lng(),5)+"</label></td></tr>";
-	webString += "<tr><td align=\"right\"><b>Altitude: </b></td><td align=\"left\"> <label id=\"alt\">"+String(gps.altitude.meters(),2)+"</label> m.</td></tr>";
-	webString += "<tr><td align=\"right\"><b>Speed: </b></td><td align=\"left\"> <label id=\"spd\">"+String(gps.speed.kmph(),2)+"</label> km/h</td></tr>";
-	webString += "<tr><td align=\"right\"><b>Course: </b></td><td align=\"left\"> <label id=\"csd\">"+String(gps.course.deg(),1)+"</label></td></tr>";	
-	webString += "<tr><td align=\"right\"><b>HDOP: </b></td><td align=\"left\"> <label id=\"hdop\">"+String(gps.hdop.hdop(),2)+"</label> </td></tr>";
-	webString += "<tr><td align=\"right\"><b>SAT: </b></td><td align=\"left\"> <label id=\"sat\">"+String(gps.satellites.value())+"</label> </td></tr>";
+	webString += "<tr><td align=\"right\"><b>Enable: </b></td><td align=\"left\"> <label id=\"en\">" + String(config.gnss_enable) + "</label></td></tr>";
+	webString += "<tr><td align=\"right\"><b>Latitude: </b></td><td align=\"left\"> <label id=\"lat\">" + String(gps.location.lat(), 5) + "</label></td></tr>";
+	webString += "<tr><td align=\"right\"><b>Longitude: </b></td><td align=\"left\"> <label id=\"lng\">" + String(gps.location.lng(), 5) + "</label></td></tr>";
+	webString += "<tr><td align=\"right\"><b>Altitude: </b></td><td align=\"left\"> <label id=\"alt\">" + String(gps.altitude.meters(), 2) + "</label> m.</td></tr>";
+	webString += "<tr><td align=\"right\"><b>Speed: </b></td><td align=\"left\"> <label id=\"spd\">" + String(gps.speed.kmph(), 2) + "</label> km/h</td></tr>";
+	webString += "<tr><td align=\"right\"><b>Course: </b></td><td align=\"left\"> <label id=\"csd\">" + String(gps.course.deg(), 1) + "</label></td></tr>";
+	webString += "<tr><td align=\"right\"><b>HDOP: </b></td><td align=\"left\"> <label id=\"hdop\">" + String(gps.hdop.hdop(), 2) + "</label> </td></tr>";
+	webString += "<tr><td align=\"right\"><b>SAT: </b></td><td align=\"left\"> <label id=\"sat\">" + String(gps.satellites.value()) + "</label> </td></tr>";
 	webString += "</table><table>";
 	// webString += "<tr><td><form accept-charset=\"UTF-8\" action=\"/test\" class=\"form-horizontal\" id=\"test_form\" method=\"post\">\n";
 	// webString += "<div style=\"margin-left: 20px;\"><input type='submit' class=\"btn btn-danger\" name=\"sendBeacon\" value='SEND BEACON'></div><br />\n";
@@ -6556,7 +6741,7 @@ void handle_gnss()
 	webString += "</table>\n";
 
 	webString += "</body></html>\n";
-	server.send(200, "text/html", webString); // send to someones browser when asked
+	request->send(200, "text/html", webString); // send to someones browser when asked
 
 	delay(100);
 	webString.clear();
@@ -6595,94 +6780,116 @@ void webService()
 	{
 		return;
 	}
-	server.close();
 	ws.onEvent(onWsEvent);
-	async_server.addHandler(&ws);
-	async_server.addHandler(&ws_gnss);
-	async_server.begin();
+
 	// web client handlers
-	server.on("/", setMainPage);
-	server.on("/logout", handle_logout);
-	server.on("/radio", handle_radio);
-	server.on("/vpn", handle_vpn);
-	server.on("/mod", handle_mod);
-	server.on("/default", handle_default);
-	server.on("/igate", handle_igate);
-	server.on("/digi", handle_digi);
-	server.on("/tracker", handle_tracker);
-	server.on("/wx", handle_wx);
-	server.on("/tlm", handle_tlm);
-	server.on("/system", handle_system);
-	server.on("/symbol", handle_symbol);
-	server.on("/wireless", handle_wireless);
-	server.on("/tnc2", handle_test);
-	server.on("/gnss", handle_gnss);
-	server.on("/realtime", handle_realtime);
-	server.on("/about", handle_about);
-	server.on("/dashboard", handle_dashboard);
-	server.on("/sidebarInfo", handle_sidebar);
-	server.on("/sysinfo", handle_sysinfo);
-	server.on("/lastHeard", handle_lastHeard);
-	server.on("/style.css", handle_css);
-	server.on("/jquery-3.7.1.js", handle_jquery);
-	/*handling uploading firmware file */
-	server.on(
-		"/update", HTTP_POST, []()
+	async_server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+					{ setMainPage(request); });
+	async_server.on("/symbol", HTTP_GET, [](AsyncWebServerRequest *request)
+					{ handle_symbol(request); });
+	// async_server.on("/symbol2", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
+	// 				{ handle_symbol2(request); });
+	async_server.on("/logout", HTTP_GET, [](AsyncWebServerRequest *request)
+					{ handle_logout(request); });
+	async_server.on("/radio", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
+					{ handle_radio(request); });
+	async_server.on("/vpn", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
+					{ handle_vpn(request); });
+	async_server.on("/mod", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
+					{ handle_mod(request); });
+	async_server.on("/default", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
+					{ handle_default(); });
+	async_server.on("/igate", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
+					{ handle_igate(request); });
+	async_server.on("/digi", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
+					{ handle_digi(request); });
+	async_server.on("/tracker", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
+					{ handle_tracker(request); });
+	async_server.on("/wx", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
+					{ handle_wx(request); });
+	async_server.on("/tlm", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
+					{ handle_tlm(request); });
+	async_server.on("/system", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
+					{ handle_system(request); });
+	async_server.on("/wireless", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
+					{ handle_wireless(request); });
+	async_server.on("/tnc2", HTTP_GET, [](AsyncWebServerRequest *request)
+					{ handle_test(request); });
+	async_server.on("/gnss", HTTP_GET, [](AsyncWebServerRequest *request)
+					{ handle_gnss(request); });
+	async_server.on("/realtime", HTTP_GET, [](AsyncWebServerRequest *request)
+					{ handle_realtime(request); });
+	async_server.on("/about", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
+					{ handle_about(request); });
+	async_server.on("/dashboard", HTTP_GET, [](AsyncWebServerRequest *request)
+					{ handle_dashboard(request); });
+	async_server.on("/sidebarInfo", HTTP_GET, [](AsyncWebServerRequest *request)
+					{ handle_sidebar(request); });
+	async_server.on("/sysinfo", HTTP_GET, [](AsyncWebServerRequest *request)
+					{ handle_sysinfo(request); });
+	async_server.on("/lastHeard", HTTP_GET, [](AsyncWebServerRequest *request)
+					{ handle_lastHeard(request); });
+	async_server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request)
+					{ handle_css(request); });
+	async_server.on("/jquery-3.7.1.js", HTTP_GET, [](AsyncWebServerRequest *request)
+					{ handle_jquery(request); });
+	async_server.on(
+		"/update", HTTP_POST, [](AsyncWebServerRequest *request)
 		{
-			server.sendHeader("Connection", "close");
-			server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
-			ESP.restart(); },
-		[]()
+  		bool espShouldReboot = !Update.hasError();
+  		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", espShouldReboot ? "<h1><strong>Update DONE</strong></h1><br><a href='/'>Return Home</a>" : "<h1><strong>Update FAILED</strong></h1><br><a href='/updt'>Retry?</a>");
+  		response->addHeader("Connection", "close");
+  		request->send(response); },
+		[](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final)
 		{
-			HTTPUpload &upload = server.upload();
-			if (upload.status == UPLOAD_FILE_START)
+			if (!index)
 			{
-				Serial.printf("Firmware Update FILE: %s\n", upload.filename.c_str());
-				if (!Update.begin(UPDATE_SIZE_UNKNOWN))
-				{ // start with max available size
-					Update.printError(Serial);
-					delay(3);
-				}
-				else
-				{
-					// wdtDisplayTimer = millis();
-					// wdtSensorTimer = millis();
-					// disableCore0WDT();
-					// disableCore1WDT();
-					// disableLoopWDT();
-
-					// aprsClient.stop();
-					// vTaskSuspend(taskAPRSHandle);
-					// vTaskSuspend(taskTNCHandle);
-					// vTaskSuspend(taskGpsHandle);
-					// vTaskSuspend(taskNetworkHandle);
-					// config.igate_en = false;
-					// config.rf_en = false;
-
-					// delay(3);
-				}
-			}
-			else if (upload.status == UPLOAD_FILE_WRITE)
-			{
-				/* flashing firmware to ESP*/
-				if (Update.write(upload.buf, upload.currentSize) != upload.currentSize)
+				Serial.printf("Update Start: %s\n", filename.c_str());
+				if (!Update.begin((ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000))
 				{
 					Update.printError(Serial);
-					delay(3);
+				}else{
+					disableLoopWDT();
+					disableCore0WDT();
+					disableCore1WDT();
+					vTaskSuspend(taskAPRSPollHandle);
+					vTaskSuspend(taskAPRSHandle);
 				}
 			}
-			else if (upload.status == UPLOAD_FILE_END)
+			if (!Update.hasError())
+			{
+				if (Update.write(data, len) != len)
+				{
+					Update.printError(Serial);
+				}
+			}
+			if (final)
 			{
 				if (Update.end(true))
-				{ // true to set the size to the current progress
-					delay(3);
+				{
+					Serial.printf("Update Success: %uByte\n", index + len);
+					delay(1000);
+					esp_restart();
 				}
 				else
 				{
 					Update.printError(Serial);
-					delay(3);
 				}
 			}
 		});
-	server.begin();
+	
+	lastheard_events.onConnect([](AsyncEventSourceClient *client)
+							   {
+    if(client->lastId()){
+      Serial.printf("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
+    }
+    // send event with message "hello!", id current millis
+    // and set reconnect delay to 1 second
+    client->send("hello!", NULL, millis(), 10000); });
+	async_server.addHandler(&lastheard_events);
+	async_server.onNotFound(notFound);
+	async_server.begin();
+	async_websocket.addHandler(&ws);
+	async_websocket.addHandler(&ws_gnss);
+	async_websocket.begin();
 }
