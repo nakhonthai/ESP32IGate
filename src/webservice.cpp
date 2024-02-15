@@ -6848,7 +6848,9 @@ void webService()
 				if (!Update.begin((ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000))
 				{
 					Update.printError(Serial);
-				}else{
+				}
+				else
+				{
 					disableLoopWDT();
 					disableCore0WDT();
 					disableCore1WDT();
@@ -6877,9 +6879,8 @@ void webService()
 				}
 			}
 		});
-	
-	lastheard_events.onConnect([](AsyncEventSourceClient *client)
-							   {
+
+	lastheard_events.onConnect([](AsyncEventSourceClient *client){
     if(client->lastId()){
       Serial.printf("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
     }
