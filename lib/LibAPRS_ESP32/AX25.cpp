@@ -252,50 +252,54 @@ void convPath(ax25header *hdr, char *txt, unsigned int size)
     memset(hdr->addr, 0, 7);
     memset(&num[0], 0, sizeof(num));
 
-    p = strpos(txt, '-');
-    if (p > 0 && p < size)
-    {
-        for (i = 0; i < p; i++)
-        { // Get CallSign/Path
-            hdr->addr[i] = txt[i];
-        }
-        j = 0;
-        for (i = p + 1; i < size; i++)
-        { // get SSID
-            //            if(txt[i]=='*') break;
-            //            if(txt[i]==',') break;
-            //            if(txt[i]==':') break;
-            if (txt[i] < 0x30)
-                break;
-            if (txt[i] > 0x39)
-                break;
-            num[j++] = txt[i];
-        }
-        if (j > 0)
+    char *call=(char *)calloc(size+1,sizeof(char));
+    if(call){
+        memset(call,0,size+1);
+        memcpy(call,txt,size);    
+        p = strpos(call, '-');
+        if (p > 2 && p < size)
         {
-            hdr->ssid = atoi(num);
+            for (i = 0; i < p; i++)
+            { // Get CallSign/Path
+                if(i>6) break;
+                hdr->addr[i] = call[i];            
+            }
+            j = 0;
+            for (i = p + 1; i < size; i++)
+            { // get SSID
+                if (call[i] < 0x30)
+                    break;
+                if (call[i] > 0x39)
+                    break;
+                num[j++] = call[i];
+            }
+            if (j > 0)
+            {
+                hdr->ssid = atoi(num);
+            }
+            hdr->ssid <<= 1;
         }
-        hdr->ssid <<= 1;
-    }
-    else
-    {
-        for (i = 0; i < size; i++)
-        { // Get CallSign/Path
-            if (txt[i] == '*')
-                break;
-            if (txt[i] == ',')
-                break;
-            if (txt[i] == ':')
-                break;
-            hdr->addr[i] = txt[i];
-        }
+        else
+        {
+            for (i = 0; i < size; i++)
+            { // Get CallSign/Path
+                if (call[i] == '*')
+                    break;
+                if (call[i] == ',')
+                    break;
+                if (call[i] == ':')
+                    break;
+                hdr->addr[i] = call[i];
+            }
 
-        hdr->ssid = 0;
+            hdr->ssid = 0;
+        }
+        p = strpos(call, '*');
+        if (p > 0 && p < size)
+            hdr->ssid |= 0x80;
+        hdr->ssid |= 0x60;
+        free(call);
     }
-    p = strpos(txt, '*');
-    if (p > 0 && p < size)
-        hdr->ssid |= 0x80;
-    hdr->ssid |= 0x60;
 }
 
 char ax25_encode(ax25frame &frame, char *txt, int size)

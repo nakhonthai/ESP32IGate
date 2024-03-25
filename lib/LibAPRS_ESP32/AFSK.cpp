@@ -71,6 +71,16 @@ uint8_t CountOnesFromInteger(uint8_t value)
   return count;
 }
 
+uint16_t CountOnesFromInteger(uint16_t value)
+{
+  uint16_t count=0;
+  for (int i=0; i<16;i++){
+    if(value & 0x0001) count++;
+    value>>=1;
+  }
+  return count;
+}
+
 #define IMPLEMENTATION FIFO
 
 #ifndef I2S_INTERNAL
@@ -308,7 +318,7 @@ void AFSK_hw_init(void)
   digitalWrite(LED_PIN, LOW);
 
   digitalWrite(_ptt_pin, !_ptt_active);
-  digitalWrite(_pwr_pin, LOW);
+  digitalWrite(_pwr_pin, !_pwr_active);
 
   esp_adc_cal_characterize(ADC_UNIT_1, cfg_adc_atten, ADC_WIDTH_BIT_12, 1100, &adc_chars);
 
@@ -349,7 +359,7 @@ void AFSK_init(Afsk *afsk)
   filter_param_t flt = {
       .size = FIR_LPF_N,
       .sampling_freq = SAMPLERATE,
-      .pass_freq = 0,
+      .pass_freq = 600,
       .cutoff_freq = mark_freq+((space_freq-mark_freq)/2),
   };
   int16_t *lpf_an, *bpf_an, *hpf_an;
@@ -368,8 +378,8 @@ void AFSK_init(Afsk *afsk)
 
   // HPF
   flt.size = FIR_BPF_N;
-  flt.pass_freq = 1000;
-  flt.cutoff_freq = 10000;
+  flt.pass_freq = 1200;
+  flt.cutoff_freq = 20000;
   hpf_an = filter_coeff(&flt);
   filter_init(&hpf, hpf_an, FIR_BPF_N);
 
@@ -440,16 +450,12 @@ uint8_t AFSK_dac_isr(Afsk *afsk)
 {
   if (afsk->sampleIndex == 0)
   {
-    // LED_RX_ON();
-    // digitalWrite(LED_PIN), LOW);
     if (afsk->txBit == 0)
     {
       if (fifo_isempty(&afsk->txFifo) && afsk->tailLength == 0)
       {
         AFSK_DAC_IRQ_STOP();
         afsk->sending = false;
-        // LED_TX_OFF();
-        // digitalWrite(PTT_PIN, LOW);
         return 0;
       }
       else
@@ -480,8 +486,6 @@ uint8_t AFSK_dac_isr(Afsk *afsk)
           {
             AFSK_DAC_IRQ_STOP();
             afsk->sending = false;
-            // LED_TX_OFF();
-            // digitalWrite(PTT_PIN, LOW);
             return 0;
           }
           else
@@ -558,7 +562,7 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
       // the buffer and indicate that we are now
       // receiving data. For bling we also turn
       // on the RX LED.
-      if (++hdlc_flag_count > 2)
+      if (++hdlc_flag_count > 3)
       {
         hdlc->receiving = true;
         fifo_flush(fifo);
@@ -815,10 +819,10 @@ void AFSK_adc_isr(Afsk *afsk, int16_t currentSample)
     // bit in our stream of demodulated bits
     afsk->actualBits <<= 1;
 
-    //// Alternative using 5 bits ////////////////
-    uint8_t bits = afsk->sampledBits & 0x1f;
-    uint8_t c = CountOnesFromInteger(bits);
-    if (c >= 3)
+    //// Alternative using 16 bits ////////////////
+    uint16_t bits = afsk->sampledBits;//& 0xff;
+    uint16_t c = CountOnesFromInteger(bits);
+    if (c >= 8)
       afsk->actualBits |= 1;
     /////////////////////////////////////////////////
 
@@ -1088,11 +1092,8 @@ void AFSK_Poll(bool SA818, bool RFPower)
       dac_i2s_disable();
       i2s_zero_dma_buffer(I2S_NUM_0);
       // i2s_adc_enable(I2S_NUM_0);
-      digitalWrite(_ptt_pin, !_ptt_active);
-      // if (SA818)
-      // {
-      //   digitalWrite(12, LOW); // RF Power LOW
-      // }
+      digitalWrite(_pwr_pin, !_pwr_active);
+      digitalWrite(_ptt_pin, !_ptt_active);            
     }
 #endif
   }
@@ -1150,9 +1151,8 @@ void AFSK_Poll(bool SA818, bool RFPower)
 
           if (input_HPF)
           {
-            adcVal = (int)filter(&bpf, (int16_t)adcVal);
-          }
-          if (input_BPF)
+            adcVal = (int)filter(&hpf, (int16_t)adcVal);
+          }else if (input_BPF)
           {
             adcVal = (int)filter(&bpf, (int16_t)adcVal);
           }
@@ -1176,7 +1176,7 @@ void AFSK_Poll(bool SA818, bool RFPower)
             mVrms = sqrtl(mVsum / mVsumCount);
             mVsum = 0;
             mVsumCount = 0;
-            lastVrms = millis() + 500;
+            lastVrms = millis() + 200;
             VrmsFlag = true;
             // Tool conversion dBv <--> Vrms at http://sengpielaudio.com/calculator-db-volt.htm
             // dBV = 20.0F * log10(Vrms);

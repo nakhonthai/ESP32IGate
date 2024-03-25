@@ -11,16 +11,14 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define VERSION "1.2"
-#define VERSION_BUILD 'd'
+#define VERSION "1.3"
+#define VERSION_BUILD ' '
 
-// #define DEBUG
-// #define DEBUG_IS
 #define WX
 
 //#define OLED
-//  #define SDCARD
-//  #define BLUETOOTH
+//#define SDCARD
+//#define BLUETOOTH
 
 #define WIFI_OFF_FIX 0
 #define WIFI_AP_FIX 1
@@ -43,7 +41,7 @@
 #define PKGTXSIZE 100
 #else
 #define TLMLISTSIZE 10
-#define PKGLISTSIZE 30
+#define PKGLISTSIZE 20
 #define PKGTXSIZE 5
 #endif
 

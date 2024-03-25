@@ -166,17 +166,18 @@ int igateProcess(AX25Msg &Packet)
 
     // Add Information
     header += String(F(":"));
-    uint8_t *Raw = (uint8_t*)malloc(300);
+    uint8_t *Raw = (uint8_t *)calloc(350,sizeof(uint8_t));
     if (Raw)
     {
-        memset(Raw, 0, 300); // Clear frame packet
+        memset(Raw, 0, 350); // Clear frame packet
         size_t hSize = strlen(header.c_str());
         memcpy(&Raw[0], header.c_str(), hSize);           // Copy header to frame packet
         memcpy(&Raw[hSize], &Packet.info[0], Packet.len); // Copy info to frame packet
         uint8_t *ptr = &Raw[0];
         int i, rmv = 0;
+        size_t fsize=hSize + Packet.len;
         // Remove CR,LF in frame packet
-        for (i = 0; i < (hSize + Packet.len - rmv); i++)
+        for (i = 0; i < fsize; i++)
         {
             if ((Raw[i] == '\r') || (Raw[i] == '\n'))
             {
@@ -187,11 +188,18 @@ int igateProcess(AX25Msg &Packet)
             {
                 Raw[i] = *ptr++;
             }
+            if(i>(fsize-rmv)){
+                i=fsize-rmv;
+                break;
+            }
         }
+        if(i>350 || i>fsize) i=strlen((char*)Raw);
         Raw[i] = 0;
         log_d("RF2INET: %s", Raw);
-        aprsClient.write(&Raw[0], i); // Send binary frame packet to APRS-IS (aprsc)
-        aprsClient.write("\r\n");     // Send CR LF the end frame packet
+        if(aprsClient.connected()){
+            aprsClient.write(&Raw[0], i); // Send binary frame packet to APRS-IS (aprsc)
+            aprsClient.write("\r\n");     // Send CR LF the end frame packet
+        }
         status.txCount++;
         free(Raw);
     }

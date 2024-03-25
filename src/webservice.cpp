@@ -50,6 +50,7 @@ void setMainPage(AsyncWebServerRequest *request)
 	{
 		return request->requestAuthentication();
 	}
+
 	webString = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n";
 	webString += "<meta name=\"robots\" content=\"index\" />\n";
 	webString += "<meta name=\"robots\" content=\"follow\" />\n";
@@ -370,7 +371,11 @@ void handle_sidebar(AsyncWebServerRequest *request)
 		html += "<th style=\"background:#0b0; color:#030; width:50%;border-radius: 10px;border: 2px solid white;\">WX</th>\n";
 	else
 		html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\">WX</th>\n";
-	html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\">SAT</th>\n";
+	//html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\">SAT</th>\n";
+	if (config.trk_en)
+		html += "<th style=\"background:#0b0; color:#030; width:50%;border-radius: 10px;border: 2px solid white;\">TRACKER</th>\n";
+	else
+		html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\">TRACKER</th>\n";
 	html += "</tr>\n";
 	html += "</table>\n";
 	html += "<br />\n";
@@ -423,29 +428,31 @@ void handle_sidebar(AsyncWebServerRequest *request)
 	html += "<td style=\"background: #ffffff;\">" + String(status.dropCount) + "/" + String(status.errorCount) + "</td>\n";
 	html += "</tr>\n";
 	html += "</table>\n";
-	html += "<br />\n";
-	html += "<table>\n";
-	html += "<tr>\n";
-	html += "<th colspan=\"2\">GPS Info <a href=\"/gnss\" target=\"_gnss\" style=\"color: yellow;font-size:8pt\">[View]</a></th>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td>LAT:</td>\n";
-	html += "<td style=\"background: #ffffff;text-align: left;\">" + String(gps.location.lat(), 5) + "</td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td>LON:</td>\n";
-	html += "<td style=\"background: #ffffff;text-align: left;\">" + String(gps.location.lng(), 5) + "</td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td>ALT:</td>\n";
-	html += "<td style=\"background: #ffffff;text-align: left;\">" + String(gps.altitude.meters(), 1) + "</td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td>SAT:</td>\n";
-	html += "<td style=\"background: #ffffff;text-align: left;\">" + String(gps.satellites.value()) + "</td>\n";
-	html += "</tr>\n";
-	html += "</table>\n";
-
+	if(config.gnss_enable==true)
+	{
+		html += "<br />\n";
+		html += "<table>\n";
+		html += "<tr>\n";
+		html += "<th colspan=\"2\">GPS Info <a href=\"/gnss\" target=\"_gnss\" style=\"color: yellow;font-size:8pt\">[View]</a></th>\n";
+		html += "</tr>\n";
+		html += "<tr>\n";
+		html += "<td>LAT:</td>\n";
+		html += "<td style=\"background: #ffffff;text-align: left;\">" + String(gps.location.lat(), 5) + "</td>\n";
+		html += "</tr>\n";
+		html += "<tr>\n";
+		html += "<td>LON:</td>\n";
+		html += "<td style=\"background: #ffffff;text-align: left;\">" + String(gps.location.lng(), 5) + "</td>\n";
+		html += "</tr>\n";
+		html += "<tr>\n";
+		html += "<td>ALT:</td>\n";
+		html += "<td style=\"background: #ffffff;text-align: left;\">" + String(gps.altitude.meters(), 1) + "</td>\n";
+		html += "</tr>\n";
+		html += "<tr>\n";
+		html += "<td>SAT:</td>\n";
+		html += "<td style=\"background: #ffffff;text-align: left;\">" + String(gps.satellites.value()) + "</td>\n";
+		html += "</tr>\n";
+		html += "</table>\n";
+	}
 	html += "<script>\n";
 	html += "$(window).trigger('resize');\n";
 	html += "</script>\n";
@@ -574,7 +581,7 @@ void handle_lastHeard(AsyncWebServerRequest *request)
 	html += "<th style=\"min-width:5ch\">AUDIO</th>\n";
 	html += "</tr>\n";
 
-	for (int i = 0; i < 30; i++)
+	for (int i = 0; i < PKGLISTSIZE; i++)
 	{
 		if (i >= PKGLISTSIZE)
 			break;
@@ -622,7 +629,7 @@ void handle_lastHeard(AsyncWebServerRequest *request)
 				if (aprsParse.parse_aprs(&aprs))
 				{
 					pkg.calsign[10] = 0;
-					time_t tm = pkg.time;
+					//time_t tm = pkg.time;
 					localtime_r(&pkg.time, &tmstruct);
 					char strTime[10];
 					sprintf(strTime, "%02d:%02d:%02d", tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
@@ -754,6 +761,7 @@ void event_lastHeard()
 	struct tm tmstruct;
 
 	String html = "";
+	String line = "";
 	sort(pkgList, PKGLISTSIZE);
 
 	html = "<table>\n";
@@ -777,14 +785,14 @@ void event_lastHeard()
 	html += "<th style=\"min-width:5ch\">AUDIO</th>\n";
 	html += "</tr>\n";
 
-	for (int i = 0; i < 30; i++)
+	for (int i = 0; i < PKGLISTSIZE; i++)
 	{
 		if (i >= PKGLISTSIZE)
 			break;
 		pkgListType pkg = getPkgList(i);
 		if (pkg.time > 0)
 		{
-			String line = String(pkg.raw);
+			line = String(pkg.raw);
 			int packet = pkg.pkg;
 			int start_val = line.indexOf(">", 0); // หาตำแหน่งแรกของ >
 			if (start_val > 3)
@@ -825,7 +833,7 @@ void event_lastHeard()
 				if (aprsParse.parse_aprs(&aprs))
 				{
 					pkg.calsign[10] = 0;
-					time_t tm = pkg.time;
+					//time_t tm = pkg.time;
 					localtime_r(&pkg.time, &tmstruct);
 					char strTime[10];
 					sprintf(strTime, "%02d:%02d:%02d", tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
@@ -890,6 +898,7 @@ void event_lastHeard()
 							else
 								html += "<td style=\"text-align: left;\">RF: " + path + "</td>";
 						}
+						LPath.clear();
 					}
 					// html += "<td>" + path + "</td>";
 					if (aprs.flags & F_HASPOS)
@@ -937,11 +946,22 @@ void event_lastHeard()
 						html += String(audBV, 1) + "dBV</td></tr>\n";
 					}
 				}
+				path.clear();
+				src_call.clear();
 			}
+			line.clear();
 		}
 	}
 	html += "</table>\n";
-	lastheard_events.send(html.c_str(), "lastHeard", millis());
+	char  *info=(char*)calloc(html.length(),sizeof(char));
+	if(info){
+		html.toCharArray(info,html.length(),0);
+		html.clear();
+		lastheard_events.send(info, "lastHeard", millis(),5000);
+		free(info);
+	}else{
+		log_d("Memory is low!!");
+	}
 }
 
 void handle_radio(AsyncWebServerRequest *request)
@@ -5459,7 +5479,6 @@ void handle_tracker(AsyncWebServerRequest *request)
 	bool compEn = false;
 
 	bool posGPS = false;
-	bool bcnEN = false;
 	bool pos2RF = false;
 	bool pos2INET = false;
 	bool optCST = false;
@@ -6393,7 +6412,7 @@ void handle_ws_gnss(char *nmea, size_t size)
 
 	unsigned int output_length = encode_base64_length(size);
 	unsigned char nmea_enc[output_length];
-	char jsonMsg[output_length + 100];
+	char jsonMsg[output_length + 200];
 	encode_base64((unsigned char *)nmea, size, (unsigned char *)nmea_enc);
 	// Serial.println(output_buffer);
 	sprintf(jsonMsg, "{\"en\":\"%d\",\"lat\":\"%.5f\",\"lng\":\"%.5f\",\"alt\":\"%.2f\",\"spd\":\"%.2f\",\"csd\":\"%.1f\",\"hdop\":\"%.2f\",\"sat\":\"%d\",\"timeStamp\":\"%li\",\"RAW\":\"%s\"}", (int)config.gnss_enable, gps.location.lat(), gps.location.lng(), gps.altitude.meters(), gps.speed.kmph(), gps.course.deg(), gps.hdop.hdop(), gps.satellites.value(), timeStamp, nmea_enc);
@@ -6510,7 +6529,7 @@ void handle_about(AsyncWebServerRequest *request)
 	// webString += "<tr><th width=\"200\"><span><b>Name</b></span></th><th><span><b>Information</b></span></th></tr>";
 	webString += "<tr><td align=\"right\"><b>Hardware Version: </b></td><td align=\"left\"> ESP32DR Simple,ESP32DR_SA868,DIY </td></tr>";
 	webString += "<tr><td align=\"right\"><b>Firmware Version: </b></td><td align=\"left\"> V" + String(VERSION) + String(VERSION_BUILD) + "</td></tr>\n";
-	webString += "<tr><td align=\"right\"><b>RF Analog Module: </b></td><td align=\"left\"> MODEL: " + String(RF_TYPE[config.rf_type]) + "</td></tr>\n";
+	webString += "<tr><td align=\"right\"><b>RF Analog Module: </b></td><td align=\"left\"> MODEL: " + String(RF_TYPE[config.rf_type]) +" ("+ RF_VERSION+")</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>ESP32 Model: </b></td><td align=\"left\"> " + String(ESP.getChipModel()) + "</td></tr>";
 	webString += "<tr><td align=\"right\"><b>Chip ID: </b></td><td align=\"left\"> " + String(strCID) + "</td></tr>";
 	webString += "<tr><td align=\"right\"><b>Revision: </b></td><td align=\"left\"> " + String(ESP.getChipRevision()) + "</td></tr>";
@@ -6882,11 +6901,11 @@ void webService()
 
 	lastheard_events.onConnect([](AsyncEventSourceClient *client){
     if(client->lastId()){
-      Serial.printf("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
+      log_d("Web Client reconnected! Last message ID that it got is: %u\n", client->lastId());
     }
     // send event with message "hello!", id current millis
     // and set reconnect delay to 1 second
-    client->send("hello!", NULL, millis(), 10000); });
+    client->send("hello!", NULL, millis(), 1000); });
 	async_server.addHandler(&lastheard_events);
 	async_server.onNotFound(notFound);
 	async_server.begin();

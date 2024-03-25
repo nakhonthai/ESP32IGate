@@ -234,7 +234,7 @@ typedef struct
  * and pass this information together with the event type
  * and timestamp to the main program using a queue.
  */
-static void IRAM_ATTR pcnt_intr_handler(void *arg)
+static void pcnt_intr_handler(void *arg)
 {
     unsigned long currentMillis = millis(); // Time at instant ISR was called
     uint32_t intr_status = PCNT.int_st.val;
@@ -648,7 +648,7 @@ void defaultConfig()
     sprintf(config.wifi_ap_pass, "aprsthnetwork");
 
     //--RF Module
-    config.rf_en = false;
+    config.rf_en = true;
     config.rf_type = RF_SA868_VHF;
     config.freq_rx = 144.3900;
     config.freq_tx = 144.3900;
@@ -909,8 +909,10 @@ void defaultConfig()
 
     config.onewire_enable = false;
     config.onewire_gpio = -1;
-
-    config.rf_baudrate = 9600;
+    
+#ifdef RFMODULE
+    config.rf_en = true;
+    config.rf_type = RF_SA868_VHF;
     config.rf_tx_gpio = 13;
     config.rf_rx_gpio = 14;
     config.rf_sql_gpio = 33;
@@ -919,10 +921,25 @@ void defaultConfig()
     config.rf_ptt_gpio = 32;
     config.rf_sql_active = 0;
     config.rf_pd_active = 1;
-    config.rf_pwr_active = 0;
+    config.rf_pwr_active = 1;
     config.rf_ptt_active = 1;
+#else
+    config.rf_en = false;
+    config.rf_type = RF_NONE;
+    config.rf_tx_gpio = -1;
+    config.rf_rx_gpio = -1;
+    config.rf_sql_gpio = -1;
+    config.rf_pd_gpio = -1;
+    config.rf_pwr_gpio = -1;
+    config.rf_ptt_gpio = 32;
+    config.rf_sql_active = 1;
+    config.rf_pd_active = 1;
+    config.rf_pwr_active = 1;
+    config.rf_ptt_active = 1;
+#endif    
     config.adc_atten = 0;
     config.adc_dc_offset = 625;
+    config.rf_baudrate = 9600;
 
 #ifdef OLED
     config.i2c_enable = true;
@@ -1093,8 +1110,8 @@ uint16_t pkgType(const char *raw)
 {
     uint16_t type = 0;
     char packettype = 0;
-    const char *info_start, *body;
-    int paclen = strlen(raw);
+    const char *body;
+    //int paclen = strlen(raw);
     char *ptr;
 
     if (*raw == 0)
@@ -1283,8 +1300,9 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
             else
                 pkgList[i].audio_level = 0;
             len = strlen(raw);
-            if (len > 500)
-                len = 500;
+            if (len > 300)
+                len = 300;
+            memset(pkgList[i].raw,0,300);
             memcpy(pkgList[i].raw, raw, len);
             log_d("Update: pkgList_idx=%d", i);
         }
@@ -1307,10 +1325,12 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
         else
             pkgList[i].audio_level = 0;
         // strcpy(pkgList[i].calsign, callsign);
+        memset(pkgList[i].calsign,0,11);
         memcpy(pkgList[i].calsign, callsign, strlen(callsign));
         len = strlen(raw);
-        if (len > 500)
-            len = 500;
+        if (len > 300)
+            len = 300;
+        memset(pkgList[i].raw,0,300);
         memcpy(pkgList[i].raw, raw, len);
         // strcpy(pkgList[i].raw, raw);
         pkgList[i].calsign[10] = 0;
@@ -1411,7 +1431,7 @@ bool pkgTxSend()
         delay(1);
     psramBusy = true;
 #endif
-    char info[500];
+
     for (int i = 0; i < PKGTXSIZE; i++)
     {
         if (txQueue[i].Active)
@@ -1420,28 +1440,39 @@ bool pkgTxSend()
             if (decTime > txQueue[i].Delay)
             {
                 txQueue[i].Active = false;
-                memset(info, 0, sizeof(info));
-                strcpy(info, txQueue[i].Info);
-                psramBusy = false;
-                digitalWrite(config.rf_pwr_gpio, config.rf_power); // RF Power
-                status.txCount++;
+                char *info = (char*)calloc(500,sizeof(char));
+                if(info){
+                    memset(info, 0, 500);
+                    strcpy(info, txQueue[i].Info);
+                    psramBusy = false;
+                    if ((config.rf_type == RF_SR_1WV) || (config.rf_type == RF_SR_1WU) || (config.rf_type == RF_SR_1W350)){
+                        digitalWrite(config.rf_pwr_gpio,LOW);
+                        if(config.rf_power ^ !config.rf_pwr_active)
+                            pinMode(config.rf_pwr_gpio,OPEN_DRAIN);
+                        else
+                            pinMode(config.rf_pwr_gpio,OUTPUT);
+                    }else{
+                        digitalWrite(config.rf_pwr_gpio, config.rf_power ^ !config.rf_pwr_active); // ON RF Power H/L
+                    }
+                    status.txCount++;
 
-                APRS_setPreamble(config.preamble * 100);
-                APRS_sendTNC2Pkt(String(info)); // Send packet to RF
-                txQueue[i].Active = false;
-                igateTLM.TX++;
-                log_d("TX->RF: %s\n", info);
-
-                for (int i = 0; i < 100; i++)
-                {
-                    // if (digitalRead(config.rf_ptt_gpio) ^ config.rf_ptt_active)
-                    if (!getReceive())
-                        break;
-                    delay(50); // TOT 5sec
+                    APRS_setPreamble(config.preamble * 100);
+                    APRS_sendTNC2Pkt(String(info)); // Send packet to RF
+                    txQueue[i].Active = false;
+                    igateTLM.TX++;
+                    log_d("TX->RF: %s\n", info);
+                    free(info);
+                    for (int i = 0; i < 100; i++)
+                    {
+                        // if (digitalRead(config.rf_ptt_gpio) ^ config.rf_ptt_active)
+                        if (!getTransmit())
+                            break;
+                        delay(50); // TOT 5sec                        
+                    }
+                    digitalWrite(config.rf_pwr_gpio, !config.rf_pwr_active); // OFF RF Power H/L    
+                    pinMode(config.rf_pwr_gpio,OUTPUT);            
+                    return true;
                 }
-
-                digitalWrite(config.rf_pwr_gpio, 0); // set RF Power Low
-                return true;
             }
         }
     }
@@ -1523,7 +1554,10 @@ bool SA868_waitResponse(String &data, String rsp, uint32_t timeout)
             {
                 return true;
             }
+            esp_task_wdt_reset();
         }
+        delay(1);
+        esp_task_wdt_reset();
     } while (millis() - startMillis < timeout);
     return false;
 }
@@ -1572,13 +1606,13 @@ String FRS_getVERSION()
     String data;
     String version;
 
-    SerialRF.printf("AT+DMOVER\r\n");
+    SerialRF.printf("AT+DMOVERQ\r\n");
     if (SA868_waitResponse(data, "\r\n", 1000))
     {
-        int st = data.indexOf("DMOVER:");
+        int st = data.indexOf("DMOVERQ:");
         if (st > 0)
         {
-            version = data.substring(st + 7, data.indexOf("\r\n"));
+            version = data.substring(st + 8, data.indexOf("\r\n"));
         }
         else
         {
@@ -1597,7 +1631,7 @@ unsigned long SA818_Timeout = 0;
 
 void RF_MODULE_SLEEP()
 {
-    digitalWrite(config.rf_pwr_gpio, LOW);
+    digitalWrite(config.rf_pwr_gpio, !config.rf_pwr_active);
     digitalWrite(config.rf_pd_gpio, LOW);
     // PMU.disableDC3();
 }
@@ -1653,51 +1687,55 @@ void RF_MODULE(bool boot)
     //! DC3 Radio & Pixels VDD , Don't change
     // PMU.setDC3Voltage(3400);
     // PMU.disableDC3();
-
-    pinMode(config.rf_pd_gpio, OUTPUT);
-    digitalWrite(config.rf_pd_gpio, config.rf_pd_active); // PD HIGH
-
     pinMode(config.rf_pwr_gpio, OUTPUT);
-    digitalWrite(config.rf_pwr_gpio, LOW); // RF POWER LOW
+    digitalWrite(config.rf_pwr_gpio, !config.rf_pwr_active); // RF POWER LOW
 
     pinMode(config.rf_ptt_gpio, OUTPUT);
     digitalWrite(config.rf_ptt_gpio, !config.rf_ptt_active); // PTT HIGH
+    pinMode(config.rf_pd_gpio, OUTPUT);
     if (boot)
     {
         SerialRF.begin(config.rf_baudrate, SWSERIAL_8N1, config.rf_rx_gpio, config.rf_tx_gpio);
+    }else{
+        digitalWrite(config.rf_pd_gpio, !config.rf_pd_active); // PD LOW
+        delay(500);
     }
+    
+    digitalWrite(config.rf_pd_gpio, config.rf_pd_active); // PD HIGH
 
-    delay(1500);
+    delay(1000);
     SerialRF.write("\r\n");
 
     char str[200];
     String rsp = "\r\n";
     if (config.sql_level > 8)
         config.sql_level = 8;
+    
+    esp_task_wdt_reset();
     if ((config.rf_type == RF_SR_1WV) || (config.rf_type == RF_SR_1WU) || (config.rf_type == RF_SR_1W350))
     {
         SerialRF.printf("AT+DMOCONNECT\r\n");
         if (SA868_waitResponse(data, rsp, 1000))
             log_d("%s", data.c_str());
-        RF_VERSION = SA868_getVERSION();
+        RF_VERSION = FRS_getVERSION();
         log_d("RF Module Version %s", RF_VERSION);
         sprintf(str, "AT+DMOSETGROUP=%01d,%0.4f,%0.4f,%d,%01d,%d,0", config.band, config.freq_tx + ((float)config.offset_tx / 1000000), config.freq_rx + ((float)config.offset_rx / 1000000), config.tone_rx, config.sql_level, config.tone_tx);
         SerialRF.println(str);
         log_d("Write to SR_FRS: %s", str);
-        if (SA868_waitResponse(data, rsp, 1000))
+        if (SA868_waitResponse(data, rsp, 1500))
             log_d("%s", data.c_str());
         // Module auto power save setting
         SerialRF.printf("AT+DMOAUTOPOWCONTR=1\r\n");
-        if (SA868_waitResponse(data, rsp, 1000))
+        if (SA868_waitResponse(data, rsp, 1500))
             log_d("%s", data.c_str());
         SerialRF.printf("AT+DMOSETVOX=0\r\n");
-        if (SA868_waitResponse(data, rsp, 1000))
+        if (SA868_waitResponse(data, rsp, 1500))
             log_d("%s", data.c_str());
         SerialRF.printf("AT+DMOSETMIC=6,0\r\n");
-        if (SA868_waitResponse(data, rsp, 1000))
+        if (SA868_waitResponse(data, rsp, 1500))
             log_d("%s", data.c_str());
         SerialRF.printf("AT+DMOSETVOLUME=%d\r\n", config.volume);
-        if (SA868_waitResponse(data, rsp, 1000))
+        if (SA868_waitResponse(data, rsp, 1500))
             log_d("%s", data.c_str());
     }
     else if ((config.rf_type == RF_SA868_VHF) || (config.rf_type == RF_SA868_UHF) || (config.rf_type == RF_SA868_350))
@@ -1788,6 +1826,7 @@ void RF_MODULE(bool boot)
         if (SA868_waitResponse(data, rsp, 1000))
             log_d("%s", data.c_str());
     }
+    delay(1);
 }
 
 void RF_MODULE_CHECK()
@@ -1809,7 +1848,7 @@ void RF_MODULE_CHECK()
     else
     {
         log_d("RF Module %s sleep", RF_TYPE[config.rf_type]);
-        digitalWrite(config.rf_pwr_gpio, LOW);
+        digitalWrite(config.rf_pwr_gpio, !config.rf_pwr_active);
         digitalWrite(config.rf_pd_gpio, LOW);
         delay(500);
         RF_MODULE(true);
@@ -1878,6 +1917,7 @@ bool AFSKInitAct = false;
 void setup()
 {
     byte *ptr;
+    //setCpuFrequencyMhz(160);
 #ifdef BOARD_HAS_PSRAM
     pkgList = (pkgListType *)ps_malloc(sizeof(pkgListType) * PKGLISTSIZE);
     Telemetry = (TelemetryType *)malloc(sizeof(TelemetryType) * TLMLISTSIZE);
@@ -2142,17 +2182,17 @@ void setup()
         &taskAPRSPollHandle, /* Task handle. */
         0);                  /* Core where the task should run */
 
-    // if (config.gnss_enable)
-    // {
-    //     xTaskCreatePinnedToCore(
-    //         taskGPS,        /* Function to implement the task */
-    //         "taskGPS",      /* Name of the task */
-    //         2048,           /* Stack size in words */
-    //         NULL,           /* Task input parameter */
-    //         2,              /* Priority of the task */
-    //         &taskGPSHandle, /* Task handle. */
-    //         1);             /* Core where the task should run */
-    // }
+    if (config.gnss_enable)
+    {
+        xTaskCreatePinnedToCore(
+            taskGPS,        /* Function to implement the task */
+            "taskGPS",      /* Name of the task */
+            3072,           /* Stack size in words */
+            NULL,           /* Task input parameter */
+            2,              /* Priority of the task */
+            &taskGPSHandle, /* Task handle. */
+            1);             /* Core where the task should run */
+    }
 
     if (config.ext_tnc_enable || (config.wx_en && (config.wx_channel > 0 && config.wx_channel < 4)))
     {
@@ -2729,6 +2769,7 @@ int packet2Raw(String &tnc2, AX25Msg &Packet)
     }
     for (int i = 0; i < Packet.rpt_count; i++)
     {
+        if(i>=8) break;
         tnc2 += String(",");
         tnc2 += String(Packet.rpt_list[i].call);
         if (Packet.rpt_list[i].ssid > 0)
@@ -2752,7 +2793,7 @@ int timeHalfSec = 0;
 
 unsigned long timeTask;
 unsigned long timeSec;
-char nmea[200];
+char nmea[100];
 int nmea_idx = 0;
 void loop()
 {
@@ -2789,7 +2830,7 @@ void loop()
                 // digitalWrite(LED_RX, LOW);
                 // digitalWrite(LED_TX, LOW);
                 defaultConfig();
-                Serial.println("SYSTEM REBOOT NOW!");
+                log_d("SYSTEM REBOOT NOW!");
                 esp_restart();
             }
             else
@@ -2895,8 +2936,8 @@ void loop()
     {
         esp_task_wdt_reset();
         timeCheck = millis() + 1000;
-        // if (ESP.getFreeHeap() < 60000)
-        //     esp_restart();
+        if (ESP.getFreeHeap() < 60000)
+            esp_restart();
         // Serial.println(String(ESP.getFreeHeap()));
     }
 }
@@ -3055,7 +3096,7 @@ void sendTelemetry_0(char *raw, bool header)
     }
 }
 
-RTC_IRAM_ATTR statusType statOld;
+RTC_DATA_ATTR statusType statOld;
 uint8_t getSensor(int ch)
 {
     int val = 0;
@@ -3445,7 +3486,7 @@ void taskGPS(void *pvParameters)
                         gps.encode((char)c);
                         if (webServiceBegin == false)
                         {
-                            if (nmea_idx > 195)
+                            if (nmea_idx > 99)
                             {
                                 nmea_idx = 0;
                                 memset(nmea, 0, sizeof(nmea));
@@ -3456,8 +3497,8 @@ void taskGPS(void *pvParameters)
                                 nmea[nmea_idx++] = (char)c;
                                 if ((char)c == '\r' || (char)c == '\n')
                                 {
-                                    nmea[nmea_idx++] = 0;
-                                    if (nmea_idx > 5)
+                                    //nmea[nmea_idx++] = 0;
+                                    if (nmea_idx > 10)
                                     {
                                         if (ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
                                         // if (webServiceBegin == false)
@@ -3467,6 +3508,8 @@ void taskGPS(void *pvParameters)
                                         // log_d("%s",nmea);
                                     }
                                     nmea_idx = 0;
+                                    memset(nmea, 0, sizeof(nmea));
+                                    vTaskDelay(50 / portTICK_PERIOD_MS);
                                     break;
                                 }
                             }
@@ -3498,18 +3541,18 @@ void taskGPS(void *pvParameters)
                             gps.encode(c);
                             if (webServiceBegin == false)
                             {
-                                if (nmea_idx > 195)
+                                if (nmea_idx > 99)
                                 {
                                     nmea_idx = 0;
                                     memset(nmea, 0, sizeof(nmea));
                                 }
                                 else
                                 {
-                                    nmea[nmea_idx++] = c;
+                                    //nmea[nmea_idx++] = c;
                                     if (c == '\r' || c == '\n')
                                     {
                                         nmea[nmea_idx++] = 0;
-                                        if (nmea_idx > 5)
+                                        if (nmea_idx > 10)
                                         {
                                             if (ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
                                             {
@@ -3518,6 +3561,8 @@ void taskGPS(void *pvParameters)
                                             // log_d("%s",nmea);
                                         }
                                         nmea_idx = 0;
+                                        memset(nmea, 0, sizeof(nmea));
+                                        vTaskDelay(50 / portTICK_PERIOD_MS);
                                     }
                                 }
                             }
@@ -3790,7 +3835,7 @@ void taskAPRS(void *pvParameters)
     unsigned long tickInterval = 0;
     unsigned long DiGiInterval = 0;
 
-    Serial.println("Task APRS has been start");
+    log_d("Task APRS has been start");
     PacketBuffer.clean();
 
     afskSetModem(config.modem_type);
@@ -3968,9 +4013,8 @@ void taskAPRS(void *pvParameters)
 
                 if (config.trk_loc2rf)
                 { // TRACKER SEND TO RF
-                    char *rawP = (char *)malloc(rawData.length());
+                    char *rawP = (char *)calloc(rawData.length(),sizeof(char));
                     memcpy(rawP, rawData.c_str(), rawData.length());
-                    // rawData.toCharArray(rawP, rawData.length());
                     pkgTxPush(rawP, rawData.length(), 0);
 #ifdef OLED
                     pushTxDisp(TXCH_RF, "TX TRACKER", sts);
@@ -4075,7 +4119,7 @@ void taskAPRS(void *pvParameters)
             else
                 sprintf(call, "%s", incomingPacket.src.call);
 
-            char *rawP = (char *)malloc(tnc2.length());
+            char *rawP = (char *)calloc(tnc2.length(),sizeof(char));
             memcpy(rawP, tnc2.c_str(), tnc2.length());
             int idx = pkgListUpdate(call, rawP, type, 0);
             free(rawP);
@@ -4092,6 +4136,7 @@ void taskAPRS(void *pvParameters)
 #endif
             lastPkg = true;
             lastPkgRaw = tnc2;
+            tnc2.clear();            
             handle_ws();
             // ESP_BT.println(tnc2);
             status.allCount++;
@@ -4127,7 +4172,7 @@ void taskAPRS(void *pvParameters)
                             sprintf(sts, "POSITION FIX\nINTERVAL %ds", tx_interval);
                         if (config.igate_loc2rf)
                         { // IGATE SEND POSITION TO RF
-                            char *rawP = (char *)malloc(rawData.length());
+                            char *rawP = (char *)calloc(rawData.length(),sizeof(char));
                             // rawData.toCharArray(rawP, rawData.length());
                             memcpy(rawP, rawData.c_str(), rawData.length());
                             pkgTxPush(rawP, rawData.length(), 0);
@@ -4206,7 +4251,7 @@ void taskAPRS(void *pvParameters)
                             sprintf(sts, "POSITION FIX\nINTERVAL %ds", tx_interval);
                         if (config.digi_loc2rf)
                         { // DIGI SEND POSITION TO RF
-                            char *rawP = (char *)malloc(rawData.length());
+                            char *rawP = (char *)calloc(rawData.length(),sizeof(char));
                             // rawData.toCharArray(rawP, rawData.length());
                             memcpy(rawP, rawData.c_str(), rawData.length());
                             pkgTxPush(rawP, rawData.length(), 0);
@@ -4272,7 +4317,7 @@ void taskAPRS(void *pvParameters)
                         packet2Raw(digiPkg, incomingPacket);
                         log_d("DIGI_REPEAT: %s", digiPkg.c_str());
                         log_d("DIGI delay=%d ms.", digiDelay);
-                        char *rawP = (char *)malloc(digiPkg.length());
+                        char *rawP = (char *)calloc(digiPkg.length(),sizeof(char));
                         // digiPkg.toCharArray(rawP, digiPkg.length());
                         memcpy(rawP, digiPkg.c_str(), digiPkg.length());
                         pkgTxPush(rawP, digiPkg.length(), digiDelay);
@@ -4480,8 +4525,8 @@ void taskNetwork(void *pvParameters)
         vTaskDelay(9 / portTICK_PERIOD_MS);
         timerNetwork_old = micros();
 
-        if (config.gnss_enable)
-            taskGPSActive();
+        // if (config.gnss_enable)
+        //     taskGPSActive();
 
         if (config.wifi_mode & WIFI_AP_FIX)
         {
@@ -4664,6 +4709,8 @@ void taskNetwork(void *pvParameters)
                     }
                 }
             }
+        }else{
+            vTaskDelay(100 / portTICK_PERIOD_MS);
         }
     } // for loop
 }
@@ -5082,7 +5129,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
             {
                 memset(&itemname, 0, sizeof(itemname));
                 memcpy(&itemname, aprs.srcname, aprs.srcname_len);
-                Serial.println(itemname);
+                //Serial.println(itemname);
                 display.print(itemname);
             }
             else
