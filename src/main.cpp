@@ -123,7 +123,7 @@ int mVrms = 0;
 
 long timeNetwork, timeAprs, timeGui;
 
-cppQueue PacketBuffer(sizeof(AX25Msg), 5, IMPLEMENTATION); // Instantiate queue
+cppQueue PacketBuffer(sizeof(AX25Msg), 3, IMPLEMENTATION); // Instantiate queue
 #ifdef OLED
 cppQueue dispBuffer(300, 5, IMPLEMENTATION);
 cppQueue queTxDisp(sizeof(txDisp), 10, IMPLEMENTATION); // Instantiate queue
@@ -172,10 +172,10 @@ TaskHandle_t taskAPRSPollHandle;
 TaskHandle_t taskSerialHandle;
 TaskHandle_t taskGPSHandle;
 
-unsigned long timerNetwork,timerNetwork_old;
-unsigned long timerAPRS,timerAPRS_old;
-unsigned long timerGPS,timerGPS_old;
-unsigned long timerSerial,timerSerial_old;
+unsigned long timerNetwork, timerNetwork_old;
+unsigned long timerAPRS, timerAPRS_old;
+unsigned long timerGPS, timerGPS_old;
+unsigned long timerSerial, timerSerial_old;
 
 SoftwareSerial SerialRF;
 
@@ -842,8 +842,8 @@ void defaultConfig()
     config.tx_display = true;
     config.rx_display = true;
 
-    //afsk,TNC
-    config.modem_type = 1; //0=AFSK300,1=AFSK1200
+    // afsk,TNC
+    config.modem_type = 1; // 0=AFSK300,1=AFSK1200
     config.audio_hpf = false;
     config.audio_bpf = false;
     config.preamble = 3;
@@ -1434,8 +1434,8 @@ bool pkgTxSend()
 
                 for (int i = 0; i < 100; i++)
                 {
-                    //if (digitalRead(config.rf_ptt_gpio) ^ config.rf_ptt_active)
-                    if(!getReceive())
+                    // if (digitalRead(config.rf_ptt_gpio) ^ config.rf_ptt_active)
+                    if (!getReceive())
                         break;
                     delay(50); // TOT 5sec
                 }
@@ -1456,6 +1456,11 @@ void aprs_msg_callback(struct AX25Msg *msg)
     AX25Msg pkg;
 
     memcpy(&pkg, msg, sizeof(AX25Msg));
+    int timeout=0;
+    while(PacketBuffer.isFull()){
+        delay(3);
+        if(++timeout>1000) return;
+    }
     PacketBuffer.push(&pkg); // ใส่แพ็จเก็จจาก TNC ลงคิวบัพเฟอร์
     status.rxCount++;
 }
@@ -1866,7 +1871,7 @@ void postTransmission()
     digitalWrite(config.modbus_de_gpio, 0);
 }
 
-//3 seconds WDT
+// 3 seconds WDT
 #define WDT_TIMEOUT 3
 
 bool AFSKInitAct = false;
@@ -2080,8 +2085,8 @@ void setup()
     // enableLoopWDT();
     // enableCore0WDT();
     // enableCore1WDT();
-    esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
-    esp_task_wdt_add(NULL); //add current thread to WDT watch
+    esp_task_wdt_init(WDT_TIMEOUT, true); // enable panic so ESP32 restarts
+    esp_task_wdt_add(NULL);               // add current thread to WDT watch
 
     oledSleepTimeout = millis() + (config.oled_timeout * 1000);
     AFSKInitAct = false;
@@ -2127,15 +2132,15 @@ void setup()
         1,                  /* Priority of the task */
         &taskNetworkHandle, /* Task handle. */
         1);                 /* Core where the task should run */
-    
+
     xTaskCreatePinnedToCore(
-            taskAPRSPoll,        /* Function to implement the task */
-            "taskAPRSPoll",      /* Name of the task */
-            4096,           /* Stack size in words */
-            NULL,           /* Task input parameter */
-            1,              /* Priority of the task */
-            &taskAPRSPollHandle, /* Task handle. */
-            0);             /* Core where the task should run */
+        taskAPRSPoll,        /* Function to implement the task */
+        "taskAPRSPoll",      /* Name of the task */
+        4096,                /* Stack size in words */
+        NULL,                /* Task input parameter */
+        1,                   /* Priority of the task */
+        &taskAPRSPollHandle, /* Task handle. */
+        0);                  /* Core where the task should run */
 
     // if (config.gnss_enable)
     // {
@@ -2754,8 +2759,8 @@ void loop()
     if (millis() > timeTask)
     {
         timeTask = millis() + 10000;
-        log_d("Task process APRS=%iuS\t NETWORK=%iuS\t GPS=%iuS\t SERIAL=%iuS\n",timerAPRS,timerNetwork,timerGPS,timerSerial);
-        log_d("Free heap: %s KB \tWiFi:%s ,RSSI:%s dBm", String((float)ESP.getFreeHeap() / 1000, 1).c_str(),String(WiFi.SSID()).c_str(),String(WiFi.RSSI()).c_str());
+        log_d("Task process APRS=%iuS\t NETWORK=%iuS\t GPS=%iuS\t SERIAL=%iuS\n", timerAPRS, timerNetwork, timerGPS, timerSerial);
+        log_d("Free heap: %s KB \tWiFi:%s ,RSSI:%s dBm", String((float)ESP.getFreeHeap() / 1000, 1).c_str(), String(WiFi.SSID()).c_str(), String(WiFi.RSSI()).c_str());
     }
 
     vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -3222,7 +3227,7 @@ extern AsyncWebSocket ws_gnss;
 void taskGPSActive()
 {
     int c;
-    //log_d("GNSS Init");
+    // log_d("GNSS Init");
     nmea_idx = 0;
 
     // if (config.gnss_enable)
@@ -3286,10 +3291,10 @@ void taskGPSActive()
                                     nmea[nmea_idx] = 0;
                                     if (nmea_idx > 5)
                                     {
-                                        if(ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
+                                        if (ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
                                         // if (webServiceBegin == false)
                                         {
-                                            handle_ws_gnss(nmea,nmea_idx);
+                                            handle_ws_gnss(nmea, nmea_idx);
                                         }
                                         // log_d("%s",nmea);
                                     }
@@ -3338,9 +3343,9 @@ void taskGPSActive()
                                         nmea[nmea_idx] = 0;
                                         if (nmea_idx > 5)
                                         {
-                                            if(ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
+                                            if (ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
                                             {
-                                                handle_ws_gnss(nmea,nmea_idx);
+                                                handle_ws_gnss(nmea, nmea_idx);
                                             }
                                             // log_d("%s",nmea);
                                         }
@@ -3412,9 +3417,9 @@ void taskGPS(void *pvParameters)
     }
     for (;;)
     {
-        timerGPS=micros()-timerGPS_old;
+        timerGPS = micros() - timerGPS_old;
         vTaskDelay(10 / portTICK_PERIOD_MS);
-        timerGPS_old=micros();
+        timerGPS_old = micros();
 
         if (config.gnss_enable)
         {
@@ -3454,10 +3459,10 @@ void taskGPS(void *pvParameters)
                                     nmea[nmea_idx++] = 0;
                                     if (nmea_idx > 5)
                                     {
-                                        if(ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
+                                        if (ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
                                         // if (webServiceBegin == false)
                                         {
-                                            handle_ws_gnss(nmea,nmea_idx);
+                                            handle_ws_gnss(nmea, nmea_idx);
                                         }
                                         // log_d("%s",nmea);
                                     }
@@ -3506,9 +3511,9 @@ void taskGPS(void *pvParameters)
                                         nmea[nmea_idx++] = 0;
                                         if (nmea_idx > 5)
                                         {
-                                            if(ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
+                                            if (ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
                                             {
-                                                handle_ws_gnss(nmea,nmea_idx);
+                                                handle_ws_gnss(nmea, nmea_idx);
                                             }
                                             // log_d("%s",nmea);
                                         }
@@ -3591,9 +3596,9 @@ void taskSerial(void *pvParameters)
     }
     for (;;)
     {
-        timerSerial=millis()-timerSerial_old;
+        timerSerial = millis() - timerSerial_old;
         vTaskDelay(10 / portTICK_PERIOD_MS);
-        timerSerial_old=micros();
+        timerSerial_old = micros();
 
         if (config.wx_en)
         {
@@ -3793,7 +3798,7 @@ void taskAPRS(void *pvParameters)
     afskSetPTT(config.rf_ptt_gpio, config.rf_ptt_active);
     afskSetPWR(config.rf_pwr_gpio, config.rf_pwr_active);
     afskSetDCOffset(config.adc_dc_offset);
-    afskSetADCAtten(config.adc_atten);    
+    afskSetADCAtten(config.adc_atten);
     APRS_init();
     APRS_setCallsign(config.aprs_mycall, config.aprs_ssid);
     // APRS_setPath1("WIDE1-1", 1);
@@ -3801,7 +3806,7 @@ void taskAPRS(void *pvParameters)
     APRS_setTail(0);
     sendTimer = millis() - (config.igate_interval * 1000) + 30000;
     igateTLM.TeleTimeout = millis() + 60000; // 1Min
-    
+
     timeSlot = millis();
     timeAprs = 0;
     afskSetHPF(config.audio_hpf);
@@ -3826,9 +3831,9 @@ void taskAPRS(void *pvParameters)
             tx_interval = config.trk_interval;
             tx_counter = tx_interval - 10;
         }
-        timerAPRS=micros()-timerAPRS_old;
+        timerAPRS = micros() - timerAPRS_old;
         vTaskDelay(10 / portTICK_PERIOD_MS);
-        timerAPRS_old=micros();
+        timerAPRS_old = micros();
 
         // if (config.rf_en)
         { // RF Module enable
@@ -3866,8 +3871,8 @@ void taskAPRS(void *pvParameters)
                 tickInterval = millis() + 1000;
 
                 tx_counter++;
-                //log_d("TRACKER tx_counter=%d\t INTERVAL=%d\n", tx_counter, tx_interval);
-                //  Check interval timeout
+                // log_d("TRACKER tx_counter=%d\t INTERVAL=%d\n", tx_counter, tx_interval);
+                //   Check interval timeout
                 if (config.trk_smartbeacon && config.trk_gps)
                 {
                     if (tx_counter > tx_interval)
@@ -3890,14 +3895,14 @@ void taskAPRS(void *pvParameters)
                 }
 
                 // if (config.trk_gps && gps.speed.isValid() && gps.location.isValid() && gps.course.isValid() && (gps.hdop.hdop() < 10.0) && (gps.satellites.value() > 3))
-                //if (config.trk_gps && gps.speed.isValid() && gps.location.isValid() && gps.course.isValid())
+                // if (config.trk_gps && gps.speed.isValid() && gps.location.isValid() && gps.course.isValid())
                 if (config.trk_gps)
                 {
                     SB_SPEED_OLD = SB_SPEED;
-                    //if (gps.speed.isUpdated())
-                        SB_SPEED = (unsigned char)gps.speed.kmph();
-                    //if (gps.course.isUpdated())
-                    if(gps.speed.kmph()>config.trk_lspeed)
+                    // if (gps.speed.isUpdated())
+                    SB_SPEED = (unsigned char)gps.speed.kmph();
+                    // if (gps.course.isUpdated())
+                    if (gps.speed.kmph() > config.trk_lspeed)
                         SB_HEADING = (int16_t)gps.course.deg();
                     if (config.trk_smartbeacon) // SMART BEACON CAL
                     {
@@ -4397,7 +4402,7 @@ long wifiTTL = 0;
 
 // WiFi connect timeout per AP. Increase when connecting takes longer.
 const uint32_t connectTimeoutMs = 10000;
-uint8_t APStationNum=0;
+uint8_t APStationNum = 0;
 
 void taskNetwork(void *pvParameters)
 {
@@ -4462,7 +4467,8 @@ void taskNetwork(void *pvParameters)
     pingTimeout = millis() + 10000;
     unsigned long timeNetworkOld = millis();
     timeNetwork = 0;
-    if (config.wifi_mode & WIFI_AP_STA_FIX) webService();
+    if (config.wifi_mode & WIFI_AP_STA_FIX)
+        webService();
     for (;;)
     {
         unsigned long now = millis();
@@ -4470,17 +4476,20 @@ void taskNetwork(void *pvParameters)
         timeNetworkOld = now;
         // wdtNetworkTimer = millis();
         serviceHandle();
-        timerNetwork=micros()-timerNetwork_old;
+        timerNetwork = micros() - timerNetwork_old;
         vTaskDelay(9 / portTICK_PERIOD_MS);
-        timerNetwork_old=micros();
+        timerNetwork_old = micros();
 
-        if (config.gnss_enable) taskGPSActive();
+        if (config.gnss_enable)
+            taskGPSActive();
 
-
-        if (config.wifi_mode & WIFI_AP_FIX){
+        if (config.wifi_mode & WIFI_AP_FIX)
+        {
             APStationNum = WiFi.softAPgetStationNum();
-            if(APStationNum>0){                
-                if(WiFi.isConnected() == false){
+            if (APStationNum > 0)
+            {
+                if (WiFi.isConnected() == false)
+                {
                     vTaskDelay(9 / portTICK_PERIOD_MS);
                     continue;
                 }
@@ -4488,7 +4497,7 @@ void taskNetwork(void *pvParameters)
         }
 
         if (wifiMulti.run(connectTimeoutMs) == WL_CONNECTED)
-        {            
+        {
             if (millis() > NTP_Timeout)
             {
                 NTP_Timeout = millis() + 86400000;
@@ -4547,7 +4556,7 @@ void taskNetwork(void *pvParameters)
                             status.rxCount++;
                             igateTLM.RX++;
 
-                            log_d("INET: %s\n", line.c_str());                            
+                            log_d("INET: %s\n", line.c_str());
                             memset(&raw[0], 0, sizeof(raw));
                             start_val = line.indexOf(":", 10); // Search of info in ax25
                             if (start_val > 5)

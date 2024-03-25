@@ -409,7 +409,7 @@ void afsk_putchar(char c)
   while (fifo_isfull_locked(&AFSK_modem->txFifo))
   {
     /* Wait */
-    // delay(10);
+    delay(10);
   }
   fifo_push_locked(&AFSK_modem->txFifo, c);
 }

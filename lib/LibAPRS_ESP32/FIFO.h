@@ -5,15 +5,19 @@
 #include <Arduino.h>
 #include <stddef.h>
 
-#define xt_rsil(level) (__extension__({uint32_t state; __asm__ __volatile__("rsil %0," __STRINGIFY(level) : "=a" (state)); state;}))
-#define xt_wsr_ps(state)  __asm__ __volatile__("wsr %0,ps; isync" :: "a" (state) : "memory")
 
-#define RB_ATOMIC_START do { uint32_t _savedIS = xt_rsil(1) ;
-#define RB_ATOMIC_END xt_wsr_ps(_savedIS) ;} while(0);
+// #define xt_rsil(level) (__extension__({uint32_t state; __asm__ __volatile__("rsil %0," __STRINGIFY(level) : "=a" (state)); state;}))
+// #define xt_wsr_ps(state)  __asm__ __volatile__("wsr %0,ps; isync" :: "a" (state) : "memory")
 
+// #define RB_ATOMIC_START do { uint32_t _savedIS = xt_rsil(1) ;
+// #define RB_ATOMIC_END xt_wsr_ps(_savedIS) ;} while(0);
+
+#define RB_ATOMIC_START while(f->lock){ delay(1);} f->lock=true;
+#define RB_ATOMIC_END f->lock=false;
 
 typedef struct FIFOBuffer
 {
+  bool lock;
   unsigned char *begin;
   unsigned char *end;
   unsigned char * volatile head;
@@ -49,19 +53,18 @@ inline unsigned char fifo_pop(FIFOBuffer *f) {
 
 inline void fifo_flush(FIFOBuffer *f) {
   f->head = f->tail;
+  f->lock=false;
 }
 
-inline bool fifo_isempty_locked(const FIFOBuffer *f) {
+inline bool fifo_isempty_locked(FIFOBuffer *f) {
   bool result;
   RB_ATOMIC_START
-  {
     result = fifo_isempty(f);
-  }
   RB_ATOMIC_END
   return result;
 }
 
-inline bool fifo_isfull_locked(const FIFOBuffer *f) {
+inline bool fifo_isfull_locked(FIFOBuffer *f) {
   bool result;
   RB_ATOMIC_START
   {
@@ -92,6 +95,7 @@ inline unsigned char fifo_pop_locked(FIFOBuffer *f) {
 inline void fifo_init(FIFOBuffer *f, unsigned char *buffer, size_t size) {
   f->head = f->tail = f->begin = buffer;
   f->end = buffer + size -1;
+  f->lock=false;
 }
 
 inline size_t fifo_len(FIFOBuffer *f) {
