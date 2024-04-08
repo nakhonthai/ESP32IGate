@@ -24,7 +24,7 @@ bool getCSV2Wx(String stream)
     // stream = Serial.readString();
     //  Serial.println(stream);
     // delay(100);
-    st = stream.indexOf("DATA:");
+    st = stream.indexOf("MQTT:");
     // Serial.printf("Find ModBus > %d",st);
     // Serial.println(stream);
     if (st >= 0)

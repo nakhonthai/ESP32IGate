@@ -166,16 +166,16 @@ int igateProcess(AX25Msg &Packet)
 
     // Add Information
     header += String(F(":"));
-    uint8_t *Raw = (uint8_t *)calloc(350,sizeof(uint8_t));
+    uint8_t *Raw = (uint8_t *)calloc(500,sizeof(uint8_t));
     if (Raw)
     {
-        memset(Raw, 0, 350); // Clear frame packet
+        memset(Raw, 0, 500); // Clear frame packet
         size_t hSize = strlen(header.c_str());
         memcpy(&Raw[0], header.c_str(), hSize);           // Copy header to frame packet
         memcpy(&Raw[hSize], &Packet.info[0], Packet.len); // Copy info to frame packet
         uint8_t *ptr = &Raw[0];
         int i, rmv = 0;
-        size_t fsize=hSize + Packet.len;
+        size_t fsize=hSize + Packet.len;        
         // Remove CR,LF in frame packet
         for (i = 0; i < fsize; i++)
         {
@@ -193,8 +193,7 @@ int igateProcess(AX25Msg &Packet)
                 break;
             }
         }
-        if(i>350 || i>fsize) i=strlen((char*)Raw);
-        Raw[i] = 0;
+        if(i>500 || i>fsize) i=strlen((char*)Raw);
         log_d("RF2INET: %s", Raw);
         if(aprsClient.connected()){
             aprsClient.write(&Raw[0], i); // Send binary frame packet to APRS-IS (aprsc)
@@ -202,6 +201,7 @@ int igateProcess(AX25Msg &Packet)
         }
         status.txCount++;
         free(Raw);
+        log_d("Send TCP Finish!");
     }
     return 1;
 }

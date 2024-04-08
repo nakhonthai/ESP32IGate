@@ -50,9 +50,9 @@ int digiProcess(AX25Msg &Packet)
             {
                 for (idx = 0; idx < Packet.rpt_count; idx++)
                 {
-                    if (!strcmp(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0])) // Is path same callsign
+                    if (!strcmp(&Packet.rpt_list[idx].call[0], &config.digi_mycall[0])) // Is path same callsign
                     {
-                        if (Packet.rpt_list[idx].ssid == config.aprs_ssid) // IS path same SSID
+                        if (Packet.rpt_list[idx].ssid == config.digi_ssid) // IS path same SSID
                         {
                             if (Packet.rpt_flags & (1 << idx))
                             {
@@ -84,8 +84,8 @@ int digiProcess(AX25Msg &Packet)
 
                     // Add new part
                     Packet.rpt_count += 1;
-                    strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-                    Packet.rpt_list[idx].ssid = config.aprs_ssid;
+                    strcpy(&Packet.rpt_list[idx].call[0], &config.digi_mycall[0]);
+                    Packet.rpt_list[idx].ssid = config.digi_ssid;
                     Packet.rpt_flags |= (1 << idx);
                     return 2;
                     // j = 1;
@@ -95,8 +95,8 @@ int digiProcess(AX25Msg &Packet)
             else
             {
                 idx = 0;
-                strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-                Packet.rpt_list[idx].ssid = config.aprs_ssid;
+                strcpy(&Packet.rpt_list[idx].call[0], &config.digi_mycall[0]);
+                Packet.rpt_list[idx].ssid = config.digi_ssid;
                 Packet.rpt_flags |= (1 << idx);
                 Packet.rpt_count += 1;
                 return 2;
@@ -149,8 +149,8 @@ int digiProcess(AX25Msg &Packet)
                     ctmp = 0;
                 if (ctmp == 0)
                 {
-                    strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-                    Packet.rpt_list[idx].ssid = config.aprs_ssid;
+                    strcpy(&Packet.rpt_list[idx].call[0], &config.digi_mycall[0]);
+                    Packet.rpt_list[idx].ssid = config.digi_ssid;
                     Packet.rpt_flags |= (1 << idx);
                     j = 2;
                     break;
@@ -166,8 +166,8 @@ int digiProcess(AX25Msg &Packet)
             else
             {
                 j = 2;
-                strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-                Packet.rpt_list[idx].ssid = config.aprs_ssid;
+                strcpy(&Packet.rpt_list[idx].call[0], &config.digi_mycall[0]);
+                Packet.rpt_list[idx].ssid = config.digi_ssid;
                 Packet.rpt_flags |= (1 << idx);
                 break;
             }
@@ -183,8 +183,8 @@ int digiProcess(AX25Msg &Packet)
                 ctmp = 0;
             if (ctmp == 0)
             {
-                strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-                Packet.rpt_list[idx].ssid = config.aprs_ssid;
+                strcpy(&Packet.rpt_list[idx].call[0], &config.digi_mycall[0]);
+                Packet.rpt_list[idx].ssid = config.digi_ssid;
                 Packet.rpt_flags |= (1 << idx);
                 j = 2;
                 break;
@@ -212,8 +212,8 @@ int digiProcess(AX25Msg &Packet)
 
                 // Add new part
                 Packet.rpt_count += 1;
-                strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-                Packet.rpt_list[idx].ssid = config.aprs_ssid;
+                strcpy(&Packet.rpt_list[idx].call[0], &config.digi_mycall[0]);
+                Packet.rpt_list[idx].ssid = config.digi_ssid;
                 Packet.rpt_flags |= (1 << idx);
                 j = 2;
                 break;
@@ -222,39 +222,39 @@ int digiProcess(AX25Msg &Packet)
         else if (!strncmp(&Packet.rpt_list[idx].call[0], "RFONLY", 6))
         {
             j = 2;
-            // strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-            // Packet.rpt_list[idx].ssid = config.aprs_ssid;
+            // strcpy(&Packet.rpt_list[idx].call[0], &config.digi_mycall[0]);
+            // Packet.rpt_list[idx].ssid = config.digi_ssid;
             Packet.rpt_flags |= (1 << idx);
             break;
         }
         else if (!strncmp(&Packet.rpt_list[idx].call[0], "RELAY", 5))
         {
             j = 2;
-            strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-            Packet.rpt_list[idx].ssid = config.aprs_ssid;
+            strcpy(&Packet.rpt_list[idx].call[0], &config.digi_mycall[0]);
+            Packet.rpt_list[idx].ssid = config.digi_ssid;
             Packet.rpt_flags |= (1 << idx);
             break;
         }
         else if (!strncmp(&Packet.rpt_list[idx].call[0], "GATE", 4))
         {
             j = 2;
-            strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-            Packet.rpt_list[idx].ssid = config.aprs_ssid;
+            strcpy(&Packet.rpt_list[idx].call[0], &config.digi_mycall[0]);
+            Packet.rpt_list[idx].ssid = config.digi_ssid;
             Packet.rpt_flags |= (1 << idx);
             break;
         }
         else if (!strncmp(&Packet.rpt_list[idx].call[0], "ECHO", 4))
         {
             j = 2;
-            strcpy(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0]);
-            Packet.rpt_list[idx].ssid = config.aprs_ssid;
+            strcpy(&Packet.rpt_list[idx].call[0], &config.digi_mycall[0]);
+            Packet.rpt_list[idx].ssid = config.digi_ssid;
             Packet.rpt_flags |= (1 << idx);
             break;
         }
-        else if (!strcmp(&Packet.rpt_list[idx].call[0], &config.aprs_mycall[0])) // Is path same callsign
+        else if (!strcmp(&Packet.rpt_list[idx].call[0], &config.digi_mycall[0])) // Is path same callsign
         {
             ctmp = Packet.rpt_list[idx].ssid & 0x1F;
-            if (ctmp == config.aprs_ssid) // IS path same SSID
+            if (ctmp == config.digi_ssid) // IS path same SSID
             {
                 if (Packet.rpt_flags & (1 << idx))
                 {

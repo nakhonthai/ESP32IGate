@@ -371,7 +371,7 @@ void handle_sidebar(AsyncWebServerRequest *request)
 		html += "<th style=\"background:#0b0; color:#030; width:50%;border-radius: 10px;border: 2px solid white;\">WX</th>\n";
 	else
 		html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\">WX</th>\n";
-	//html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\">SAT</th>\n";
+	// html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\">SAT</th>\n";
 	if (config.trk_en)
 		html += "<th style=\"background:#0b0; color:#030; width:50%;border-radius: 10px;border: 2px solid white;\">TRACKER</th>\n";
 	else
@@ -428,7 +428,7 @@ void handle_sidebar(AsyncWebServerRequest *request)
 	html += "<td style=\"background: #ffffff;\">" + String(status.dropCount) + "/" + String(status.errorCount) + "</td>\n";
 	html += "</tr>\n";
 	html += "</table>\n";
-	if(config.gnss_enable==true)
+	if (config.gnss_enable == true)
 	{
 		html += "<br />\n";
 		html += "<table>\n";
@@ -625,11 +625,10 @@ void handle_lastHeard(AsyncWebServerRequest *request)
 				aprs.srccall_end = &aprs.data[start_dst];
 
 				// Serial.println(aprs.info_start);
-				// aprsParse.parse_aprs(&aprs);
 				if (aprsParse.parse_aprs(&aprs))
 				{
 					pkg.calsign[10] = 0;
-					//time_t tm = pkg.time;
+					// time_t tm = pkg.time;
 					localtime_r(&pkg.time, &tmstruct);
 					char strTime[10];
 					sprintf(strTime, "%02d:%02d:%02d", tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
@@ -689,10 +688,14 @@ void handle_lastHeard(AsyncWebServerRequest *request)
 						}
 						else
 						{
-							if (LPath.indexOf("*") > 0)
+							if (path.indexOf("*") > 0)
+							{
 								html += "<td style=\"text-align: left;\">DIGI: " + path + "</td>";
+							}
 							else
+							{
 								html += "<td style=\"text-align: left;\">RF: " + path + "</td>";
+							}
 						}
 					}
 					// html += "<td>" + path + "</td>";
@@ -764,6 +767,8 @@ void event_lastHeard()
 	String line = "";
 	sort(pkgList, PKGLISTSIZE);
 
+	//log_d("Create html last heard");
+
 	html = "<table>\n";
 	html += "<th colspan=\"7\" style=\"background-color: #070ac2;\">LAST HEARD <a href=\"/tnc2\" target=\"_tnc2\" style=\"color: yellow;font-size:8pt\">[RAW]</a></th>\n";
 	html += "<tr>\n";
@@ -793,6 +798,7 @@ void event_lastHeard()
 		if (pkg.time > 0)
 		{
 			line = String(pkg.raw);
+			//log_d("IDX=%d RAW:%s",i,line.c_str());
 			int packet = pkg.pkg;
 			int start_val = line.indexOf(">", 0); // หาตำแหน่งแรกของ >
 			if (start_val > 3)
@@ -803,20 +809,24 @@ void event_lastHeard()
 				aprs.packet_len = line.length();
 				line.toCharArray(&aprs.data[0], aprs.packet_len);
 				int start_info = line.indexOf(":", 0);
-				int end_ssid = line.indexOf(",", 0);
-				int start_dst = line.indexOf(">", 2);
-				int start_dstssid = line.indexOf("-", start_dst);
+				if(start_info<10) continue;
+				int start_dst = line.lastIndexOf(">", start_info);
+				if(start_dst<5) continue;
+				int end_ssid = line.indexOf(",", 10);
+				if(end_ssid>start_info || end_ssid<10) end_ssid=start_info;
+				
+				int start_dstssid = line.lastIndexOf("-",end_ssid);
+				if(start_dstssid<start_dst) start_dstssid=-1;
 				String path = "";
 
 				if ((end_ssid > start_dst) && (end_ssid < start_info))
 				{
 					path = line.substring(end_ssid + 1, start_info);
 				}
-				if (end_ssid < 5)
-					end_ssid = start_info;
-				if ((start_dstssid > start_dst) && (start_dstssid < start_dst + 10))
+
+				if (start_dstssid > start_dst)
 				{
-					aprs.dstcall_end_or_ssid = &aprs.data[start_dstssid];
+					aprs.dstcall_end_or_ssid = &aprs.data[start_dstssid+1];
 				}
 				else
 				{
@@ -829,11 +839,10 @@ void event_lastHeard()
 				aprs.srccall_end = &aprs.data[start_dst];
 
 				// Serial.println(aprs.info_start);
-				// aprsParse.parse_aprs(&aprs);
 				if (aprsParse.parse_aprs(&aprs))
 				{
 					pkg.calsign[10] = 0;
-					//time_t tm = pkg.time;
+					// time_t tm = pkg.time;
 					localtime_r(&pkg.time, &tmstruct);
 					char strTime[10];
 					sprintf(strTime, "%02d:%02d:%02d", tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
@@ -865,6 +874,7 @@ void event_lastHeard()
 							}
 							html += "<td><img src=\"http://aprs.dprns.com/symbols/icons/" + fileImg + "\"></td>";
 						}
+						fileImg.clear();
 					}
 					else
 					{
@@ -874,7 +884,7 @@ void event_lastHeard()
 					if (aprs.srcname_len > 0 && aprs.srcname_len < 10) // Get Item/Object
 					{
 						char itemname[10];
-						memset(&itemname, 0, sizeof(itemname));
+						memset(&itemname, 0, 10);
 						memcpy(&itemname, aprs.srcname, aprs.srcname_len);
 						html += "(" + String(itemname) + ")";
 					}
@@ -893,7 +903,7 @@ void event_lastHeard()
 						}
 						else
 						{
-							if (LPath.indexOf("*") > 0)
+							if (path.indexOf("*") > 0)
 								html += "<td style=\"text-align: left;\">DIGI: " + path + "</td>";
 							else
 								html += "<td style=\"text-align: left;\">RF: " + path + "</td>";
@@ -953,13 +963,17 @@ void event_lastHeard()
 		}
 	}
 	html += "</table>\n";
-	char  *info=(char*)calloc(html.length(),sizeof(char));
-	if(info){
-		html.toCharArray(info,html.length(),0);
+	char *info = (char *)calloc(html.length(), sizeof(char));
+	if (info)
+	{
+		//log_d("Send Event lastHeard");
+		html.toCharArray(info, html.length(), 0);
 		html.clear();
-		lastheard_events.send(info, "lastHeard", millis(),5000);
+		lastheard_events.send(info, "lastHeard", millis(), 5000);
 		free(info);
-	}else{
+	}
+	else
+	{
 		log_d("Memory is low!!");
 	}
 }
@@ -6333,7 +6347,7 @@ void handle_realtime(AsyncWebServerRequest *request)
 	if (afskSync && (lastPkgRaw.length() > 5))
 	{
 		int input_length = lastPkgRaw.length();
-		jsonMsg = (char *)malloc((input_length * 2) + 70);
+		jsonMsg = (char *)malloc((input_length * 2) + 200);
 		char *input_buffer = (char *)malloc(input_length + 2);
 		char *output_buffer = (char *)malloc(input_length * 2);
 		if (output_buffer)
@@ -6371,38 +6385,48 @@ void handle_ws()
 	time_t timeStamp;
 	time(&timeStamp);
 
+	if(ws.count()<1) return;
+
 	if (afskSync && (lastPkgRaw.length() > 5))
 	{
 		int input_length = lastPkgRaw.length();
-		jsonMsg = (char *)malloc((input_length * 2) + 70);
-		char *input_buffer = (char *)malloc(input_length + 2);
-		char *output_buffer = (char *)malloc(input_length * 2);
-		if (output_buffer)
+		jsonMsg = (char *)calloc((input_length * 2) + 200, sizeof(char));
+		if (jsonMsg)
 		{
-			memset(input_buffer, 0, (input_length + 2));
-			memset(output_buffer, 0, (input_length * 2));
-			// lastPkgRaw.toCharArray(input_buffer, input_length, 0);
-			memcpy(input_buffer, lastPkgRaw.c_str(), lastPkgRaw.length());
-			lastPkgRaw.clear();
-			encode_base64((unsigned char *)input_buffer, input_length, (unsigned char *)output_buffer);
-			// Serial.println(output_buffer);
-			sprintf(jsonMsg, "{\"Active\":\"1\",\"mVrms\":\"%d\",\"RAW\":\"%s\",\"timeStamp\":\"%li\"}", mVrms, output_buffer, timeStamp);
-			// Serial.println(jsonMsg);
-			free(input_buffer);
-			free(output_buffer);
+			char *input_buffer = (char *)calloc(input_length + 2, sizeof(char));
+			char *output_buffer = (char *)calloc(input_length * 2, sizeof(char));
+			if (output_buffer)
+			{
+				memset(input_buffer, 0, (input_length + 2));
+				memset(output_buffer, 0, (input_length * 2));
+				// lastPkgRaw.toCharArray(input_buffer, input_length, 0);
+				memcpy(input_buffer, lastPkgRaw.c_str(), lastPkgRaw.length());
+				lastPkgRaw.clear();
+				encode_base64((unsigned char *)input_buffer, input_length, (unsigned char *)output_buffer);
+				// Serial.println(output_buffer);
+				sprintf(jsonMsg, "{\"Active\":\"1\",\"mVrms\":\"%d\",\"RAW\":\"%s\",\"timeStamp\":\"%li\"}", mVrms, output_buffer, timeStamp);
+				// Serial.println(jsonMsg);
+				free(input_buffer);
+				free(output_buffer);
+			}
+			ws.textAll(jsonMsg);
+			free(jsonMsg);
 		}
 	}
 	else
 	{
-		jsonMsg = (char *)malloc(100);
-		if (afskSync)
-			sprintf(jsonMsg, "{\"Active\":\"1\",\"mVrms\":\"%d\",\"RAW\":\"REVDT0RFIEZBSUwh\",\"timeStamp\":\"%li\"}", mVrms, timeStamp);
-		else
-			sprintf(jsonMsg, "{\"Active\":\"0\",\"mVrms\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%li\"}", timeStamp);
+		jsonMsg = (char *)calloc(300, sizeof(char));
+		if (jsonMsg )
+		{
+			if (afskSync)
+				sprintf(jsonMsg, "{\"Active\":\"1\",\"mVrms\":\"%d\",\"RAW\":\"REVDT0RFIEZBSUwh\",\"timeStamp\":\"%li\"}", mVrms, timeStamp);
+			else
+				sprintf(jsonMsg, "{\"Active\":\"0\",\"mVrms\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%li\"}", timeStamp);
+			ws.textAll(jsonMsg);
+			free(jsonMsg);
+		}
 	}
 	afskSync = false;
-	ws.textAll(jsonMsg);
-	free(jsonMsg);
 }
 
 void handle_ws_gnss(char *nmea, size_t size)
@@ -6529,7 +6553,7 @@ void handle_about(AsyncWebServerRequest *request)
 	// webString += "<tr><th width=\"200\"><span><b>Name</b></span></th><th><span><b>Information</b></span></th></tr>";
 	webString += "<tr><td align=\"right\"><b>Hardware Version: </b></td><td align=\"left\"> ESP32DR Simple,ESP32DR_SA868,DIY </td></tr>";
 	webString += "<tr><td align=\"right\"><b>Firmware Version: </b></td><td align=\"left\"> V" + String(VERSION) + String(VERSION_BUILD) + "</td></tr>\n";
-	webString += "<tr><td align=\"right\"><b>RF Analog Module: </b></td><td align=\"left\"> MODEL: " + String(RF_TYPE[config.rf_type]) +" ("+ RF_VERSION+")</td></tr>\n";
+	webString += "<tr><td align=\"right\"><b>RF Analog Module: </b></td><td align=\"left\"> MODEL: " + String(RF_TYPE[config.rf_type]) + " (" + RF_VERSION + ")</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>ESP32 Model: </b></td><td align=\"left\"> " + String(ESP.getChipModel()) + "</td></tr>";
 	webString += "<tr><td align=\"right\"><b>Chip ID: </b></td><td align=\"left\"> " + String(strCID) + "</td></tr>";
 	webString += "<tr><td align=\"right\"><b>Revision: </b></td><td align=\"left\"> " + String(ESP.getChipRevision()) + "</td></tr>";
@@ -6899,7 +6923,8 @@ void webService()
 			}
 		});
 
-	lastheard_events.onConnect([](AsyncEventSourceClient *client){
+	lastheard_events.onConnect([](AsyncEventSourceClient *client)
+							   {
     if(client->lastId()){
       log_d("Web Client reconnected! Last message ID that it got is: %u\n", client->lastId());
     }

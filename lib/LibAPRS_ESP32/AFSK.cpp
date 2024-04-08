@@ -593,7 +593,6 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
     hdlc->bitIndex = 0;
     return ret;
   }
-  sync_flage = false;
 
   // Check if we have received a RESET flag (01111111)
   // In this comparison we also detect when no transmission
@@ -619,6 +618,7 @@ static bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo)
   if (!hdlc->receiving)
     return ret;
 
+  sync_flage = false;
   //hdlc_flage_end = true;
 
   // First check if what we are seeing is a stuffed bit.
@@ -822,7 +822,7 @@ void AFSK_adc_isr(Afsk *afsk, int16_t currentSample)
     //// Alternative using 16 bits ////////////////
     uint16_t bits = afsk->sampledBits;//& 0xff;
     uint16_t c = CountOnesFromInteger(bits);
-    if (c >= 8)
+    if (c > 7)
       afsk->actualBits |= 1;
     /////////////////////////////////////////////////
 
@@ -1176,16 +1176,17 @@ void AFSK_Poll(bool SA818, bool RFPower)
             mVrms = sqrtl(mVsum / mVsumCount);
             mVsum = 0;
             mVsumCount = 0;
-            lastVrms = millis() + 200;
+            lastVrms = millis() + 300;
             VrmsFlag = true;
             // Tool conversion dBv <--> Vrms at http://sengpielaudio.com/calculator-db-volt.htm
             // dBV = 20.0F * log10(Vrms);
-            log_d("Audio dc_offset=%d mVrms=%d", offset, mVrms);
+            
           }
           if (millis() > lastVrms && VrmsFlag)
           {
             afskSync = true;
             VrmsFlag = false;
+            log_d("Audio dc_offset=%d mVrms=%d", offset, mVrms);
           }
         }
       }

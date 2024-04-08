@@ -123,10 +123,10 @@ int mVrms = 0;
 
 long timeNetwork, timeAprs, timeGui;
 
-cppQueue PacketBuffer(sizeof(AX25Msg), 3, IMPLEMENTATION); // Instantiate queue
+cppQueue PacketBuffer(sizeof(AX25Msg), 5, IMPLEMENTATION); // Instantiate queue
 #ifdef OLED
 cppQueue dispBuffer(300, 5, IMPLEMENTATION);
-cppQueue queTxDisp(sizeof(txDisp), 10, IMPLEMENTATION); // Instantiate queue
+cppQueue queTxDisp(sizeof(txDisp), 5, IMPLEMENTATION); // Instantiate queue
 
 void pushTxDisp(uint8_t ch, const char *name, char *info)
 {
@@ -670,7 +670,8 @@ void defaultConfig()
     config.igate_loc2rf = false;
     config.igate_loc2inet = true;
     config.rf2inetFilter = 0xFFF; // All
-    config.inet2rfFilter = config.digiFilter = FILTER_OBJECT | FILTER_ITEM | FILTER_MESSAGE | FILTER_MICE | FILTER_POSITION | FILTER_WX;
+    config.digiFilter = FILTER_OBJECT | FILTER_ITEM | FILTER_MESSAGE | FILTER_MICE | FILTER_POSITION | FILTER_WX;
+    config.inet2rfFilter = FILTER_MESSAGE;
     //--APRS-IS
     config.aprs_ssid = 1;
     config.aprs_port = 14580;
@@ -1262,9 +1263,9 @@ pkgListType getPkgList(int idx)
     return ret;
 }
 
-int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
+int pkgListUpdate(char *call, char *raw,size_t len, uint16_t type, bool channel)
 {
-    size_t len;
+    //size_t len;
     if (*call == 0)
         return -1;
     if (*raw == 0)
@@ -1299,7 +1300,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
                 pkgList[i].audio_level = (int16_t)mVrms;
             else
                 pkgList[i].audio_level = 0;
-            len = strlen(raw);
+            //len = strlen(raw);
             if (len > 300)
                 len = 300;
             memset(pkgList[i].raw,0,300);
@@ -1327,7 +1328,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
         // strcpy(pkgList[i].calsign, callsign);
         memset(pkgList[i].calsign,0,11);
         memcpy(pkgList[i].calsign, callsign, strlen(callsign));
-        len = strlen(raw);
+        //len = strlen(raw);
         if (len > 300)
             len = 300;
         memset(pkgList[i].raw,0,300);
@@ -1482,6 +1483,7 @@ bool pkgTxSend()
 
 uint8_t *packetData;
 // ฟังชั่นถูกเรียกมาจาก ax25_decode
+//uint8_t swap=0;
 void aprs_msg_callback(struct AX25Msg *msg)
 {
     AX25Msg pkg;
@@ -1489,9 +1491,21 @@ void aprs_msg_callback(struct AX25Msg *msg)
     memcpy(&pkg, msg, sizeof(AX25Msg));
     int timeout=0;
     while(PacketBuffer.isFull()){
-        delay(3);
-        if(++timeout>1000) return;
+        delay(100);
+        if(++timeout>10) return;
     }
+    // if(++swap%3 == 0){
+    // sprintf((char *)pkg.info,"`l-hl }>/`\"3q}144.937MHz Pirate Pilot on board!!!_%%");
+    // pkg.len=52;
+    // sprintf(pkg.src.call,"E25KFR");
+    // pkg.src.ssid=9;
+    // sprintf(pkg.dst.call,"QS4WU3");
+    // pkg.dst.ssid=0;
+    // pkg.rpt_count=1;
+    // sprintf(pkg.rpt_list[0].call,"WIDE1");
+    // pkg.rpt_list[0].ssid=1;
+    // }
+
     PacketBuffer.push(&pkg); // ใส่แพ็จเก็จจาก TNC ลงคิวบัพเฟอร์
     status.rxCount++;
 }
@@ -1911,7 +1925,7 @@ void postTransmission()
 }
 
 // 3 seconds WDT
-#define WDT_TIMEOUT 3
+#define WDT_TIMEOUT 10
 
 bool AFSKInitAct = false;
 void setup()
@@ -1940,7 +1954,7 @@ void setup()
 
     // Set up serial port
 #ifdef CORE_DEBUG_LEVEL
-    Serial.begin(921600); // debug
+    Serial.begin(115200); // debug
 #else
     Serial.begin(9600); // monitor
 #endif
@@ -3667,7 +3681,7 @@ void taskSerial(void *pvParameters)
                 // while (SerialWX->available())
                 //{
                 // String wx = SerialWX->readString();
-                if (wx != "" && wx.indexOf("DATA:") >= 0)
+                if (wx != "" && wx.indexOf("MQTT:") >= 0)
                 {
                     log_d("WX Raw >> %d", wx.c_str());
                     getCSV2Wx(wx);
@@ -3731,7 +3745,7 @@ void taskSerial(void *pvParameters)
                     strcpy(call, src_call.c_str());
                     strcpy(rawP, raw.c_str());
                     uint16_t type = pkgType((const char *)rawP);
-                    pkgListUpdate(call, rawP, type, 1);
+                    pkgListUpdate(call, rawP,raw.length(), type, 1);
                     if (config.rf2inet && aprsClient.connected())
                     {
                         // RF->INET
@@ -3803,7 +3817,7 @@ void taskSerial(void *pvParameters)
                                 // }
                                 // log_d("HEX: %s",hstr.c_str());
                                 uint16_t type = pkgType((const char *)rawP);
-                                pkgListUpdate(call, rawP, type, 1);
+                                pkgListUpdate(call, rawP,raw.length(), type, 1);
                                 if (config.rf2inet && aprsClient.connected())
                                 {
                                     // RF->INET
@@ -4042,8 +4056,8 @@ void taskAPRS(void *pvParameters)
             String tnc2;
             // นำข้อมูลแพ็จเกจจาก TNC ออกจากคิว
             PacketBuffer.pop(&incomingPacket);
-            // igateProcess(incomingPacket);
-            packet2Raw(tnc2, incomingPacket);
+            packet2Raw(tnc2, incomingPacket);           
+            //log_d("incommingPacket: %s",tnc2.c_str()); 
             newIGatePkg = true;
             newDigiPkg = true;
             if (config.ext_tnc_enable)
@@ -4121,7 +4135,7 @@ void taskAPRS(void *pvParameters)
 
             char *rawP = (char *)calloc(tnc2.length(),sizeof(char));
             memcpy(rawP, tnc2.c_str(), tnc2.length());
-            int idx = pkgListUpdate(call, rawP, type, 0);
+            int idx = pkgListUpdate(call, rawP,tnc2.length(), type, 0);
             free(rawP);
 #ifdef OLED
             if (idx > -1)
@@ -4204,8 +4218,9 @@ void taskAPRS(void *pvParameters)
                     int ret = 0;
                     uint16_t type = pkgType((const char *)&incomingPacket.info[0]);
                     // IGate Filter RF->INET
-                    if ((type & config.rf2inetFilter))
-                        ret = igateProcess(incomingPacket);
+                    if ((type & config.rf2inetFilter)){
+                        ret = igateProcess(incomingPacket);                        
+                    }
                     if (ret == 0)
                     {
                         status.dropCount++;
@@ -4446,13 +4461,12 @@ int mqttRetry = 0;
 long wifiTTL = 0;
 
 // WiFi connect timeout per AP. Increase when connecting takes longer.
-const uint32_t connectTimeoutMs = 10000;
+const uint32_t connectTimeoutMs = 30000;
 uint8_t APStationNum = 0;
 
 void taskNetwork(void *pvParameters)
 {
-    int c = 0;
-    char raw[500];
+    char raw[300];
     log_d("Task Network has been start");
 
     // WiFi.onEvent(Wifi_connected,SYSTEM_EVENT_STA_CONNECTED);
@@ -4600,8 +4614,7 @@ void taskNetwork(void *pvParameters)
                             status.allCount++;
                             status.rxCount++;
                             igateTLM.RX++;
-
-                            log_d("INET: %s\n", line.c_str());
+                            
                             memset(&raw[0], 0, sizeof(raw));
                             start_val = line.indexOf(":", 10); // Search of info in ax25
                             if (start_val > 5)
@@ -4618,8 +4631,9 @@ void taskNetwork(void *pvParameters)
                                 if (start_dstssid > 0)
                                     ssid = line.charAt(start_dstssid + 1);
 
-                                if (ssid > 47 && ssid < 58)
+                                if ((ssid > 47 && ssid < 58) && (type & config.inet2rfFilter))
                                 {
+                                    log_d("INET: %s\n", line.c_str());
                                     size_t len = src_call.length();
                                     char call[15];
                                     memset(call, 0, sizeof(call));
@@ -4630,7 +4644,7 @@ void taskNetwork(void *pvParameters)
                                     memset(raw, 0, sizeof(raw));
                                     memcpy(raw, line.c_str(), line.length());
                                     raw[sizeof(raw) - 1] = 0;
-                                    int idx = pkgListUpdate(call, raw, type, 1);
+                                    int idx = pkgListUpdate(call, raw,line.length(), type, 1);
 #ifdef OLED
                                     if (idx > -1)
                                     {
@@ -4709,8 +4723,6 @@ void taskNetwork(void *pvParameters)
                     }
                 }
             }
-        }else{
-            vTaskDelay(100 / portTICK_PERIOD_MS);
         }
     } // for loop
 }
@@ -4929,25 +4941,54 @@ void dispWindow(String line, uint8_t mode, bool filter)
     {
         // powerWakeup();
         //  Serial.println(line);
+        // String src_call = line.substring(0, start_val);
+        // memset(&aprs, 0, sizeof(pbuf_t));
+        // aprs.buf_len = 300;
+        // aprs.packet_len = line.length();
+        // line.toCharArray(&aprs.data[0], aprs.packet_len);
+        // int start_info = line.indexOf(":", 0);
+        // int end_ssid = line.indexOf(",", 0);
+        // int start_dst = line.indexOf(">", 2);
+        // int start_dstssid = line.indexOf("-", start_dst);
+        // if ((end_ssid < 0) || (end_ssid > start_info))
+        //     end_ssid = start_info;
+        // if ((start_dstssid > start_dst) && (start_dstssid < start_dst + 10))
+        // {
+        //     aprs.dstcall_end_or_ssid = &aprs.data[start_dstssid];
+        // }
+        // else
+        // {
+        //     aprs.dstcall_end_or_ssid = &aprs.data[end_ssid];
+        // }
         String src_call = line.substring(0, start_val);
-        memset(&aprs, 0, sizeof(pbuf_t));
-        aprs.buf_len = 300;
-        aprs.packet_len = line.length();
-        line.toCharArray(&aprs.data[0], aprs.packet_len);
-        int start_info = line.indexOf(":", 0);
-        int end_ssid = line.indexOf(",", 0);
-        int start_dst = line.indexOf(">", 2);
-        int start_dstssid = line.indexOf("-", start_dst);
-        if ((end_ssid < 0) || (end_ssid > start_info))
-            end_ssid = start_info;
-        if ((start_dstssid > start_dst) && (start_dstssid < start_dst + 10))
-        {
-            aprs.dstcall_end_or_ssid = &aprs.data[start_dstssid];
-        }
-        else
-        {
-            aprs.dstcall_end_or_ssid = &aprs.data[end_ssid];
-        }
+				memset(&aprs, 0, sizeof(pbuf_t));
+				aprs.buf_len = 300;
+				aprs.packet_len = line.length();
+				line.toCharArray(&aprs.data[0], aprs.packet_len);
+				int start_info = line.indexOf(":", 0);
+				if(start_info<10) return;
+				int start_dst = line.lastIndexOf(">", start_info);
+				if(start_dst<5) return;
+				int end_ssid = line.indexOf(",", 10);
+				if(end_ssid>start_info || end_ssid<10) end_ssid=start_info;
+				
+				int start_dstssid = line.lastIndexOf("-",end_ssid);
+				if(start_dstssid<start_dst) start_dstssid=-1;
+				String path = "";
+
+				if ((end_ssid > start_dst) && (end_ssid < start_info))
+				{
+					path = line.substring(end_ssid + 1, start_info);
+				}
+
+				if (start_dstssid > start_dst)
+				{
+					aprs.dstcall_end_or_ssid = &aprs.data[start_dstssid+1];
+				}
+				else
+				{
+					aprs.dstcall_end_or_ssid = &aprs.data[end_ssid];
+				}
         aprs.info_start = &aprs.data[start_info + 1];
         aprs.dstname = &aprs.data[start_dst + 1];
         aprs.dstname_len = end_ssid - start_dst;

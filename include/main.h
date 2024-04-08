@@ -12,7 +12,7 @@
 #define MAIN_H
 
 #define VERSION "1.3"
-#define VERSION_BUILD ' '
+#define VERSION_BUILD 'a'
 
 #define WX
 
@@ -536,7 +536,7 @@ int digiProcess(AX25Msg &Packet);
 void printTime();
 int popTNC2Raw(int &ret);
 int pushTNC2Raw(int raw);
-int pkgListUpdate(char *call, char *raw, uint16_t type);
+int pkgListUpdate(char *call, char *raw,size_t len, uint16_t type, bool channel);
 pkgListType getPkgList(int idx);
 String myBeacon(String Path);
 int tlmList_Find(char *call);
