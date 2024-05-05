@@ -553,6 +553,7 @@ bool pkgTxUpdate(const char *info, int delay);
 void dispWindow(String line, uint8_t mode, bool filter);
 void dispTxWindow(txDisp txs);
 void systemDisp();
+void gpsDisp();
 void pkgCountDisp();
 void pkgLastDisp();
 void statisticsDisp();
