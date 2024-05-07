@@ -6066,15 +6066,11 @@ void gpsDisp()
 
     int x;
     String str;
-    time_t upTime = now() - systemUptime;
 
-    // display.fillRect(0, 16, 128, 10, WHITE);
-    // display.drawLine(0, 16, 0, 63, WHITE);
     display.fillRect(0, 0, 128, 15, WHITE);
 
     display.drawRect(0, 16, 128, 48, WHITE);
     display.fillRect(1, 17, 126, 46, BLACK);
-    // display.fillRoundRect(1, 17, 126, 46, 2, WHITE);
 
     display.setCursor(15, 7);
     display.setTextSize(1);
@@ -6109,20 +6105,19 @@ void gpsDisp()
     display.print(str);
 
     display.setCursor(3, 44);
-    display.print("WiFi RSSI:");
-    str = String(WiFi.RSSI()) + "dBm";
-    // str = String(str_status[WiFi.status()]);
+    display.print("Speed:");
+    str = String(gps.speed.kmph(), 0);
+    str += " km/h";
     x = str.length() * 6;
     display.setCursor(126 - x, 44);
     display.print(str);
 
     display.setCursor(3, 53);
-    display.print("CPU:");
-    str = "V" + String(VERSION);
+    display.print("Course:");
+    str = String(gps.course.deg(), 0);
     x = str.length() * 6;
     display.setCursor(126 - x, 53);
-    display.print(String((float)(temprature_sens_read() - 32) / 1.8F, 1));
-    //display.print(str);
+    display.print(str);
 
     display.display();
 }
